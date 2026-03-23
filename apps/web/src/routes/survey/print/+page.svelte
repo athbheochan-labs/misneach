@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { PUBLIC_SURVEY_QR_BASE_URL } from '$env/static/public';
+  import { env } from '$env/dynamic/public';
   import { onMount } from 'svelte';
   import { tick } from 'svelte';
 
@@ -25,7 +25,7 @@
   let printing: FormatKey | null = null;
 
   $: runtimeOrigin = browser ? window.location.origin : '';
-  $: qrBaseUrl = (PUBLIC_SURVEY_QR_BASE_URL || runtimeOrigin).replace(/\/$/, '');
+  $: qrBaseUrl = (env.PUBLIC_SURVEY_QR_BASE_URL || runtimeOrigin).replace(/\/$/, '');
   $: surveyUrl =
     campaignId && qrBaseUrl
       ? `${qrBaseUrl}/survey/${audience}/appetite?c=${encodeURIComponent(campaignId)}`
