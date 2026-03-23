@@ -1,0 +1,267 @@
+version: "3.9"
+
+name: misneach
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+
+services:
+  mariadb:
+    image: mariadb:11
+    restart: unless-stopped
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/mariadb.env
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.0
+    restart: unless-stopped
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/zookeeper.env
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/kafka.env
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+      - "29092:29092"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/kafka-ui.env
+    ports:
+      - "9095:8080"
+
+  translator:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-translator:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/translation/translation-connector
+    command: ["node", "dist/main"]
+    depends_on:
+      - kafka
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/translator.env
+    ports:
+      - "3009:3009"
+
+  nlp:
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-nlp:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "8300:8300"
+
+  lexicon:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-lexicon:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/lexicon
+    command: ["./entrypoint.sh"]
+    depends_on:
+      - kafka
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/lexicon.env
+    ports:
+      - "3010:3010"
+
+  phrasebook:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-phrasebook:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/phrasebook
+    command: ["./entrypoint.sh"]
+    depends_on:
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/phrasebook.env
+    ports:
+      - "3011:3011"
+
+  flashcards:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-flashcards:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/flashcards
+    command: ["./entrypoint.sh"]
+    depends_on:
+      - kafka
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/flashcards.env
+    ports:
+      - "3012:3012"
+
+  focus:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-focus:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/focus
+    command: ["node", "dist/main"]
+    depends_on:
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/focus.env
+    expose:
+      - "3013"
+
+  practice:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-practice:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/practice
+    command: ["./entrypoint.sh"]
+    depends_on:
+      - mariadb
+      - kafka
+      - phrasebook
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/practice.env
+    expose:
+      - "3014"
+
+  courses:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-courses:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/courses
+    command: ["./entrypoint.sh"]
+    depends_on:
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/courses.env
+    expose:
+      - "3015"
+
+  challenges:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-challenges:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/challenges
+    command: ["node", "dist/main"]
+    depends_on:
+      - mariadb
+      - courses
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/challenges.env
+    expose:
+      - "3016"
+
+  payment:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-payment:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/payment
+    command: ["node", "dist/main"]
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/payment.env
+    expose:
+      - "3017"
+
+  discounts:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-discounts:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/discounts
+    command: ["node", "dist/main"]
+    depends_on:
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/discounts.env
+    expose:
+      - "3020"
+
+  business:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-business:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/business
+    command: ["node", "dist/main"]
+    depends_on:
+      - payment
+      - discounts
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/business.env
+    expose:
+      - "3018"
+
+  waitlist:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-waitlist:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/waitlist
+    command: ["node", "dist/main"]
+    depends_on:
+      - mariadb
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/waitlist.env
+    expose:
+      - "3021"
+
+  client:
+    <<: *backend-common
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-client:${IMAGE_TAG:-latest}
+    working_dir: /usr/src/app/apps/client
+    command: ["node", "dist/main"]
+    depends_on:
+      - mariadb
+      - kafka
+      - flashcards
+      - focus
+      - practice
+      - courses
+      - challenges
+      - payment
+      - business
+      - discounts
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/client.env
+    ports:
+      - "8000:8000"
+
+  web:
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - business
+      - waitlist
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/web.env
+    ports:
+      - "5173:5173"
+
+  app-web:
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-app-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - client
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/app-web.env
+    ports:
+      - "5175:5175"
+
+  admin-web:
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-admin-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - client
+    env_file:
+      - ${ENV_DIR:-/opt/misneach/env}/admin-web.env
+    ports:
+      - "5174:5174"
+
+volumes:
+  mariadb_data:
+  redis_data:

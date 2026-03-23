@@ -1,0 +1,114 @@
+name: Deploy Router
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: read
+
+jobs:
+  resolve-deploy-plan:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_backend: ${{ steps.plan.outputs.deploy_backend }}
+      deploy_frontend: ${{ steps.plan.outputs.deploy_frontend }}
+      target_env: ${{ steps.plan.outputs.target_env }}
+      merge_sha: ${{ steps.plan.outputs.merge_sha }}
+      pr_number: ${{ steps.plan.outputs.pr_number }}
+    steps:
+      - name: Resolve merged PR metadata
+        id: plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commitSha = context.sha;
+
+            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: commitSha,
+            });
+
+            if (!prs.data.length) {
+              core.info("No PR associated with this commit. Skipping deploy routing.");
+              core.setOutput("deploy_backend", "false");
+              core.setOutput("deploy_frontend", "false");
+              core.setOutput("target_env", "staging");
+              core.setOutput("merge_sha", commitSha);
+              core.setOutput("pr_number", "");
+              return;
+            }
+
+            const pr = prs.data[0];
+            const labels = (pr.labels || []).map(l => l.name);
+
+            const has = (name) => labels.includes(name);
+            const deployNone = has("deploy:none");
+            const deployBoth = has("deploy:both");
+            const deployBackend = !deployNone && (deployBoth || has("deploy:backend"));
+            const deployFrontend = !deployNone && (deployBoth || has("deploy:frontend"));
+            const targetEnv = has("env:prod") ? "prod" : "staging";
+
+            core.info(`Routing from PR #${pr.number} labels: ${labels.join(", ")}`);
+            core.setOutput("deploy_backend", String(deployBackend));
+            core.setOutput("deploy_frontend", String(deployFrontend));
+            core.setOutput("target_env", targetEnv);
+            core.setOutput("merge_sha", commitSha);
+            core.setOutput("pr_number", String(pr.number));
+
+  trigger-backend-images:
+    needs: resolve-deploy-plan
+    if: needs.resolve-deploy-plan.outputs.deploy_backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch backend image publish workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: "backend-images-dockerhub.yml",
+              ref: "main",
+              inputs: { service: "all" },
+            });
+            core.info("Dispatched backend-images-dockerhub.yml with service=all");
+
+  signal-frontend-deploy:
+    needs: resolve-deploy-plan
+    if: needs.resolve-deploy-plan.outputs.deploy_frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emit repository dispatch for frontend pipeline
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            await github.rest.repos.createDispatchEvent({
+              owner,
+              repo,
+              event_type: "frontend_deploy_requested",
+              client_payload: {
+                sha: "${{ needs.resolve-deploy-plan.outputs.merge_sha }}",
+                environment: "${{ needs.resolve-deploy-plan.outputs.target_env }}",
+                source_pr: "${{ needs.resolve-deploy-plan.outputs.pr_number }}",
+              },
+            });
+            core.info("Emitted frontend_deploy_requested repository_dispatch event");
+
+  summary:
+    needs: resolve-deploy-plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print resolved plan
+        run: |
+          echo "PR: ${{ needs.resolve-deploy-plan.outputs.pr_number }}"
+          echo "SHA: ${{ needs.resolve-deploy-plan.outputs.merge_sha }}"
+          echo "Target env: ${{ needs.resolve-deploy-plan.outputs.target_env }}"
+          echo "Deploy backend: ${{ needs.resolve-deploy-plan.outputs.deploy_backend }}"
+          echo "Deploy frontend: ${{ needs.resolve-deploy-plan.outputs.deploy_frontend }}"

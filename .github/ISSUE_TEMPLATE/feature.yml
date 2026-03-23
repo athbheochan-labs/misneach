@@ -1,0 +1,73 @@
+name: Feature
+description: Product or platform feature work
+title: "[Feature] "
+labels: ["type:feature"]
+body:
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain
+      options:
+        - app
+        - web
+        - admin
+        - backend
+        - infra
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy_impact
+    attributes:
+      label: Deployment Impact
+      options:
+        - deploy:frontend
+        - deploy:backend
+        - deploy:both
+        - deploy:none
+    validations:
+      required: true
+
+  - type: dropdown
+    id: env_target
+    attributes:
+      label: Environment Target
+      options:
+        - env:staging
+        - env:prod
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      placeholder: What user/business problem are we solving?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      placeholder: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollout
+    attributes:
+      label: Rollout Plan
+      placeholder: Flags, migration steps, deployment order
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback Plan
+      placeholder: Exact rollback steps
+    validations:
+      required: true

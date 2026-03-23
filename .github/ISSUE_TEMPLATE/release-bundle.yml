@@ -1,0 +1,54 @@
+name: Release Bundle
+description: Parent issue for work that must ship together
+title: "[Release Bundle] "
+labels: ["type:chore"]
+body:
+  - type: input
+    id: release_name
+    attributes:
+      label: Release Name
+      placeholder: e.g. 2026-03-Platform-Hardening
+    validations:
+      required: true
+
+  - type: dropdown
+    id: env_target
+    attributes:
+      label: Target Environment
+      options:
+        - env:staging
+        - env:prod
+    validations:
+      required: true
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Blocking Child Issues
+      placeholder: |
+        - [ ] #123
+        - [ ] #124
+    validations:
+      required: true
+
+  - type: textarea
+    id: release_criteria
+    attributes:
+      label: Release Criteria
+      placeholder: What must be true to deploy this bundle?
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollout
+    attributes:
+      label: Rollout Plan
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback
+    attributes:
+      label: Rollback Plan
+    validations:
+      required: true
