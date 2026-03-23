@@ -122,8 +122,7 @@ jobs:
       - publish-shared-backend
     if: |
       (github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.service != 'nlp' &&
-        (github.event.inputs.service == 'all' || github.event.inputs.service == matrix.service)) ||
+        github.event.inputs.service != 'nlp') ||
       (github.event_name != 'workflow_dispatch' && needs.detect.outputs.backend == 'true')
     runs-on: ubuntu-latest
     strategy:
@@ -153,9 +152,17 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Pull shared runtime image
+        if: |
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == matrix.service
         run: docker pull ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }}
 
       - name: Tag and push service image
+        if: |
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.service == 'all' ||
+          github.event.inputs.service == matrix.service
         run: |
           docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:${{ github.sha }}
           docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:latest
