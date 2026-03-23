@@ -14,6 +14,7 @@ import {
   PracticeMistakesQueryDto,
   PracticeHistoryQueryDto,
   PracticeProgressQueryDto,
+  PhraseHealthQueryDto,
   ResetProfilesDto,
   SubmitPracticeAttemptDto,
 } from './practice.dto';
@@ -1097,6 +1098,111 @@ export class PracticeService {
           return [type, { ...stats, accuracy }];
         }),
       ),
+    };
+  }
+
+  async getPhraseHealth(clientId: string, query: PhraseHealthQueryDto) {
+    const limit = Math.max(1, Math.min(50, Number(query.limit || 5)));
+    const lookbackDays = Math.max(7, Math.min(365, Number(query.lookbackDays || 30)));
+    const now = new Date();
+    const since = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
+
+    const phrases = await this.getPhrases(clientId);
+    const resolvedPhrases = phrases
+      .map((phrase) => {
+        const pair = this.resolvePhrasePair(phrase);
+        if (!pair) return null;
+        return {
+          phraseId: phrase.id,
+          irish: pair.irish,
+          english: pair.english,
+        };
+      })
+      .filter(Boolean) as Array<{ phraseId: number; irish: string; english: string }>;
+
+    const attemptStatsRaw = await this.attemptRepo
+      .createQueryBuilder('attempt')
+      .select('attempt.phraseId', 'phraseId')
+      .addSelect('COUNT(*)', 'attempts')
+      .addSelect('SUM(CASE WHEN attempt.isCorrect = 1 THEN 1 ELSE 0 END)', 'correct')
+      .addSelect('MAX(attempt.createdAt)', 'lastAttemptAt')
+      .where('attempt.clientId = :clientId', { clientId })
+      .andWhere('attempt.createdAt >= :since', { since })
+      .groupBy('attempt.phraseId')
+      .getRawMany();
+
+    const dueByPhraseRaw = await this.profileRepo
+      .createQueryBuilder('profile')
+      .select('profile.phraseId', 'phraseId')
+      .addSelect('COUNT(*)', 'dueExercises')
+      .where('profile.clientId = :clientId', { clientId })
+      .andWhere('profile.dueAt <= :now', { now })
+      .groupBy('profile.phraseId')
+      .getRawMany();
+
+    const attemptStats = new Map<
+      number,
+      { attempts: number; correct: number; lastAttemptAt: Date | null }
+    >();
+    for (const row of attemptStatsRaw) {
+      const phraseId = Number(row.phraseId);
+      if (!Number.isFinite(phraseId)) continue;
+      const attempts = Number(row.attempts || 0);
+      const correct = Number(row.correct || 0);
+      const lastAttemptAt = row.lastAttemptAt ? new Date(row.lastAttemptAt) : null;
+      attemptStats.set(phraseId, { attempts, correct, lastAttemptAt });
+    }
+
+    const dueByPhrase = new Map<number, number>();
+    for (const row of dueByPhraseRaw) {
+      const phraseId = Number(row.phraseId);
+      if (!Number.isFinite(phraseId)) continue;
+      dueByPhrase.set(phraseId, Number(row.dueExercises || 0));
+    }
+
+    const scored = resolvedPhrases.map((phrase) => {
+      const stats = attemptStats.get(phrase.phraseId);
+      const attempts = stats?.attempts || 0;
+      const correct = stats?.correct || 0;
+      const dueExercises = dueByPhrase.get(phrase.phraseId) || 0;
+      const accuracyRaw = attempts > 0 ? (correct / attempts) * 100 : 0;
+      const accuracy = attempts > 0 ? Number(accuracyRaw.toFixed(2)) : 0;
+
+      const daysSinceLastAttempt = stats?.lastAttemptAt
+        ? Math.floor((now.getTime() - stats.lastAttemptAt.getTime()) / (24 * 60 * 60 * 1000))
+        : lookbackDays;
+
+      const baseline = attempts > 0 ? accuracy : 35;
+      const duePenalty = Math.min(30, dueExercises * 12);
+      const freshnessPenalty = Math.min(20, Math.floor(daysSinceLastAttempt / 7) * 4);
+      const consistencyBonus = attempts >= 8 ? 6 : attempts >= 4 ? 3 : 0;
+      const pct = Math.round(this.clamp(baseline - duePenalty - freshnessPenalty + consistencyBonus, 0, 100));
+
+      return {
+        phraseId: phrase.phraseId,
+        irish: phrase.irish,
+        english: phrase.english,
+        pct,
+        accuracy,
+        attempts,
+        dueExercises,
+        lastAttemptAt: stats?.lastAttemptAt || null,
+      };
+    });
+
+    scored.sort((a, b) => {
+      if (b.dueExercises !== a.dueExercises) return b.dueExercises - a.dueExercises;
+      if (a.pct !== b.pct) return a.pct - b.pct;
+      const aTime = a.lastAttemptAt ? a.lastAttemptAt.getTime() : 0;
+      const bTime = b.lastAttemptAt ? b.lastAttemptAt.getTime() : 0;
+      return aTime - bTime;
+    });
+
+    return {
+      rows: scored.slice(0, limit),
+      duePhraseCount: dueByPhrase.size,
+      lookedBackDays: lookbackDays,
+      generatedAt: now.toISOString(),
     };
   }
 

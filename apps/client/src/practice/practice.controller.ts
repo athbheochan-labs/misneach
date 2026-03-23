@@ -43,6 +43,15 @@ export class PracticeController {
     return this.practiceService.get('/practice/progress', clientId, query);
   }
 
+  @Get('phrase-health')
+  async getPhraseHealth(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    const clientId = await this.authService.getClientIdFromSession(req);
+    return this.practiceService.get('/practice/phrase-health', clientId, query);
+  }
+
   @Get('history')
   async getHistory(
     @Req() req: AuthenticatedRequest,

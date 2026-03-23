@@ -33,7 +33,7 @@ export class TranslationProducer {
       extraHeaders: options?.extraHeaders,
     };
 
-    // 3️⃣ Emit using the legacy translation contract expected by translator/ai-connector.
+    // 3️⃣ Emit using the legacy translation contract expected by translator.
     // This preserves compatibility with existing downstream consumers.
     const event = {
       requestId: dto.requestId,

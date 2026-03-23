@@ -82,3 +82,19 @@ export class GetDueCardsQueryDto {
   @Max(200)
   limit?: number;
 }
+
+export class GetFlashcardHealthQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(7)
+  @Max(365)
+  lookbackDays?: number;
+}

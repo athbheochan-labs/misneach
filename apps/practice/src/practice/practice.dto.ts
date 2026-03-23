@@ -105,6 +105,26 @@ export class PracticeMistakesQueryDto {
   limit?: number;
 }
 
+export class PhraseHealthQueryDto {
+  @IsOptional()
+  @IsString()
+  clientId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(7)
+  @Max(365)
+  lookbackDays?: number;
+}
+
 export class ResetProfilesDto {
   @IsOptional()
   @Type(() => Number)

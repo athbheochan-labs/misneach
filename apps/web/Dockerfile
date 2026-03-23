@@ -1,9 +1,12 @@
 FROM node:20-alpine
-WORKDIR /app
+WORKDIR /app/apps/web
 
-COPY package*.json ./
+COPY apps/web/package*.json ./
 RUN npm install
-COPY . ./
+COPY apps/web ./
+COPY libs/misneach-ui /app/libs/misneach-ui
+COPY content /app/content
+COPY apps/courses/src/content /app/apps/courses/src/content
 
 RUN npm run build
 

@@ -1,0 +1,65 @@
+# Dependencies and build output
+node_modules
+dist
+build
+.svelte-kit
+.next
+.nuxt
+coverage
+.nyc_output
+.cache
+
+# Logs
+logs
+*.log
+*.out
+*.trace
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+*.kubeconfig
+*.ovpn
+*.secret
+*.secrets
+*.credentials
+secrets/
+credentials/
+
+# Tests
+test/
+tests/
+__tests__/
+__mocks__/
+__snapshots__/
+
+# Temporary and editor files
+temp
+tmp
+.vscode
+.idea
+*.swp
+*.swo
+*.bak
+.DS_Store
+Thumbs.db
+
+# Version control
+.git
+.gitignore
+.gitattributes

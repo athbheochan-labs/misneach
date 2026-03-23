@@ -1,7 +1,6 @@
 import { Logger, LogLevel } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -15,27 +14,8 @@ async function bootstrap() {
 
   app.useLogger(logLevels);
 
-  // Load environment variables
-  const KAFKA_BROKER = configService.get<string>('KAFKA_BROKERS', 'kafka:9092');
-  const KAFKA_GROUP_ID = configService.get<string>(
-    'KAFKA_GROUP_ID',
-    'phrasebook-consumer',
-  );
   const PORT = configService.get<number>('PORT', 3011);
   const HOST = configService.get<string>('HOST', '0.0.0.0');
-
-  // Start Kafka microservice
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.KAFKA,
-    options: {
-      client: {
-        brokers: [KAFKA_BROKER],
-      },
-      consumer: {
-        groupId: KAFKA_GROUP_ID,
-      },
-    },
-  });
 
   app.enableCors({
     origin: configService.get<string>('CORS_ORIGIN', '*'),
@@ -47,7 +27,6 @@ async function bootstrap() {
     credentials: configService.get<boolean>('CORS_CREDENTIALS', true),
   });
 
-  await app.startAllMicroservices();
   await app.listen(PORT, HOST);
   Logger.log('✅ NestJS Application Started', 'Bootstrap');
 }

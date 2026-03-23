@@ -14,8 +14,11 @@ export class CoursesController {
   }
 
   @Get('catalog')
-  getCatalog(@Query('clientId') clientId: string) {
-    return this.coursesService.getCatalog(this.requireClientId(clientId));
+  getCatalog(
+    @Query('clientId') clientId: string,
+    @Query('previewToken') previewToken?: string,
+  ) {
+    return this.coursesService.getCatalog(this.requireClientId(clientId), previewToken);
   }
 
   @Get(':courseSlug/lessons/:lessonSlug')
@@ -23,8 +26,14 @@ export class CoursesController {
     @Query('clientId') clientId: string,
     @Param('courseSlug') courseSlug: string,
     @Param('lessonSlug') lessonSlug: string,
+    @Query('previewToken') previewToken?: string,
   ) {
-    return this.coursesService.getLesson(this.requireClientId(clientId), courseSlug, lessonSlug);
+    return this.coursesService.getLesson(
+      this.requireClientId(clientId),
+      courseSlug,
+      lessonSlug,
+      previewToken,
+    );
   }
 
   @Post(':courseSlug/lessons/:lessonSlug/progress')
@@ -33,8 +42,15 @@ export class CoursesController {
     @Param('courseSlug') courseSlug: string,
     @Param('lessonSlug') lessonSlug: string,
     @Body() body: CourseProgressUpdateDto,
+    @Query('previewToken') previewToken?: string,
   ) {
-    return this.coursesService.updateProgress(this.requireClientId(clientId), courseSlug, lessonSlug, body);
+    return this.coursesService.updateProgress(
+      this.requireClientId(clientId),
+      courseSlug,
+      lessonSlug,
+      body,
+      previewToken,
+    );
   }
 
   @Post(':courseSlug/lessons/:lessonSlug/lexicon-exposure')
@@ -43,12 +59,14 @@ export class CoursesController {
     @Param('courseSlug') courseSlug: string,
     @Param('lessonSlug') lessonSlug: string,
     @Body() body: CourseLexiconExposureDto,
+    @Query('previewToken') previewToken?: string,
   ) {
     return this.coursesService.recordLexiconExposure(
       this.requireClientId(clientId),
       courseSlug,
       lessonSlug,
       body,
+      previewToken,
     );
   }
 
@@ -58,7 +76,14 @@ export class CoursesController {
     @Param('courseSlug') courseSlug: string,
     @Param('lessonSlug') lessonSlug: string,
     @Body() body: CourseGlossLookupDto,
+    @Query('previewToken') previewToken?: string,
   ) {
-    return this.coursesService.lookupGloss(this.requireClientId(clientId), courseSlug, lessonSlug, body);
+    return this.coursesService.lookupGloss(
+      this.requireClientId(clientId),
+      courseSlug,
+      lessonSlug,
+      body,
+      previewToken,
+    );
   }
 }

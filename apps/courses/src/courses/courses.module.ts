@@ -1,13 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CourseLexiconEvent, CourseProgress } from './courses.entity';
+import { CoursesAdminController } from './courses.admin.controller';
+import {
+  AdminAuditLog,
+  CourseActiveRelease,
+  CourseDraft,
+  CourseLexiconEvent,
+  CourseProgress,
+  CourseRelease,
+  CourseReleaseLesson,
+  LessonDraft,
+} from './courses.entity';
 import { CoursesController } from './courses.controller';
 import { CoursesService } from './courses.service';
-import { CoursesKafkaService } from './courses.kafka.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CourseProgress, CourseLexiconEvent])],
-  controllers: [CoursesController],
-  providers: [CoursesService, CoursesKafkaService],
+  imports: [
+    TypeOrmModule.forFeature([
+      CourseProgress,
+      CourseLexiconEvent,
+      CourseDraft,
+      LessonDraft,
+      CourseRelease,
+      CourseReleaseLesson,
+      CourseActiveRelease,
+      AdminAuditLog,
+    ]),
+  ],
+  controllers: [CoursesController, CoursesAdminController],
+  providers: [CoursesService],
 })
 export class CoursesModule {}

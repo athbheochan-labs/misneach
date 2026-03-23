@@ -98,6 +98,16 @@ export class FlashcardsService {
     return this.parseResponse(res);
   }
 
+  async getHealth(clientId: string, limit: number = 5, lookbackDays: number = 30) {
+    const params = new URLSearchParams({
+      clientId,
+      limit: String(limit),
+      lookbackDays: String(lookbackDays),
+    });
+    const res = await fetch(`${this.flashcardsUrl}/health?${params.toString()}`);
+    return this.parseResponse(res);
+  }
+
   async recordAttempt(
     clientId: string,
     cardId: number,

@@ -1,19 +1,20 @@
 // src/phrasebook/phrasebook.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { Kafka, EachMessagePayload } from 'kafkajs';
+import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { UpdatePhraseDto } from './phrasebook.dto';
 import { AuthService } from 'src/auth/auth.service';
 import { AuthenticatedRequest } from 'src/auth/types/request';
-import { KafkaService } from 'src/utils/kafka/kafka.service';
 
 export interface PhrasebookStatement {
   id: string;
   text: string;
+  source?: string;
   translation?: string | null;
   pronunciation?: string | null;
   example?: string | null;
   notes?: string | null;
+  inPractice?: boolean;
+  inFlashcards?: boolean;
   tokens?: Array<{
     position: number;
     surface: string;
@@ -24,51 +25,13 @@ export interface PhrasebookStatement {
 
 @Injectable()
 export class PhrasebookService {
-  private readonly logger = new Logger(PhrasebookService.name);
-  private kafka: Kafka;
-  private consumer: any;
-  private phrasebookUrl = 'http://phrasebook:3011';
+  private phrasebookUrl = process.env.PHRASEBOOK_URL || 'http://phrasebook:3011';
 
   private sseClients: Array<{ clientId: string; res: any }> = [];
 
   constructor(
     private readonly authService: AuthService,
-    private readonly kafkaService: KafkaService,
-  ) {
-    this.kafka = new Kafka({
-      clientId: 'phrasebook-service',
-      brokers: ['kafka:9092'],
-    });
-    this.consumer = this.kafka.consumer({ groupId: 'phrasebook-sse-group' });
-  }
-
-  async onModuleInit() {
-    await this.consumer.connect();
-    await this.consumer.subscribe({ topic: 'phrasebook.events' });
-
-    await this.consumer.run({
-      eachMessage: async ({ topic, message }: EachMessagePayload) => {
-        if (!message.value) return;
-        try {
-          const payload = JSON.parse(message.value.toString());
-          const value =
-            payload && typeof payload === 'object' && 'value' in payload
-              ? payload.value
-              : payload;
-          const event =
-            typeof value === 'string' ? JSON.parse(value) : value;
-
-          const data = JSON.stringify(event);
-
-          this.sseClients
-            .filter((client) => client.clientId === event.clientId)
-            .forEach((client) => client.res.write(`data: ${data}\n\n`));
-        } catch (err) {
-          this.logger.error('Failed to process Kafka message', err);
-        }
-      },
-    });
-  }
+  ) {}
 
   // ---------------- SSE ----------------
 
@@ -95,9 +58,11 @@ export class PhrasebookService {
 
   broadcastUpdate(payload: any) {
     const data = JSON.stringify(payload);
-    this.sseClients.forEach((client) =>
-      client.res.write(`data: ${data}\n\n`),
-    );
+    this.sseClients
+      .filter((client) => client.clientId === payload?.clientId)
+      .forEach((client) =>
+        client.res.write(`data: ${data}\n\n`),
+      );
   }
 
   // ---------------- CRUD ----------------
@@ -122,21 +87,39 @@ export class PhrasebookService {
     const autoTranslation =
       typeof body?.autoTranslate === 'boolean' ? body.autoTranslate : undefined;
 
-    const payload: any = {
-      action: 'create',
+    const source =
+      typeof body?.source === 'string' && body.source.trim().length > 0
+        ? body.source.trim()
+        : 'own';
+
+    const res = await fetch(
+      `${this.phrasebookUrl}/phrases?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language,
+          source,
+          ...body,
+          ...(typeof autoTranslation === 'boolean' ? { autoTranslation } : {}),
+        }),
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Failed to create phrase');
+    }
+
+    const phrase = await res.json();
+    this.broadcastUpdate({
+      type: 'phrase.created',
       requestId,
       clientId,
-      data: {
-        language,
-        source: 'statement_created',
-        ...body,
-        ...(typeof autoTranslation === 'boolean' ? { autoTranslation } : {}),
-      },
-    };
-
-    await this.kafkaService.emit('phrasebook.commands', {
-      key: requestId,
-      value: payload,
+      phraseId: phrase?.id,
+      phrase,
+      status: 'completed',
+      timestamp: Date.now(),
     });
 
     return { accepted: true, requestId };
@@ -144,44 +127,89 @@ export class PhrasebookService {
 
   async updatePhrase(id: string, clientId: string, body: UpdatePhraseDto) {
     const requestId = randomUUID();
-    await this.kafkaService.emit('phrasebook.commands', {
-      key: requestId,
-      value: {
-        action: 'update',
-        requestId,
-        clientId,
-        phraseId: Number(id),
-        data: body,
-      },
+    const res = await fetch(`${this.phrasebookUrl}/phrases/${Number(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Failed to update phrase');
+    }
+
+    const phrase = await res.json();
+    this.broadcastUpdate({
+      type: 'phrase.updated',
+      requestId,
+      clientId,
+      phraseId: Number(id),
+      phrase,
+      status: 'completed',
+      timestamp: Date.now(),
+    });
+
     return { accepted: true, requestId };
   }
 
   async deletePhrase(id: string, clientId: string) {
     const requestId = randomUUID();
-    await this.kafkaService.emit('phrasebook.commands', {
-      key: requestId,
-      value: {
-        action: 'delete',
-        requestId,
-        clientId,
-        phraseId: Number(id),
-      },
+    const res = await fetch(`${this.phrasebookUrl}/phrases/${Number(id)}`, {
+      method: 'DELETE',
     });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Failed to delete phrase');
+    }
+
+    this.broadcastUpdate({
+      type: 'phrase.deleted',
+      requestId,
+      clientId,
+      phraseId: Number(id),
+      status: 'completed',
+      timestamp: Date.now(),
+    });
+
     return { accepted: true, requestId };
   }
 
   async generateTranslation(id: string, clientId: string) {
     const requestId = randomUUID();
-    await this.kafkaService.emit('phrasebook.commands', {
-      key: requestId,
-      value: {
-        action: 'translate',
-        requestId,
-        clientId,
-        phraseId: Number(id),
-      },
+
+    this.broadcastUpdate({
+      type: 'phrase.translation.requested',
+      requestId,
+      clientId,
+      phraseId: Number(id),
+      status: 'accepted',
+      timestamp: Date.now(),
     });
+
+    const res = await fetch(
+      `${this.phrasebookUrl}/phrases/${Number(id)}/translate?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+      },
+    );
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || 'Failed to generate phrase translation');
+    }
+
+    const phrase = await res.json();
+    this.broadcastUpdate({
+      type: 'phrase.translated',
+      requestId,
+      clientId,
+      phraseId: Number(id),
+      phrase,
+      status: 'completed',
+      timestamp: Date.now(),
+    });
+
     return { accepted: true, requestId };
   }
 }

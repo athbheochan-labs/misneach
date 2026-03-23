@@ -1,6 +1,3 @@
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-
 import {
   Body,
   Controller,
@@ -39,34 +36,22 @@ export class LexiconController {
     private readonly lexiconService: LexiconService,
   ) { }
 
-  /**
-   * Renders the full layout with the lexicon partial path injected.
-   */
-  @Get('/lexicon')
-  async getLexiconPage(@Res() res: Response) {
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    let layoutHtml = await readFile(layoutPath, 'utf-8');
+  private resolveLexiconBaseUrls(): string[] {
+    const configured = (process.env.LEXICON_INTERNAL_URL || '').trim();
+    const configuredList = (process.env.LEXICON_INTERNAL_URLS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
 
-    layoutHtml = layoutHtml.replace('{{PARTIAL_ROUTE}}', '/lexicon-partial');
-    return res.send(layoutHtml);
-  }
+    const candidates = [
+      configured,
+      ...configuredList,
+      'http://lexicon:3010',
+      'http://127.0.0.1:3010',
+      'http://localhost:3010',
+    ].filter(Boolean);
 
-  /**
-   * Returns the lexicon partial content to be injected into the layout.
-   */
-  @Get('/lexicon-partial')
-  async getLexionPagePartial(@Res() res: Response) {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'pages',
-      'dashboard',
-      'lexicon',
-      'lexicon.html',
-    );
-    return res.sendFile(partialPath);
+    return [...new Set(candidates)];
   }
 
   /**
@@ -75,14 +60,36 @@ export class LexiconController {
   @Get('/snapshot/:clientId')
   async getSnapshot(@Param('clientId') clientId: string, @Res() res: Response) {
     const user = await this.authService.findUserByClientId(clientId);
-    try {
-      // Call your existing endpoint (assuming same server)
-      const response = await fetch(
-        `http://lexicon:3010/snapshot/${clientId}/${user?.languageSettings?.[0]?.targetLanguage ?? 'ga'}`,
-      );
-      const data = await response.json();
+    const targetLanguage = user?.languageSettings?.[0]?.targetLanguage ?? 'ga';
+    const baseUrls = this.resolveLexiconBaseUrls();
 
-      return res.json(data);
+    try {
+      let lastError: Error | null = null;
+
+      for (const baseUrl of baseUrls) {
+        const url = `${baseUrl}/snapshot/${clientId}/${targetLanguage}`;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            const bodyText = await response.text().catch(() => '');
+            this.logger.warn(
+              `Snapshot upstream returned ${response.status} from ${url}${bodyText ? `: ${bodyText}` : ''}`,
+            );
+            continue;
+          }
+
+          const data = await response.json();
+          return res.json(data);
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          this.logger.warn(`Snapshot upstream request failed for ${url}: ${lastError.message}`);
+        }
+      }
+
+      return res.status(502).json({
+        error: 'Snapshot service unavailable',
+        attempted: baseUrls,
+      });
     } catch (err) {
       this.logger.error(`Failed to fetch snapshot ${clientId}`, err);
       return res.status(500).json({ error: 'Failed to fetch snapshot data' });

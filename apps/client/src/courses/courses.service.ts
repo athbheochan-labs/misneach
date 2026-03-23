@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
+type AdminForwardContext = {
+  userId: number;
+  clientId: string;
+  role: 'admin' | 'learner';
+};
+
 @Injectable()
 export class CoursesGatewayService {
   private readonly coursesUrl = process.env.COURSES_SERVICE_URL || 'http://courses:3015';
@@ -35,9 +41,11 @@ export class CoursesGatewayService {
     throw lastError;
   }
 
-  private buildUrl(path: string, clientId: string, query?: Record<string, string | undefined>) {
+  private buildUrl(path: string, clientId?: string, query?: Record<string, string | undefined>) {
     const url = new URL(`${this.coursesUrl}${path}`);
-    url.searchParams.set('clientId', clientId);
+    if (clientId) {
+      url.searchParams.set('clientId', clientId);
+    }
 
     if (query) {
       for (const [key, value] of Object.entries(query)) {
@@ -70,6 +78,81 @@ export class CoursesGatewayService {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: body == null ? undefined : JSON.stringify(body),
+      });
+    } catch (error) {
+      throw new Error(
+        `Courses service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return this.parseResponse(res);
+  }
+
+  private adminHeaders(context: AdminForwardContext, baseHeaders?: HeadersInit): Headers {
+    const headers = new Headers(baseHeaders || {});
+    headers.set('x-admin-user-id', String(context.userId));
+    headers.set('x-admin-client-id', context.clientId);
+    headers.set('x-admin-user-role', context.role);
+    if (process.env.INTERNAL_AUTH_SECRET) {
+      headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+    }
+    return headers;
+  }
+
+  async adminGet(
+    path: string,
+    context: AdminForwardContext,
+    query?: Record<string, string | undefined>,
+  ) {
+    let res: Response;
+    try {
+      res = await this.fetchWithRetry(this.buildUrl(path, undefined, query), {
+        headers: this.adminHeaders(context),
+      });
+    } catch (error) {
+      throw new Error(
+        `Courses service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return this.parseResponse(res);
+  }
+
+  async adminPost(
+    path: string,
+    context: AdminForwardContext,
+    body?: unknown,
+    query?: Record<string, string | undefined>,
+  ) {
+    let res: Response;
+    try {
+      res = await this.fetchWithRetry(this.buildUrl(path, undefined, query), {
+        method: 'POST',
+        headers: this.adminHeaders(context, {
+          'Content-Type': 'application/json',
+        }),
+        body: body == null ? undefined : JSON.stringify(body),
+      });
+    } catch (error) {
+      throw new Error(
+        `Courses service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return this.parseResponse(res);
+  }
+
+  async adminPut(
+    path: string,
+    context: AdminForwardContext,
+    body?: unknown,
+    query?: Record<string, string | undefined>,
+  ) {
+    let res: Response;
+    try {
+      res = await this.fetchWithRetry(this.buildUrl(path, undefined, query), {
+        method: 'PUT',
+        headers: this.adminHeaders(context, {
+          'Content-Type': 'application/json',
+        }),
         body: body == null ? undefined : JSON.stringify(body),
       });
     } catch (error) {

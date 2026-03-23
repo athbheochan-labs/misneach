@@ -81,6 +81,9 @@ export class AuthService {
   private resolveHeaderAuth(req: AuthenticatedRequest) {
     const clientId = this.getHeader(req, 'x-client-id');
     const userId = this.parseHeaderUserId(req);
+    const roleHeader = this.getHeader(req, 'x-user-role');
+    const role =
+      roleHeader === 'admin' || roleHeader === 'learner' ? roleHeader : undefined;
 
     if (!clientId && !userId) return null;
 
@@ -89,6 +92,7 @@ export class AuthService {
       userId,
       sessionId: this.getHeader(req, 'x-session-id'),
       email: this.getHeader(req, 'x-user-email'),
+      role,
     };
   }
 
@@ -103,29 +107,6 @@ export class AuthService {
     );
   }
 
-  async loadLoginPage(): Promise<string> {
-    const loginPath = join(__dirname, '..', '..', 'public', 'pages', 'auth', 'login.html');
-    return readFile(loginPath, 'utf-8');
-  }
-
-  async loadLayoutWithPartial(partialRoute: string): Promise<string> {
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    const layoutHtml = await readFile(layoutPath, 'utf-8');
-    return layoutHtml.replace('{{PARTIAL_ROUTE}}', partialRoute);
-  }
-
-  async loadPartial(relativePath: string): Promise<string> {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'pages',
-      relativePath,
-    );
-    return await readFile(partialPath, 'utf-8');
-  }
-
   async handleMagicLink(email: string): Promise<{ message: string }> {
     if (!email) {
       throw new Error('Email is required');
@@ -133,7 +114,12 @@ export class AuthService {
 
     let user = await this.userRepo.findOne({ where: { email } });
     if (!user) {
-      user = this.userRepo.create({ email, clientId: uuidv4() });
+      user = this.userRepo.create({
+        email,
+        clientId: uuidv4(),
+        role: 'learner',
+        hasCompletedSignup: false,
+      });
       await this.userRepo.save(user);
     } else if (!user.clientId) {
       user.clientId = uuidv4();

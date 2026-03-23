@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Param } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 import {
   Ctx,
   EventPattern,
@@ -106,5 +106,85 @@ export class LexiconController {
       snapshot,
       cefr,
     };
+  }
+
+  @Post('ingest/exposure')
+  async ingestExposure(
+    @Body()
+    body: {
+      requestId?: string;
+      clientId: string;
+      language?: string;
+      words?: string[];
+      interaction?: { type?: string; timestamp?: string | number };
+    },
+  ) {
+    const clientId = String(body?.clientId || '').trim();
+    const words = Array.isArray(body?.words)
+      ? body.words.map((word) => String(word || '').trim()).filter(Boolean)
+      : [];
+    const language = String(body?.language || 'ga').trim() || 'ga';
+
+    if (!clientId || words.length === 0) {
+      throw new BadRequestException('clientId and words are required');
+    }
+
+    await this.ingestService.ingestFromEvent({
+      requestId: body.requestId,
+      clientId,
+      language,
+      interaction: {
+        type: String(body?.interaction?.type || 'course_lexicon_exposure'),
+        timestamp: body?.interaction?.timestamp ?? Date.now(),
+      },
+      sentences: [
+        {
+          text: words.join(' '),
+          tokens: words.map((word) => ({
+            surface: word,
+            lemma: word,
+            pos: 'unknown',
+          })),
+        },
+      ],
+    });
+
+    return { ok: true, ingested: words.length };
+  }
+
+  @Post('ingest/nlp-complete')
+  async ingestNlpComplete(
+    @Body()
+    body: {
+      requestId?: string;
+      statementId?: number | string;
+      clientId: string;
+      language: string;
+      interaction?: { type?: string; timestamp?: string | number };
+      sentences?: Array<{
+        sentenceId?: string;
+        text: string;
+        tokens?: Array<{
+          surface: string;
+          lemma?: string;
+          pos?: string;
+          morph?: Record<string, unknown>;
+        }>;
+      }>;
+      changes?: {
+        text?: string;
+        translation?: string;
+        pronunciation?: string;
+        notes?: string;
+      };
+    },
+  ) {
+    const event = this.normalizeEventPayload(body);
+    if (!event) {
+      throw new BadRequestException('Invalid nlp-complete payload');
+    }
+
+    await this.ingestService.ingestFromEvent(event);
+    return { ok: true };
   }
 }

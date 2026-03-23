@@ -1,9 +1,7 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectConnection, InjectRepository } from '@nestjs/typeorm';
 import { Connection, Repository } from 'typeorm';
 
-import { ClientKafka } from '@nestjs/microservices';
-import { lastValueFrom } from 'rxjs';
 import { User, Word, WordForm } from 'src/bank/bank.entity';
 import { InteractionService } from 'src/interaction/interaction.service';
 import { Statement } from 'src/statement/statement.entity';
@@ -19,47 +17,6 @@ import {
   PreparedToken,
 } from './lexicon.ingest.types';
 
-function serializeStatement(statement: Statement) {
-  return {
-    id: statement.id,
-    requestId: statement.requestId,
-    text: statement.text,
-    meaning: statement.meaning,
-    translation: statement.translation,
-    pronunciation: statement.pronunciation,
-    example: statement.example,
-    notes: statement.notes,
-    tokens:
-      statement.tokens?.map((t) => ({
-        position: t.position,
-        surface: t.surface,
-        lemma: t.lemma,
-        pos: t.pos,
-      })) ?? [],
-    language: statement.language,
-    clientId: statement.clientId,
-  };
-}
-
-function serializePhrasebookTokens(
-  statement: Statement,
-  event: NlpCompleteEvent,
-) {
-  return {
-    requestId: event.requestId ?? statement.requestId,
-    statementId: event.statementId ?? null,
-    clientId: event.clientId,
-    language: event.language,
-    tokens:
-      statement.tokens?.map((token) => ({
-        position: token.position,
-        surface: token.surface,
-        lemma: token.lemma,
-        pos: token.pos,
-      })) ?? [],
-  };
-}
-
 /**
  * Service responsible for ingesting NLP-completed text into the lexicon.
  *
@@ -71,7 +28,7 @@ function serializePhrasebookTokens(
  * This service is deliberately stateless and driven entirely by events.
  */
 @Injectable()
-export class LexiconIngestService implements OnModuleInit {
+export class LexiconIngestService {
   private readonly logger = new Logger(LexiconIngestService.name);
 
   constructor(
@@ -83,12 +40,7 @@ export class LexiconIngestService implements OnModuleInit {
     private readonly profile: RedisProfileService,
     private readonly interactionService: InteractionService,
     private readonly statementService: StatementService,
-    @Inject('STATEMENT_PRODUCER') private readonly kafkaProducer: ClientKafka,
   ) { }
-
-  async onModuleInit() {
-    await this.kafkaProducer.connect();
-  }
 
   /**
    * Entry point for lexicon ingestion.
@@ -199,21 +151,8 @@ export class LexiconIngestService implements OnModuleInit {
         },
       );
 
-      await lastValueFrom(
-        this.kafkaProducer.emit(
-          event.interaction?.type === 'statement_created'
-            ? 'statement.created'
-            : 'statement.updated',
-          serializeStatement(statementWithTokens),
-        ),
-      );
-
-      await lastValueFrom(
-        this.kafkaProducer.emit(
-          'phrasebook.tokens',
-          serializePhrasebookTokens(statementWithTokens, event),
-        ),
-      );
+      // Kafka fan-out removed for NLP -> Lexicon pipeline.
+      void statementWithTokens;
     }
 
     // ---------------------------------------------------------------------------

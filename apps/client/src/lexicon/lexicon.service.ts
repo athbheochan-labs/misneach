@@ -4,7 +4,6 @@ import { ulid } from 'ulid';
 
 import { AuthService } from 'src/auth/auth.service';
 import { TranslationsService } from 'src/translations/translations.service';
-import { KafkaService } from 'src/utils/kafka/kafka.service';
 
 interface StatementEventInput {
   statementId?: string; // optional for new statements
@@ -25,10 +24,10 @@ interface StatementEventInput {
 @Injectable()
 export class LexiconService {
   private readonly logger = new Logger(LexiconService.name);
+  private readonly nlpUrl = process.env.NLP_SERVICE_URL || 'http://nlp:8300';
 
   constructor(
     @Inject('REDIS') private readonly redis: Redis,
-    private readonly kafka: KafkaService,
     private readonly translationsService: TranslationsService,
     private readonly authService: AuthService,
   ) { }
@@ -89,11 +88,15 @@ export class LexiconService {
           : Date.now(),
       },
     };
-
-    await this.kafka.emit('lexicon.import', {
-      key: payload.clientId,
-      value: enrichedPayload,
+    const response = await fetch(`${this.nlpUrl}/ingest/lexicon-import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(enrichedPayload),
     });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`NLP import failed (${response.status}): ${body || 'empty response'}`);
+    }
   }
 
   async handleStatementEvent(input: StatementEventInput) {
@@ -103,21 +106,25 @@ export class LexiconService {
     const requestId = ulid();
 
     const event = {
-      key: input.statementId || ulid(),
-      value: {
-        requestId,
-        statementId: input.statementId || ulid(),
-        clientId: input.clientId,
-        changes: input.changes,
-        language: user.languageSettings?.[0]?.targetLanguage ?? 'ga',
-        interaction: input.interaction,
-        type: isNew ? 'statement_created' : 'statement_updated',
-        autoTranslate: input.autoTranslate ?? false,
-        timestamp: Date.now(),
-      },
+      requestId,
+      statementId: input.statementId || null,
+      clientId: input.clientId,
+      changes: input.changes,
+      language: user.languageSettings?.[0]?.targetLanguage ?? 'ga',
+      interaction: input.interaction,
+      type: isNew ? 'statement_created' : 'statement_updated',
+      autoTranslate: input.autoTranslate ?? false,
+      timestamp: Date.now(),
     };
-
-    await this.kafka.emit('statement.events', event);
+    const response = await fetch(`${this.nlpUrl}/ingest/statement-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`NLP statement ingest failed (${response.status}): ${body || 'empty response'}`);
+    }
 
     // Optionally trigger translation if requested
     if (input.autoTranslate) {

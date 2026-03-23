@@ -31,6 +31,10 @@ export class FocusGatewayService {
     return url.toString();
   }
 
+  private adminUrl(path: string) {
+    return `${this.focusUrl}${path}`;
+  }
+
   async get(path: string, clientId: string, query?: Record<string, string | undefined>) {
     const res = await fetch(this.buildUrl(path, clientId, query));
     return this.parseResponse(res);
@@ -54,6 +58,19 @@ export class FocusGatewayService {
         'Content-Type': 'application/json',
       },
       body: body == null ? undefined : JSON.stringify(body),
+    });
+    return this.parseResponse(res);
+  }
+
+  async adminGet(path: string, headers?: HeadersInit) {
+    const merged = new Headers(headers || {});
+    if (process.env.INTERNAL_AUTH_SECRET) {
+      merged.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+    }
+
+    const res = await fetch(this.adminUrl(path), {
+      method: 'GET',
+      headers: merged,
     });
     return this.parseResponse(res);
   }

@@ -1,42 +1,31 @@
-FROM node:23.5.0
-
+FROM node:23.5.0 AS build
 WORKDIR /usr/src/app
 
-# --------------------------------------------------
-# 1. Copy root-level dependency manifests
-# --------------------------------------------------
 COPY package*.json ./
 COPY tsconfig.base.json ./
-
-# App + lib package.json files (needed for file: deps)
 COPY apps/phrasebook/package.json apps/phrasebook/
 COPY libs/messaging/package.json libs/messaging/
+RUN npm ci --workspace phrasebook --workspace @decyphr/messaging --include-workspace-root
 
-# Install dependencies (resolves file:../../libs/messaging)
-RUN npm install
-
-# --------------------------------------------------
-# 2. Copy source AFTER install (better caching)
-# --------------------------------------------------
 COPY apps/phrasebook apps/phrasebook
-COPY libs libs
+COPY libs/messaging libs/messaging
 
 RUN npm run build --workspace @decyphr/messaging
+RUN npm run build --workspace phrasebook
+RUN npm prune --omit=dev --workspaces --include-workspace-root
 
-# --------------------------------------------------
-# 3. Build the app
-# --------------------------------------------------
+FROM node:23.5.0-slim AS runtime
+WORKDIR /usr/src/app
+ENV NODE_ENV=production
+
+COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/apps/phrasebook/package.json ./apps/phrasebook/package.json
+COPY --from=build /usr/src/app/apps/phrasebook/dist ./apps/phrasebook/dist
+COPY --from=build /usr/src/app/apps/phrasebook/entrypoint.sh ./apps/phrasebook/entrypoint.sh
+COPY --from=build /usr/src/app/libs/messaging ./libs/messaging
+
 WORKDIR /usr/src/app/apps/phrasebook
-
-RUN npm run build
-
-# Optional cleanup
-# RUN rm -rf src
-
-# --------------------------------------------------
-# 4. Entrypoint
-# --------------------------------------------------
-COPY apps/phrasebook/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 CMD ["./entrypoint.sh"]

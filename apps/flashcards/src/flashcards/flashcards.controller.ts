@@ -14,6 +14,7 @@ import {
   CreateFlashcardDto,
   CreateFlashcardPackWithCardsDto,
   GetDueCardsQueryDto,
+  GetFlashcardHealthQueryDto,
   RecordAttemptDto,
 } from './flashcards.dto';
 import { FlashcardsService } from './flashcards.service';
@@ -89,6 +90,14 @@ export class FlashcardsController {
     @Query() query: GetDueCardsQueryDto,
   ) {
     return this.flashcardsService.getDueCards(clientId, query);
+  }
+
+  @Get('health')
+  getHealth(
+    @Query('clientId') clientId: string,
+    @Query() query: GetFlashcardHealthQueryDto,
+  ) {
+    return this.flashcardsService.getHealth(clientId, query);
   }
 
   @Post('cards/:cardId/attempt')

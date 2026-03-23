@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { FocusService } from './focus.service';
 import {
   AdjustFocusSessionDto,
@@ -11,6 +23,33 @@ import {
 @Controller()
 export class FocusController {
   constructor(private readonly service: FocusService) {}
+
+  private requireAdmin(req: Request) {
+    const expectedInternalSecret = process.env.INTERNAL_AUTH_SECRET;
+    if (expectedInternalSecret) {
+      const provided = req.headers['x-internal-auth'];
+      if (provided !== expectedInternalSecret) {
+        throw new ForbiddenException('Forbidden');
+      }
+    }
+
+    const role = req.headers['x-user-role'] ?? req.headers['x-admin-user-role'];
+    if (role !== 'admin') {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    const userIdRaw = req.headers['x-user-id'] ?? req.headers['x-admin-user-id'];
+    const userId = Number.parseInt(String(userIdRaw ?? ''), 10);
+    if (!Number.isFinite(userId)) {
+      throw new BadRequestException('Missing admin actor');
+    }
+  }
+
+  @Get('/admin/analytics/overview')
+  adminOverview(@Req() req: Request) {
+    this.requireAdmin(req);
+    return this.service.getAdminAnalyticsOverview();
+  }
 
   @Post('/focus/sessions')
   createSession(@Query('clientId') clientId: string, @Body() dto: CreateFocusSessionDto) {

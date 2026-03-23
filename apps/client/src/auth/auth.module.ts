@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MagicLink } from './entities/MagicLink';
 import { User } from './entities/User';
+import { AdminGuard } from './guards/admin.guard';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { User } from './entities/User';
     SettingsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService],
+  providers: [AuthService, AdminGuard],
+  exports: [AuthService, AdminGuard],
 })
 export class AuthModule { }

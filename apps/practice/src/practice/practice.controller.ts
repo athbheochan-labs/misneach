@@ -6,6 +6,7 @@ import {
   PracticeProgressQueryDto,
   ResetProfilesDto,
   SubmitPracticeAttemptDto,
+  PhraseHealthQueryDto,
 } from './practice.dto';
 import { PracticeService } from './practice.service';
 
@@ -37,6 +38,11 @@ export class PracticeController {
   @Get('progress')
   getProgress(@Query('clientId') clientId: string, @Query() query: PracticeProgressQueryDto) {
     return this.practiceService.getProgress(clientId, query);
+  }
+
+  @Get('phrase-health')
+  getPhraseHealth(@Query('clientId') clientId: string, @Query() query: PhraseHealthQueryDto) {
+    return this.practiceService.getPhraseHealth(clientId, query);
   }
 
   @Get('history')

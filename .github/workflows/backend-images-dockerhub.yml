@@ -1,0 +1,193 @@
+name: Backend Images (Docker Hub)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/backend-images-dockerhub.yml'
+      - 'docker/Dockerfile.backend'
+      - 'docker-compose.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - 'libs/**'
+      - 'apps/client/**'
+      - 'apps/translation/translation-connector/**'
+      - 'apps/lexicon/**'
+      - 'apps/phrasebook/**'
+      - 'apps/flashcards/**'
+      - 'apps/focus/**'
+      - 'apps/practice/**'
+      - 'apps/courses/**'
+      - 'apps/challenges/**'
+      - 'apps/payment/**'
+      - 'apps/discounts/**'
+      - 'apps/business/**'
+      - 'apps/waitlist/**'
+      - 'nlp/**'
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service image to build
+        required: true
+        type: choice
+        options:
+          - all
+          - translator
+          - lexicon
+          - phrasebook
+          - flashcards
+          - focus
+          - practice
+          - courses
+          - challenges
+          - payment
+          - discounts
+          - business
+          - waitlist
+          - client
+          - nlp
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      nlp: ${{ steps.filter.outputs.nlp }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'docker/Dockerfile.backend'
+              - 'docker-compose.yml'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.base.json'
+              - 'libs/**'
+              - 'apps/client/**'
+              - 'apps/translation/translation-connector/**'
+              - 'apps/lexicon/**'
+              - 'apps/phrasebook/**'
+              - 'apps/flashcards/**'
+              - 'apps/focus/**'
+              - 'apps/practice/**'
+              - 'apps/courses/**'
+              - 'apps/challenges/**'
+              - 'apps/payment/**'
+              - 'apps/discounts/**'
+              - 'apps/business/**'
+              - 'apps/waitlist/**'
+            nlp:
+              - 'nlp/**'
+
+  publish-shared-backend:
+    needs: detect
+    if: |
+      github.event_name == 'workflow_dispatch' || needs.detect.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push backend-runtime
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:latest
+
+  tag-backend-services:
+    needs:
+      - detect
+      - publish-shared-backend
+    if: |
+      (github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.service != 'nlp' &&
+        (github.event.inputs.service == 'all' || github.event.inputs.service == matrix.service)) ||
+      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.backend == 'true')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - translator
+          - lexicon
+          - phrasebook
+          - flashcards
+          - focus
+          - practice
+          - courses
+          - challenges
+          - payment
+          - discounts
+          - business
+          - waitlist
+          - client
+    env:
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull shared runtime image
+        run: docker pull ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }}
+
+      - name: Tag and push service image
+        run: |
+          docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:${{ github.sha }}
+          docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:latest
+          docker push ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:${{ github.sha }}
+          docker push ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:latest
+
+  publish-nlp:
+    needs: detect
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'nlp')) ||
+      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.nlp == 'true')
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push nlp
+        uses: docker/build-push-action@v6
+        with:
+          context: nlp
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/misneach-nlp:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/misneach-nlp:latest

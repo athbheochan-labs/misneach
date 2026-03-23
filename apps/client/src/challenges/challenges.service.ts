@@ -55,6 +55,10 @@ export class ChallengesService {
     return url.toString();
   }
 
+  private adminUrl(path: string) {
+    return `${this.challengesUrl}${path}`;
+  }
+
   async get(path: string, clientId: string, query?: Record<string, string | undefined>) {
     let res: Response;
     try {
@@ -82,6 +86,27 @@ export class ChallengesService {
         `Challenges service unreachable: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    return this.parseResponse(res);
+  }
+
+  async adminGet(path: string, headers?: HeadersInit) {
+    const merged = new Headers(headers || {});
+    if (process.env.INTERNAL_AUTH_SECRET) {
+      merged.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+    }
+
+    let res: Response;
+    try {
+      res = await this.fetchWithRetry(this.adminUrl(path), {
+        method: 'GET',
+        headers: merged,
+      });
+    } catch (error) {
+      throw new Error(
+        `Challenges service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
     return this.parseResponse(res);
   }
 }

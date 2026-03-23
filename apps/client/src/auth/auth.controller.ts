@@ -11,7 +11,6 @@ import {
   Res,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { SettingsService } from 'src/settings/settings.service';
 import { AUTH_COOKIE } from './auth.constants';
 import { AuthService } from './auth.service';
 import { AuthenticatedRequest } from './types/request';
@@ -22,53 +21,7 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly settingsService: SettingsService,
   ) { }
-
-  /**
-   * Serves the full login page (non-HTMX entry point).
-   */
-  @Get('login')
-  async getLogin(@Res() res: Response) {
-    this.logger.debug('Serving login page');
-    const html = await this.authService.loadLoginPage();
-    return res.send(html);
-  }
-
-  /**
-   * Serves the first-time login (language selection) page.
-   */
-  @Get('first-login')
-  async getFirstLogin(@Res() res: Response) {
-    this.logger.debug('Serving first-login page');
-    const html = await this.authService.loadPartial('auth/first-login.html');
-    return res.send(html);
-  }
-
-  /**
-   * Handles first-time login form submission.
-   * Persists user language preferences.
-   */
-  @Post('first-login')
-  async submitFirstLogin(
-    @Body() body: {
-      firstLanguage: string;
-      targetLanguage: string;
-      immersionLevel: 'normal' | 'full';
-    },
-    @Req() req: AuthenticatedRequest,
-    @Res() res: Response,
-  ) {
-    const user = await this.authService.getUserFromSession(req);
-    await this.settingsService.createUserLanguageSetting(
-      user,
-      body.firstLanguage || 'en',
-      body.targetLanguage || 'ga',
-      body.immersionLevel || 'normal',
-    );
-
-    return res.status(200).json({ redirect: '/dashboard' });
-  }
 
   /**
    * Sends a magic login link to the given email address.
@@ -118,6 +71,7 @@ export class AuthController {
           id: user.id,
           clientId: user.clientId,
           email: user.email,
+          role: user.role,
         };
       }
 
@@ -159,12 +113,14 @@ export class AuthController {
       body.email,
     );
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        clientId: user.clientId,
-      },
-    };
+        user: {
+          id: user.id,
+          email: user.email,
+          clientId: user.clientId,
+          role: user.role,
+          signupComplete: user.hasCompletedSignup,
+        },
+      };
   }
 
   /**
@@ -180,6 +136,8 @@ export class AuthController {
           id: user.id,
           clientId: user.clientId,
           email: user.email,
+          role: user.role,
+          signupComplete: user.hasCompletedSignup,
         },
       };
     } catch {

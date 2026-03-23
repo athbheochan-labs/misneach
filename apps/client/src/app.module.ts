@@ -1,18 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { join } from 'path';
-import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { MagicLink } from './auth/entities/MagicLink';
 import { User } from './auth/entities/User';
-import { BotsModule } from './bots/bots.module';
-import { ChatModule } from './chat/chat.module';
 import { ChallengesModule } from './challenges/challenges.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { I18nController } from './i18n/i18n.controller';
-import { I18nModule } from './i18n/i18n.module';
+import { AdminModule } from './admin/admin.module';
 import { LexiconModule } from './lexicon/lexicon.module';
 import { CoursesModule } from './courses/courses.module';
 import { PomodoroModule } from './pomodoro/pomodoro.module';
@@ -20,19 +13,18 @@ import { LanguageSetting } from './settings/entities/LanguageSetting';
 import { SettingsModule } from './settings/settings.module';
 import { TranslationsModule } from './translations/translations.module';
 import { UtilsModule } from './utils/utils.module';
-import { VaultModule } from './vault/vault.module';
 import { FlashcardsModule } from './flashcards/flashcards.module';
 import { PhrasebookModule } from './phrasebook/phrasebook.module';
 import { FocusModule } from './focus/focus.module';
 import { PracticeModule } from './practice/practice.module';
+import { BusinessModule } from './business/business.module';
+import { PaymentsModule } from './payments/payments.module';
+import { DiscountsModule } from './discounts/discounts.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
     }),
     TypeOrmModule.forRoot({
       type: 'mariadb',
@@ -44,24 +36,23 @@ import { PracticeModule } from './practice/practice.module';
       entities: [User, MagicLink, LanguageSetting],
       synchronize: true,
     }),
-    BotsModule,
-    I18nModule,
-    ChatModule,
     AuthModule,
     SettingsModule,
-    DashboardModule,
     UtilsModule,
     TranslationsModule,
     LexiconModule,
-    VaultModule,
     PomodoroModule,
     FlashcardsModule,
     PhrasebookModule,
     FocusModule,
     PracticeModule,
+    BusinessModule,
+    PaymentsModule,
+    DiscountsModule,
     CoursesModule,
     ChallengesModule,
+    AdminModule,
   ],
-  controllers: [AppController, I18nController],
+  controllers: [],
 })
-export class AppModule { }
+export class AppModule {}

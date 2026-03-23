@@ -1,6 +1,15 @@
 import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
-import { CourseLexiconEvent, CourseProgress } from './courses/courses.entity';
+import {
+  AdminAuditLog,
+  CourseActiveRelease,
+  CourseDraft,
+  CourseLexiconEvent,
+  CourseProgress,
+  CourseRelease,
+  CourseReleaseLesson,
+  LessonDraft,
+} from './courses/courses.entity';
 
 config();
 
@@ -19,6 +28,15 @@ export const AppDataSource = new DataSource({
   database,
   synchronize: false,
   logging: false,
-  entities: [CourseProgress, CourseLexiconEvent],
+  entities: [
+    CourseProgress,
+    CourseLexiconEvent,
+    CourseDraft,
+    LessonDraft,
+    CourseRelease,
+    CourseReleaseLesson,
+    CourseActiveRelease,
+    AdminAuditLog,
+  ],
   migrations: [__dirname + '/migrations/*{.js,.ts}'],
 });

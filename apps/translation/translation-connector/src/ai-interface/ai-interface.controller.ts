@@ -1,165 +1,12 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  Logger,
-  OnModuleInit,
-  Param,
-} from '@nestjs/common';
-import { ClientKafka, MessagePattern } from '@nestjs/microservices';
-import { lastValueFrom } from 'rxjs';
+import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
 import { AiInterfaceService } from './ai-interface.service';
 import { TranslationDto } from './dto/translation.dto';
 
-interface KafkaMessage<T> {
-  key: string;
-  value: T;
-}
-
-/**
- * Controller that handles translation-related requests and responses.
- * It communicates with Kafka and WebSocket gateway to send/receive translation data.
- */
 @Controller()
-export class AiInterfaceController implements OnModuleInit {
+export class AiInterfaceController {
   private readonly logger = new Logger(AiInterfaceController.name);
 
-  private extractKafkaValue<T>(payload: unknown): T | null {
-    let value: unknown = payload;
-
-    if (typeof value === 'object' && value !== null && 'value' in value) {
-      value = (value as { value: unknown }).value;
-    }
-
-    if (typeof value === 'string') {
-      try {
-        value = JSON.parse(value);
-      } catch {
-        return null;
-      }
-    }
-
-    if (typeof value === 'object' && value !== null && 'value' in value) {
-      const nested = (value as { value: unknown }).value;
-      if (typeof nested === 'string') {
-        try {
-          value = JSON.parse(nested);
-        } catch {
-          return null;
-        }
-      } else if (nested != null) {
-        value = nested;
-      }
-    }
-
-    if (typeof value !== 'object' || value === null) {
-      return null;
-    }
-
-    return value as T;
-  }
-
-  constructor(
-    private readonly service: AiInterfaceService,
-    @Inject('TRANSLATION') private readonly client: ClientKafka,
-  ) { }
-
-  /**
-   * Connects the Kafka client on module initialization.
-   * Logs success or failure.
-   */
-  async onModuleInit() {
-    try {
-      await this.client.connect();
-      this.logger.log('Kafka Client Connected');
-    } catch (error) {
-      this.logger.error('Kafka Client Connection Failed', error.stack);
-    }
-  }
-
-  /**
-   * Handles translation response messages from Kafka.
-   * Saves the translation and sends the response via WebSocket if the gateway is ready.
-   * Logs success or failure.
-   *
-   * @param response The translation response received from Kafka.
-   */
-  @MessagePattern('translation.complete')
-  async handleTranslationResponse(message: unknown) {
-    try {
-      this.logger.log(
-        `Received translation response: ${JSON.stringify(message)}`,
-      );
-
-      const value = this.extractKafkaValue<Record<string, any>>(message);
-
-      if (!value?.requestId) {
-        this.logger.error('Invalid Kafka message: Missing requestId');
-        return;
-      }
-
-      const record = {
-        requestId: value.requestId,
-        clientId: value.clientId,
-        sourceLanguage: value.sourceLanguage,
-        targetLanguage: value.targetLanguage,
-        originalText: value.originalText,
-        translated: value.translated,
-      };
-
-      // Store to database
-      const translation = await this.service.saveTranslation(record);
-
-      // Use the SAME key used since initial request
-      const key = record.requestId;
-
-      // Emit to KTable topic
-      await lastValueFrom(
-        this.client.emit('translation.response.table', {
-          key,
-          value: translation,
-        }),
-      );
-      this.logger.log('✅ Stored + emitted translation.response.table');
-    } catch (error) {
-      this.logger.error('Failed to handle translation response', error);
-    }
-  }
-
-  /**
-   * Handles translation request messages from Kafka.
-   * Emits a translation request to the AI service.
-   * Logs the request.
-   *
-   * @param translationRequest The translation request from Kafka.
-   */
-  @MessagePattern('translation.translate')
-  async translateText(message: unknown) {
-    const translationRequest = this.extractKafkaValue<TranslationDto>(message);
-    this.logger.log(
-      `Received translation request from Kafka: ${JSON.stringify(translationRequest)}`,
-    );
-
-    if (!translationRequest?.requestId) {
-      this.logger.error('Invalid translation request payload');
-      return;
-    }
-
-    try {
-      await lastValueFrom(
-        this.client.emit('ai.translation.request', {
-          key: translationRequest.requestId,
-          value: translationRequest,
-        }),
-      );
-
-      this.logger.log(
-        `Translation request emitted to AI service with key ${translationRequest.requestId}`,
-      );
-    } catch (error) {
-      this.logger.error('Failed to emit translation request', error.stack);
-    }
-  }
+  constructor(private readonly service: AiInterfaceService) {}
 
   @Get('translations/:clientId')
   async getTranslationsForClient(@Param('clientId') clientId: string) {
@@ -173,12 +20,17 @@ export class AiInterfaceController implements OnModuleInit {
     } catch (error) {
       this.logger.error(
         `Failed to fetch translations for client ${clientId}:`,
-        error.stack,
+        error?.stack,
       );
       return {
         success: false,
         message: 'Failed to fetch translations',
       };
     }
+  }
+
+  @Post('translations')
+  async translateViaHttp(@Body() dto: TranslationDto) {
+    return this.service.translateViaHttp(dto);
   }
 }

@@ -395,6 +395,76 @@ export class FocusService {
     };
   }
 
+  async getAdminAnalyticsOverview() {
+    const [goalCountsRaw, courseGoalsRaw, challengeGoalsRaw, clientsWithCourseGoalsRaw, entries30dRaw] =
+      await Promise.all([
+        this.goalRepo
+          .createQueryBuilder('g')
+          .select('COUNT(*)', 'totalGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'completed' THEN 1 ELSE 0 END)", 'completedGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END)", 'activeGoals')
+          .getRawOne<{ totalGoals: string; completedGoals: string; activeGoals: string }>(),
+        this.goalRepo
+          .createQueryBuilder('g')
+          .select('COUNT(*)', 'totalGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'completed' THEN 1 ELSE 0 END)", 'completedGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END)", 'activeGoals')
+          .where('g.activityType = :activityType', { activityType: 'course_material' })
+          .getRawOne<{ totalGoals: string; completedGoals: string; activeGoals: string }>(),
+        this.goalRepo
+          .createQueryBuilder('g')
+          .select('COUNT(*)', 'totalGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'completed' THEN 1 ELSE 0 END)", 'completedGoals')
+          .addSelect("SUM(CASE WHEN g.status = 'active' THEN 1 ELSE 0 END)", 'activeGoals')
+          .where('g.activityType = :activityType', { activityType: 'course_material' })
+          .andWhere('g.targetType = :targetType', { targetType: 'unit_count' })
+          .getRawOne<{ totalGoals: string; completedGoals: string; activeGoals: string }>(),
+        this.goalRepo
+          .createQueryBuilder('g')
+          .select('COUNT(DISTINCT g.clientId)', 'value')
+          .where('g.activityType = :activityType', { activityType: 'course_material' })
+          .getRawOne<{ value: string }>(),
+        this.goalEntryRepo
+          .createQueryBuilder('e')
+          .innerJoin(Goal, 'g', 'g.id = e.goalId')
+          .select('COUNT(*)', 'totalEntries')
+          .addSelect("SUM(CASE WHEN e.entryType = 'manual_checkoff' THEN 1 ELSE 0 END)", 'manualCheckoffs')
+          .addSelect(
+            "SUM(CASE WHEN e.entryType = 'focus_session' THEN 1 ELSE 0 END)",
+            'focusSessionEntries',
+          )
+          .where('g.activityType = :activityType', { activityType: 'course_material' })
+          .andWhere('e.occurredAt >= :fromDate', {
+            fromDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          })
+          .getRawOne<{ totalEntries: string; manualCheckoffs: string; focusSessionEntries: string }>(),
+      ]);
+
+    const toCountPayload = (row: { totalGoals?: string; completedGoals?: string; activeGoals?: string }) => {
+      const totalGoals = Number(row?.totalGoals || 0);
+      const completedGoals = Number(row?.completedGoals || 0);
+      const activeGoals = Number(row?.activeGoals || 0);
+      return {
+        totalGoals,
+        completedGoals,
+        activeGoals,
+        completionRate: totalGoals > 0 ? Number((completedGoals / totalGoals).toFixed(4)) : 0,
+      };
+    };
+
+    return {
+      goals: toCountPayload(goalCountsRaw || {}),
+      courseRelatedGoals: toCountPayload(courseGoalsRaw || {}),
+      realWorldChallengeGoals: toCountPayload(challengeGoalsRaw || {}),
+      learnersWithCourseGoals: Number(clientsWithCourseGoalsRaw?.value || 0),
+      courseGoalEntriesLast30Days: {
+        totalEntries: Number(entries30dRaw?.totalEntries || 0),
+        manualCheckoffs: Number(entries30dRaw?.manualCheckoffs || 0),
+        focusSessionEntries: Number(entries30dRaw?.focusSessionEntries || 0),
+      },
+    };
+  }
+
   private async getOwnedSession(clientId: string, id: string) {
     const session = await this.focusRepo.findOne({ where: { id, clientId } });
     if (!session) throw new NotFoundException('Session not found');

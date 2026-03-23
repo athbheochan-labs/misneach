@@ -25,8 +25,13 @@ export class PhraseTokenDto {
 
 // Data needed to create or update a phrase
 export class UpdatePhraseDto {
+  @IsOptional()
   @IsString()
-  text: string;
+  text?: string;
+
+  @IsOptional()
+  @IsString()
+  source?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -49,6 +54,14 @@ export class UpdatePhraseDto {
   notes?: string;
 
   @IsOptional()
+  @IsBoolean()
+  inPractice?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  inFlashcards?: boolean;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => PhraseTokenDto)
@@ -59,10 +72,13 @@ export class UpdatePhraseDto {
 export class PhrasebookStatementDto {
   id: number;
   text: string;
+  source: string;
   autoTranslation?: boolean;
   translation?: string | null;
   pronunciation?: string | null;
   example?: string | null;
   notes?: string | null;
+  inPractice: boolean;
+  inFlashcards: boolean;
   tokens?: PhraseTokenDto[];
 }

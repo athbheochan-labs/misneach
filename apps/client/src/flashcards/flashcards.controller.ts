@@ -7,11 +7,7 @@ import {
   Post,
   Query,
   Req,
-  Res,
 } from '@nestjs/common';
-import { Response } from 'express';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
 
 import { AuthService } from 'src/auth/auth.service';
 import { AuthenticatedRequest } from 'src/auth/types/request';
@@ -24,56 +20,6 @@ export class FlashcardsController {
     private readonly authService: AuthService,
     private readonly flashcardsService: FlashcardsService,
   ) {}
-
-  @Get()
-  async getFlashcardsPage(@Res() res: Response) {
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    let layoutHtml = await readFile(layoutPath, 'utf-8');
-
-    layoutHtml = layoutHtml.replace('{{PARTIAL_ROUTE}}', '/flashcards/partial');
-    return res.send(layoutHtml);
-  }
-
-  @Get('partial')
-  async getFlashcardsPartial(@Res() res: Response) {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'pages',
-      'dashboard',
-      'flashcards',
-      'flashcards.html',
-    );
-    return res.sendFile(partialPath);
-  }
-
-  @Get('study')
-  async getStudyPage(@Res() res: Response) {
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    let layoutHtml = await readFile(layoutPath, 'utf-8');
-
-    layoutHtml = layoutHtml.replace('{{PARTIAL_ROUTE}}', '/flashcards/study/partial');
-
-    return res.send(layoutHtml);
-  }
-
-  @Get('study/partial')
-  async getStudyPartial(@Res() res: Response) {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'pages',
-      'dashboard',
-      'flashcards',
-      'study.html',
-    );
-
-    return res.sendFile(partialPath);
-  }
 
   @Get('decks')
   async getDecks(@Req() req: AuthenticatedRequest) {
@@ -118,6 +64,20 @@ export class FlashcardsController {
       clientId,
       packId ? Number(packId) : undefined,
       limit ? Number(limit) : 20,
+    );
+  }
+
+  @Get('health')
+  async getHealth(
+    @Req() req: AuthenticatedRequest,
+    @Query('limit') limit?: string,
+    @Query('lookbackDays') lookbackDays?: string,
+  ) {
+    const clientId = await this.authService.getClientIdFromSession(req);
+    return this.flashcardsService.getHealth(
+      clientId,
+      limit ? Number(limit) : 5,
+      lookbackDays ? Number(lookbackDays) : 30,
     );
   }
 

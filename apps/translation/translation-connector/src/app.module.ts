@@ -5,9 +5,6 @@ import { AiInterfaceModule } from './ai-interface/ai-interface.module';
 import { Translation } from './ai-interface/translation.entity';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { VaultAttempt } from './vaults/vault-attempt.entity';
-import { VaultEntry } from './vaults/vault.entity';
-import { VaultsModule } from './vaults/vaults.module';
 
 @Module({
   imports: [
@@ -25,13 +22,12 @@ import { VaultsModule } from './vaults/vaults.module';
         password: configService.get('MARIA_DB_PASSWORD'),
         database: configService.get('MARIA_DB_DATABASE'),
         synchronize: true,
-        entities: [Translation, VaultEntry, VaultAttempt],
+        entities: [Translation],
       }),
     }),
     AiInterfaceModule,
-    VaultsModule
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

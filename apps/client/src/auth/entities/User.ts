@@ -34,6 +34,22 @@ export class User {
   clientId!: string;
 
   /**
+   * Role for access control.
+   * - learner: default product user
+   * - admin: backoffice operator
+   */
+  @Column({ type: 'enum', enum: ['learner', 'admin'], default: 'learner' })
+  role!: 'learner' | 'admin';
+
+  /**
+   * True once learner signup flow has been completed.
+   * Defaults to true for legacy users; newly created users can be set to false
+   * until they finish signup/payment.
+   */
+  @Column({ type: 'boolean', default: true })
+  hasCompletedSignup!: boolean;
+
+  /**
    * Timestamp of when the user account was created.
    * Automatically set when the user is first persisted.
    */

@@ -1,0 +1,24 @@
+{
+	"/": [
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/admin/analytics": [
+		"src/routes/+layout.server.ts"
+	],
+	"/admin/courses": [
+		"src/routes/+layout.server.ts"
+	],
+	"/admin/courses/[courseSlug]/[lessonSlug]": [
+		"src/routes/+layout.server.ts"
+	],
+	"/admin/dashboard": [
+		"src/routes/+layout.server.ts"
+	],
+	"/admin/discount-codes": [
+		"src/routes/+layout.server.ts"
+	],
+	"/api/admin/[...path]": [
+		"src/routes/api/admin/[...path]/+server.ts"
+	]
+}

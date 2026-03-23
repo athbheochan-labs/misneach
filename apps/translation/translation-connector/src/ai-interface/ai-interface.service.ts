@@ -1,35 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { MessagePattern } from '@nestjs/microservices';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SaveTranslationResult } from './dto/save-translation-result.dto';
 import { SaveTranslationDto } from './dto/save-translation.dto';
+import { TranslationDto } from './dto/translation.dto';
 import { Translation } from './translation.entity';
 
-/**
- * Service responsible for handling translations, saving them to the database,
- * and interacting with the AiInterfaceGateway for real-time communication.
- */
 @Injectable()
 export class AiInterfaceService {
-  private readonly logger = new Logger(AiInterfaceService.name);
-
   constructor(
     @InjectRepository(Translation)
     private readonly translationRepository: Repository<Translation>,
-  ) { }
+  ) {}
 
-  /**
-   * Saves a translation to the database.
-   *
-   * @param data The translation data to be saved.
-   * @returns A plain object representation of the saved translation.
-   */
   async saveTranslation(
     data: SaveTranslationDto,
   ): Promise<SaveTranslationResult> {
-    this.logger.log(`Saving translation for client: ${data.clientId}`);
-
     const translation = this.translationRepository.create({
       clientId: data.clientId,
       originalText: data.originalText,
@@ -49,51 +35,129 @@ export class AiInterfaceService {
     };
   }
 
-  /**
-   * Retrieves translations for a specific client from the database.
-   *
-   * @param clientId The client ID whose translations are to be retrieved.
-   * @returns A list of translations for the specified client.
-   */
-  async getTranslations(clientId: string) {
-    this.logger.log(`Fetching translations for client: ${clientId}`);
-
-    try {
-      const translations = await this.translationRepository.find({
-        where: { clientId },
-        order: { createdAt: 'DESC' },
-      });
-
-      this.logger.log(
-        `Translations fetched successfully for client: ${clientId}`,
-      );
-      return translations;
-    } catch (error) {
-      this.logger.error(
-        `Error fetching translations for client: ${clientId}`,
-        error.stack,
-      );
-      throw error;
-    }
+  private normalizeLang(lang: string): string {
+    return String(lang || '')
+      .trim()
+      .toUpperCase();
   }
 
-  /**
-   * Handles incoming translation responses and sends them via the AiInterfaceGateway.
-   *
-   * @param response The translation response received from an external service.
-   */
-  @MessagePattern('ai.translation.response')
-  async handleTranslationResponse(response: any) {
-    this.logger.log('Received translation response:', response);
-
-    // Ensure the response contains a valid clientId
-    if (!response.clientId) {
-      this.logger.error('❌ Response does not contain clientId:', response);
-      return;
+  private async translateWithDeepL(
+    text: string,
+    sourceLanguage: string,
+    targetLanguage: string,
+  ): Promise<string> {
+    const apiKey = process.env.DEEPL_API_KEY;
+    if (!apiKey) {
+      throw new Error('DEEPL_API_KEY is not configured');
     }
 
-    this.logger.log(
-      `Sending translation response to client: ${response.clientId}`,
+    const deeplUrl =
+      process.env.DEEPL_API_URL || 'https://api-free.deepl.com/v2/translate';
+
+    const body = new URLSearchParams({
+      auth_key: apiKey,
+      text,
+      source_lang: this.normalizeLang(sourceLanguage),
+      target_lang: this.normalizeLang(targetLanguage),
+    });
+
+    const response = await fetch(deeplUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'DeepL request failed');
+    }
+
+    const payload = (await response.json()) as {
+      translations?: Array<{ text?: string }>;
+    };
+
+    const translated = String(payload?.translations?.[0]?.text || '').trim();
+    if (!translated) {
+      throw new Error('DeepL returned an empty translation');
+    }
+
+    return translated;
+  }
+
+  async translateViaHttp(dto: TranslationDto) {
+    const translated = await this.translateWithDeepL(
+      dto.text,
+      dto.sourceLanguage,
+      dto.targetLanguage,
     );
+
+    const saved = await this.saveTranslation({
+      requestId: dto.requestId,
+      clientId: dto.clientId,
+      targetLanguage: dto.targetLanguage,
+      originalText: dto.text,
+      translated,
+    });
+
+    await this.postNlpTranslationComplete({
+      requestId: dto.requestId,
+      clientId: dto.clientId,
+      sourceLanguage: dto.sourceLanguage,
+      targetLanguage: dto.targetLanguage,
+      originalText: dto.text,
+      translated,
+      interaction: dto.interaction,
+    });
+
+    return {
+      ...saved,
+      requestId: dto.requestId,
+      sourceLanguage: dto.sourceLanguage,
+      targetLanguage: dto.targetLanguage,
+    };
+  }
+
+  async getTranslations(clientId: string) {
+    return this.translationRepository.find({
+      where: { clientId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  private async postNlpTranslationComplete(payload: {
+    requestId?: string;
+    clientId: string;
+    sourceLanguage: string;
+    targetLanguage: string;
+    originalText: string;
+    translated: string;
+    interaction?: { type: string; timestamp: number };
+  }) {
+    const nlpUrl = process.env.NLP_URL || 'http://nlp:8300';
+    const response = await fetch(`${nlpUrl}/ingest/translation-complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requestId: payload.requestId || `${Date.now()}`,
+        clientId: payload.clientId,
+        sourceLanguage: payload.sourceLanguage,
+        targetLanguage: payload.targetLanguage,
+        originalText: payload.originalText,
+        translated: payload.translated,
+        interaction: payload.interaction ?? {
+          type: 'translate_text',
+          timestamp: Date.now(),
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || 'Failed to post translation payload to NLP');
+    }
   }
 }

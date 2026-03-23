@@ -316,4 +316,73 @@ export class ChallengesService {
 
     return this.serialize(row);
   }
+
+  async adminOverview() {
+    const [summaryRaw, clientsRaw, lessonsRaw] = await Promise.all([
+      this.challengeRepo
+        .createQueryBuilder('c')
+        .select('COUNT(*)', 'totalChallenges')
+        .addSelect("SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END)", 'completedChallenges')
+        .addSelect("SUM(CASE WHEN c.status = 'active' THEN 1 ELSE 0 END)", 'activeChallenges')
+        .getRawOne<{ totalChallenges: string; completedChallenges: string; activeChallenges: string }>(),
+      this.challengeRepo
+        .createQueryBuilder('c')
+        .select('COUNT(DISTINCT c.clientId)', 'totalClients')
+        .addSelect(
+          "COUNT(DISTINCT CASE WHEN c.status = 'completed' THEN c.clientId END)",
+          'clientsWithCompletion',
+        )
+        .getRawOne<{ totalClients: string; clientsWithCompletion: string }>(),
+      this.challengeRepo
+        .createQueryBuilder('c')
+        .select('c.sourceCourseSlug', 'courseSlug')
+        .addSelect('c.sourceLessonSlug', 'lessonSlug')
+        .addSelect('MAX(c.sourceLessonTitle)', 'lessonTitle')
+        .addSelect('COUNT(*)', 'total')
+        .addSelect("SUM(CASE WHEN c.status = 'completed' THEN 1 ELSE 0 END)", 'completed')
+        .where('c.sourceLessonSlug IS NOT NULL')
+        .groupBy('c.sourceCourseSlug')
+        .addGroupBy('c.sourceLessonSlug')
+        .getRawMany<{
+          courseSlug: string | null;
+          lessonSlug: string | null;
+          lessonTitle: string | null;
+          total: string;
+          completed: string;
+        }>(),
+    ]);
+
+    const totalChallenges = Number(summaryRaw?.totalChallenges || 0);
+    const completedChallenges = Number(summaryRaw?.completedChallenges || 0);
+    const activeChallenges = Number(summaryRaw?.activeChallenges || 0);
+
+    const byLesson = lessonsRaw
+      .map((row) => {
+        const total = Number(row.total || 0);
+        const completed = Number(row.completed || 0);
+        return {
+          courseSlug: row.courseSlug,
+          lessonSlug: row.lessonSlug,
+          lessonTitle: row.lessonTitle || row.lessonSlug || 'Unknown lesson',
+          total,
+          completed,
+          completionRate: total > 0 ? Number((completed / total).toFixed(4)) : 0,
+        };
+      })
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        return a.completionRate - b.completionRate;
+      })
+      .slice(0, 10);
+
+    return {
+      totalChallenges,
+      completedChallenges,
+      activeChallenges,
+      completionRate: totalChallenges > 0 ? Number((completedChallenges / totalChallenges).toFixed(4)) : 0,
+      learnersWithChallenges: Number(clientsRaw?.totalClients || 0),
+      learnersWithCompletion: Number(clientsRaw?.clientsWithCompletion || 0),
+      byLesson,
+    };
+  }
 }

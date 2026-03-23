@@ -64,6 +64,12 @@ export class Phrase {
   @Column({ type: 'varchar', length: 4000, nullable: true })
   notes?: string;
 
+  @Column({ type: 'boolean', default: false })
+  inPractice: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  inFlashcards: boolean;
+
   @OneToMany(() => PhraseToken, (token) => token.phrase)
   tokens: PhraseToken[];
 

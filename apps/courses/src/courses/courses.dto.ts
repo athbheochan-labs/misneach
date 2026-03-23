@@ -8,6 +8,7 @@ import {
   IsNotEmpty,
   IsObject,
   IsOptional,
+  IsPositive,
   IsString,
   Max,
   Min,
@@ -92,4 +93,110 @@ export class CourseGlossLookupDto {
   @IsOptional()
   @IsString()
   blockId?: string;
+}
+
+export class AdminCourseLessonDraftUpdateDto {
+  @IsOptional()
+  @IsString()
+  courseTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  courseLang?: string;
+
+  @IsOptional()
+  @IsString()
+  courseSummary?: string;
+
+  @IsOptional()
+  @IsString()
+  lessonTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  moduleKey?: string;
+
+  @IsOptional()
+  @IsString()
+  moduleName?: string;
+
+  @IsOptional()
+  @IsString()
+  unitKey?: string;
+
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @IsOptional()
+  @IsString()
+  group?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  order?: number;
+
+  @IsOptional()
+  @IsString()
+  lang?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsPositive()
+  estimatedMinutes?: number;
+
+  @IsOptional()
+  @IsString()
+  summary?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  resumeBlocks?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  lexicon_include?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  lexicon_exclude?: string[];
+
+  @IsOptional()
+  @IsArray()
+  tokenGlosses?: Record<string, unknown>[];
+
+  @IsOptional()
+  @IsObject()
+  pedagogy?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  markdown?: string;
+}
+
+export class AdminPreviewTokenRequestDto {
+  @IsOptional()
+  @IsString()
+  releaseId?: string;
+}
+
+export class AdminPublishReleaseRequestDto {
+  @IsOptional()
+  @IsString()
+  releaseId?: string;
+
+  @IsOptional()
+  @IsString()
+  label?: string;
 }

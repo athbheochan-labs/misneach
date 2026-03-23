@@ -1,23 +1,22 @@
-FROM node:23.5.0
+FROM node:23.5.0 AS build
 WORKDIR /usr/src/app
 
-# Copy package.json and tsconfig files
 COPY package*.json tsconfig*.json ./
+RUN npm ci
 
-# Copy source code
 COPY . .
-
-# Install all dependencies including dev (for build)
-RUN npm install
-
-# Build TypeScript
 RUN npm run build
+RUN npm prune --omit=dev
 
-# Remove src if you want (optional)
-# RUN rm -r src
+FROM node:23.5.0-slim AS runtime
+WORKDIR /usr/src/app
+ENV NODE_ENV=production
 
-# Entrypoint
-COPY entrypoint.sh .
+COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/node_modules ./node_modules
+COPY --from=build /usr/src/app/dist ./dist
+COPY --from=build /usr/src/app/entrypoint.sh ./entrypoint.sh
+
 RUN chmod +x entrypoint.sh
 
 CMD ["./entrypoint.sh"]

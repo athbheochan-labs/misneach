@@ -7,5 +7,6 @@ import { FocusGatewayService } from './focus.service';
   imports: [AuthModule],
   controllers: [FocusController],
   providers: [FocusGatewayService],
+  exports: [FocusGatewayService],
 })
 export class FocusModule {}

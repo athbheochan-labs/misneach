@@ -1,6 +1,3 @@
-import { readFile } from 'fs/promises';
-import { join } from 'path';
-
 import {
   Body,
   Controller,
@@ -30,36 +27,6 @@ export class PhrasebookController {
   async stream(@Res() res: Response, @Req() req: AuthenticatedRequest) {
     const clientId = await this.authService.getClientIdFromSession(req);
     this.phrasebookService.registerSseClient(clientId, res);
-  }
-
-  /**
-   * Serves the full layout and injects the phrasebook partial route.
-   */
-  @Get()
-  async getPhrasebookPage(@Res() res: Response) {
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    let layoutHtml = await readFile(layoutPath, 'utf-8');
-
-    layoutHtml = layoutHtml.replace('{{PARTIAL_ROUTE}}', '/phrasebook/partial');
-    return res.send(layoutHtml);
-  }
-
-  /**
-   * Returns the phrasebook partial to be injected into the layout.
-   */
-  @Get('partial')
-  async getPhrasebookPartial(@Res() res: Response) {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public',
-      'pages',
-      'dashboard',
-      'phrasebook',
-      'phrasebook.html',
-    );
-    return res.sendFile(partialPath);
   }
 
   // ---------------- Read ----------------

@@ -50,6 +50,24 @@ lerna-debug.log*
 !.env.example
 !**/.env.example
 docker/env
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+*.kubeconfig
+*.ovpn
+*.secret
+*.secrets
+*.credentials
+**/secrets
+**/secrets/**
+**/credentials
+**/credentials/**
 
 # Local virtual environments
 .venv

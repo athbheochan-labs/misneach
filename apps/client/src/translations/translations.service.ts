@@ -1,13 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Response } from 'express';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
 import { Observable, Subject } from 'rxjs';
 import { ulid } from 'ulid';
 
 import { AuthService } from 'src/auth/auth.service';
-import { KafkaService } from 'src/utils/kafka/kafka.service';
-import { KTableService } from 'src/utils/kafka/ktable.service';
 import { TranslationDto } from './dtos/translation.dto';
 
 export interface InteractionEvent<T> {
@@ -27,41 +22,23 @@ export interface Interaction {
 @Injectable()
 export class TranslationsService {
   private readonly logger = new Logger(TranslationsService.name);
-  private joinCache = new Map<string, any>();
+  private readonly joinCache = new Map<string, any>();
+  private readonly sseStreams = new Map<string, Subject<MessageEvent>>();
 
-  constructor(
-    private readonly ktableService: KTableService,
-    private readonly authService: AuthService,
-    private readonly kafkaService: KafkaService,
-  ) { }
+  constructor(private readonly authService: AuthService) {}
 
   async initKTableWatchers() {
-    await this.ktableService.watchTable('translation.response.table');
-    await this.ktableService.watchTable('nlp.complete');
-  }
-
-  renderLayout(partialPath: string, res: Response) {
-    // read layout and inject partial route
-    const layoutPath = join(__dirname, '..', '..', 'public', 'layout.html');
-    return readFile(layoutPath, 'utf8').then((layout) => {
-      res.send(layout.replace('{{PARTIAL_ROUTE}}', partialPath));
-    });
-  }
-
-  sendPartial(res: Response) {
-    const partialPath = join(
-      __dirname,
-      '..',
-      '..',
-      'public/pages/dashboard/translations/translations.html',
-    );
-    return res.sendFile(partialPath);
+    // Kafka KTable path removed for translations.
   }
 
   async submitTranslation(dto: TranslationDto) {
     const requestId = dto.requestId ?? ulid();
-    await this.emitTranslationRequest({ ...dto, requestId });
-    return { status: 'ok' };
+    const response = await this.emitTranslationRequest({ ...dto, requestId });
+    return {
+      status: 'ok',
+      requestId,
+      translation: response,
+    };
   }
 
   async getClientTranslations(clientId: string) {
@@ -70,124 +47,90 @@ export class TranslationsService {
   }
 
   getSSEStream(clientId: string): Observable<MessageEvent> {
-    this.logger.log(`📡 SSE connection opened for clientId=${clientId}`);
-
-    const subject = new Subject<MessageEvent>();
-
-    // ---- translation events
-    this.ktableService.onUpdate(
-      'translation.response.table',
-      (requestId, translation) => {
-        // Merge into cache
-        const existing = this.joinCache.get(requestId) || {};
-        this.joinCache.set(requestId, { ...existing, translation });
-
-        // Only emit if this translation belongs to this client
-        if (translation?.clientId === clientId) {
-          subject.next({ data: { ...this.joinCache.get(requestId) } } as any);
-        }
-      },
-    );
-
-    // ---- NLP events
-    this.ktableService.onUpdate('nlp.complete', (requestId, nlp) => {
-      const existing = this.joinCache.get(requestId) || {};
-      this.joinCache.set(requestId, { ...existing, nlp });
-
-      // Emit only if the cached request belongs to this client
-      const cached = this.joinCache.get(requestId);
-      const ownerClientId = cached?.translation?.clientId;
-      if (ownerClientId === clientId) {
-        subject.next({ data: cached } as any);
-      }
-    });
-
-    // optional: keep-alive ping, cleanup, etc.
-    return subject.asObservable();
+    this.logger.log(`SSE connection opened for clientId=${clientId}`);
+    return this.getClientStream(clientId).asObservable();
   }
 
-  private normalizePayload(raw: any) {
-    const id =
-      raw.id ||
-      raw.requestId ||
-      `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    const originalText =
-      raw.originalText ||
-      raw.sentences?.map((s: any) => s.text).join(' ') ||
-      '';
-    const translated = raw.translated || ''; // <- correct property name
-    const createdAt = raw.createdAt || new Date().toISOString();
-    const language = raw.language || 'ga';
-    const sentences = Array.isArray(raw.sentences)
-      ? raw.sentences.map((s) => ({
-        ...s,
-        tokens: Array.isArray(s.tokens) ? s.tokens : [],
-      }))
-      : [];
-    const flatTokens = sentences.flatMap((s) => s.tokens);
-    const loading = translated === '';
+  private getClientStream(clientId: string): Subject<MessageEvent> {
+    const existing = this.sseStreams.get(clientId);
+    if (existing) return existing;
 
-    return {
-      id,
-      originalText,
-      translated,
-      createdAt,
-      language,
-      sentences,
-      flatTokens,
-      loading,
-    };
+    const stream = new Subject<MessageEvent>();
+    this.sseStreams.set(clientId, stream);
+    return stream;
   }
 
-  async emitTranslationRequest(dto: TranslationDto): Promise<void> {
+  private publishClientEvent(clientId: string, payload: any) {
+    const stream = this.getClientStream(clientId);
+    stream.next({ data: payload } as any);
+  }
+
+  private mergeAndPublish(requestId: string, payload: any) {
+    const existing = this.joinCache.get(requestId) || {};
+    const merged = { ...existing, ...payload };
+    this.joinCache.set(requestId, merged);
+
+    const ownerClientId = merged?.translation?.clientId;
+    if (ownerClientId) {
+      this.publishClientEvent(ownerClientId, merged);
+    }
+  }
+
+  async emitTranslationRequest(dto: TranslationDto): Promise<any> {
     const user = await this.authService.findUserByClientId(dto.clientId);
     const sourceLanguage = user?.languageSettings?.[0]?.targetLanguage ?? 'ga';
     const targetLanguage = user?.languageSettings?.[0]?.firstLanguage ?? 'en';
+    const requestId = dto.requestId ?? ulid();
 
-    const event = {
-      requestId: dto.requestId,
-      clientId: dto.clientId,
-      sourceLanguage,
-      targetLanguage,
-      statementId: dto.statementId,
+    this.mergeAndPublish(requestId, {
+      translation: {
+        id: requestId,
+        requestId,
+        clientId: dto.clientId,
+        sourceLanguage,
+        targetLanguage,
+        originalText: dto.text,
+        translated: '',
+        createdAt: new Date().toISOString(),
+      },
+    });
 
-      interactions: [
-        {
+    const translatorUrl = process.env.TRANSLATOR_URL || 'http://translator:3009';
+    const response = await fetch(`${translatorUrl}/translations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId,
+        clientId: dto.clientId,
+        sourceLanguage,
+        targetLanguage,
+        text: dto.text,
+        interaction: {
           type: 'translate_text',
           timestamp: Date.now(),
         },
-      ],
+        statementId: dto.statementId ? Number(dto.statementId) : undefined,
+      }),
+    });
 
-      payload: {
-        text: dto.text,
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || 'Translation request failed');
+    }
+
+    const translation = await response.json();
+
+    this.mergeAndPublish(requestId, {
+      translation: {
+        ...translation,
+        requestId,
       },
-    };
-
-    await this.kafkaService.emit('translation.translate', {
-      key: dto.requestId,
-      value: event,
     });
+
     this.logger.log(
-      `📤 Emitted translation request for clientId=${dto.clientId}`,
+      `Submitted translation request via REST for clientId=${dto.clientId}`,
     );
-  }
 
-  async createVault(text: string, lang: string, clientId: string) {
-    const res = await fetch(process.env.TRANSLATOR_URL + '/vault/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, lang, clientId }),
-    });
-
-    const data = await res.json();
-    console.log(data);
-    return data.vaultId;
-  }
-
-  async getVaultList(clientId: string) {
-    const url = new URL(process.env.TRANSLATOR_URL + '/vault/list');
-    url.searchParams.set('clientId', clientId);
-    const res = await fetch(url.toString());
-    return res.json();
+    return translation;
   }
 }

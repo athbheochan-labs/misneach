@@ -14,6 +14,7 @@ import {
   CreateFlashcardPackDto,
   CreateFlashcardPackWithCardsDto,
   GetDueCardsQueryDto,
+  GetFlashcardHealthQueryDto,
   RecordAttemptDto,
 } from './flashcards.dto';
 import {
@@ -288,6 +289,111 @@ export class FlashcardsService {
 
     const cards = await qb.getMany();
     return cards;
+  }
+
+  async getHealth(clientId: string, query: GetFlashcardHealthQueryDto) {
+    const limit = Math.max(1, Math.min(50, Number(query.limit || 5)));
+    const lookbackDays = Math.max(7, Math.min(365, Number(query.lookbackDays || 30)));
+    const now = new Date();
+    const since = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
+
+    const dueCardCount = await this.cardRepo
+      .createQueryBuilder('card')
+      .innerJoin(FlashcardPack, 'pack', 'pack.id = card.packId')
+      .where('pack.clientId = :clientId', { clientId })
+      .andWhere('card.dueAt <= :now', { now })
+      .getCount();
+
+    const candidateLimit = Math.max(limit * 10, 80);
+    const cards = await this.cardRepo
+      .createQueryBuilder('card')
+      .innerJoinAndSelect('card.pack', 'pack')
+      .where('pack.clientId = :clientId', { clientId })
+      .orderBy('card.dueAt', 'ASC')
+      .addOrderBy('card.lastReviewedAt', 'ASC')
+      .limit(candidateLimit)
+      .getMany();
+
+    if (cards.length === 0) {
+      return {
+        rows: [],
+        dueCardCount: 0,
+        lookedBackDays: lookbackDays,
+        generatedAt: now.toISOString(),
+      };
+    }
+
+    const cardIds = cards.map((card) => card.id);
+    const recentAttemptStatsRaw = await this.attemptRepo
+      .createQueryBuilder('attempt')
+      .select('attempt.cardId', 'cardId')
+      .addSelect('COUNT(*)', 'attempts')
+      .addSelect("SUM(CASE WHEN attempt.grade IN ('good', 'easy') THEN 1 ELSE 0 END)", 'correct')
+      .where('attempt.cardId IN (:...cardIds)', { cardIds })
+      .andWhere('attempt.createdAt >= :since', { since })
+      .groupBy('attempt.cardId')
+      .getRawMany();
+
+    const recentStats = new Map<number, { attempts: number; correct: number }>();
+    for (const row of recentAttemptStatsRaw) {
+      const cardId = Number(row.cardId);
+      if (!Number.isFinite(cardId)) continue;
+      recentStats.set(cardId, {
+        attempts: Number(row.attempts || 0),
+        correct: Number(row.correct || 0),
+      });
+    }
+
+    const scored = cards.map((card) => {
+      const dueTime = card.dueAt ? new Date(card.dueAt).getTime() : now.getTime();
+      const overdueDays = Math.max(0, Math.floor((now.getTime() - dueTime) / (24 * 60 * 60 * 1000)));
+      const isDue = dueTime <= now.getTime();
+      const daysSinceReview = card.lastReviewedAt
+        ? Math.max(0, Math.floor((now.getTime() - new Date(card.lastReviewedAt).getTime()) / (24 * 60 * 60 * 1000)))
+        : lookbackDays;
+
+      const recent = recentStats.get(card.id);
+      const recentAccuracy = recent && recent.attempts > 0 ? (recent.correct / recent.attempts) * 100 : null;
+      const historicalAccuracy =
+        card.reviewCount > 0
+          ? ((card.reviewCount - Math.min(card.reviewCount, card.lapseCount || 0)) / card.reviewCount) * 100
+          : null;
+      const baseline = recentAccuracy ?? historicalAccuracy ?? 40;
+      const duePenalty = isDue ? Math.min(25, 8 + Math.ceil(overdueDays / 2)) : 0;
+      const lapsePenalty = Math.min(20, (card.lapseCount || 0) * 2);
+      const freshnessPenalty = Math.min(12, Math.floor(daysSinceReview / 10) * 3);
+      const streakBonus = Math.min(12, (card.consecutiveCorrect || 0) * 2);
+      const pct = Math.round(
+        this.clamp(baseline - duePenalty - lapsePenalty - freshnessPenalty + streakBonus, 0, 100),
+      );
+
+      return {
+        cardId: card.id,
+        front: card.front,
+        back: card.back,
+        pct,
+        due: isDue,
+        dueAt: card.dueAt,
+        lastReviewedAt: card.lastReviewedAt ?? null,
+        reviewCount: card.reviewCount || 0,
+      };
+    });
+
+    scored.sort((a, b) => {
+      if (Number(b.due) !== Number(a.due)) return Number(b.due) - Number(a.due);
+      if (a.pct !== b.pct) return a.pct - b.pct;
+      const aDue = a.dueAt ? new Date(a.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const bDue = b.dueAt ? new Date(b.dueAt).getTime() : Number.MAX_SAFE_INTEGER;
+      if (aDue !== bDue) return aDue - bDue;
+      return a.reviewCount - b.reviewCount;
+    });
+
+    return {
+      rows: scored.slice(0, limit),
+      dueCardCount,
+      lookedBackDays: lookbackDays,
+      generatedAt: now.toISOString(),
+    };
   }
 
   async recordAttempt(clientId: string, cardId: number, dto: RecordAttemptDto) {

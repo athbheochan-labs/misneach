@@ -7,5 +7,6 @@ import { CoursesGatewayService } from './courses.service';
   imports: [AuthModule],
   controllers: [CoursesController],
   providers: [CoursesGatewayService],
+  exports: [CoursesGatewayService],
 })
 export class CoursesModule {}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { MisButton, MisInput, MisSelect } from '@decyphr/misneach-ui';
   import { focusStore } from '$lib/stores/focus';
 
   const activityTypes = [
@@ -71,29 +72,31 @@
 
       <div class="flex items-center gap-2">
         {#if session.status === 'running'}
-          <button onclick={() => focusStore.pause()} class="flex-1 rounded-lg bg-amber-500 text-white py-2 text-sm font-medium">Pause</button>
+          <MisButton variant="unstyled" size="none" onclick={() => focusStore.pause()} className="flex-1 rounded-lg bg-amber-500 text-white py-2 text-sm font-medium">Pause</MisButton>
         {:else}
-          <button onclick={() => focusStore.resume()} class="flex-1 rounded-lg bg-emerald-600 text-white py-2 text-sm font-medium">Resume</button>
+          <MisButton variant="unstyled" size="none" onclick={() => focusStore.resume()} className="flex-1 rounded-lg bg-emerald-600 text-white py-2 text-sm font-medium">Resume</MisButton>
         {/if}
-        <button onclick={() => focusStore.complete()} class="flex-1 rounded-lg bg-blue-600 text-white py-2 text-sm font-medium">Complete</button>
-        <button onclick={() => focusStore.cancel()} class="rounded-lg border px-3 py-2 text-sm">End</button>
+        <MisButton variant="unstyled" size="none" onclick={() => focusStore.complete()} className="flex-1 rounded-lg bg-blue-600 text-white py-2 text-sm font-medium">Complete</MisButton>
+        <MisButton variant="unstyled" size="none" onclick={() => focusStore.cancel()} className="rounded-lg border px-3 py-2 text-sm">End</MisButton>
       </div>
 
       {#if session.mode === 'time'}
         <div class="flex items-center gap-2">
-          <button onclick={() => focusStore.adjust({ remainingSecondsDelta: 300 })} class="rounded border px-2 py-1 text-xs">+5m</button>
-          <button onclick={() => focusStore.adjust({ remainingSecondsDelta: 600 })} class="rounded border px-2 py-1 text-xs">+10m</button>
-          <button onclick={() => focusStore.adjust({ remainingSecondsDelta: -300 })} class="rounded border px-2 py-1 text-xs">-5m</button>
+          <MisButton variant="unstyled" size="none" onclick={() => focusStore.adjust({ remainingSecondsDelta: 300 })} className="rounded border px-2 py-1 text-xs">+5m</MisButton>
+          <MisButton variant="unstyled" size="none" onclick={() => focusStore.adjust({ remainingSecondsDelta: 600 })} className="rounded border px-2 py-1 text-xs">+10m</MisButton>
+          <MisButton variant="unstyled" size="none" onclick={() => focusStore.adjust({ remainingSecondsDelta: -300 })} className="rounded border px-2 py-1 text-xs">-5m</MisButton>
         </div>
       {/if}
     </div>
   {:else}
-    <button
+    <MisButton
+      variant="unstyled"
+      size="none"
       onclick={() => (open = !open)}
-      class="rounded-full bg-emerald-600 text-white px-4 py-3 shadow-lg hover:bg-emerald-700 text-sm font-semibold"
+      className="rounded-full bg-emerald-600 text-white px-4 py-3 shadow-lg hover:bg-emerald-700 text-sm font-semibold"
     >
       Start Focus
-    </button>
+    </MisButton>
 
     {#if open}
       <div class="mt-2 w-80 rounded-2xl bg-white border shadow-lg p-4 space-y-3">
@@ -101,38 +104,38 @@
 
         <div>
           <label for="focus-mode" class="block text-xs text-gray-500 mb-1">Mode</label>
-          <select id="focus-mode" bind:value={mode} class="w-full rounded-lg border px-2 py-2 text-sm">
+          <MisSelect id="focus-mode" bind:value={mode} variant="unstyled" className="w-full rounded-lg border px-2 py-2 text-sm">
             <option value="time">Time mode</option>
             <option value="goal">Goal mode</option>
-          </select>
+          </MisSelect>
         </div>
 
         <div>
           <label for="focus-activity" class="block text-xs text-gray-500 mb-1">Activity</label>
-          <select id="focus-activity" bind:value={activityType} class="w-full rounded-lg border px-2 py-2 text-sm">
+          <MisSelect id="focus-activity" bind:value={activityType} variant="unstyled" className="w-full rounded-lg border px-2 py-2 text-sm">
             {#each activityTypes as activity}
               <option value={activity}>{activity.replace('_', ' ')}</option>
             {/each}
-          </select>
+          </MisSelect>
         </div>
 
         {#if mode === 'time'}
           <div>
             <label for="focus-minutes" class="block text-xs text-gray-500 mb-1">Minutes</label>
-            <input id="focus-minutes" type="number" min="1" bind:value={plannedMinutes} class="w-full rounded-lg border px-2 py-2 text-sm" />
+            <MisInput id="focus-minutes" type="number" min="1" bind:value={plannedMinutes} variant="unstyled" className="w-full rounded-lg border px-2 py-2 text-sm" />
           </div>
         {:else}
           <div>
             <label for="focus-goal" class="block text-xs text-gray-500 mb-1">Goal target</label>
-            <input id="focus-goal" type="text" bind:value={goalText} placeholder="Finish lesson 3" class="w-full rounded-lg border px-2 py-2 text-sm" />
+            <MisInput id="focus-goal" type="text" bind:value={goalText} placeholder="Finish lesson 3" variant="unstyled" className="w-full rounded-lg border px-2 py-2 text-sm" />
           </div>
         {/if}
 
         <div class="flex items-center gap-2">
-          <button onclick={start} disabled={loading} class="flex-1 rounded-lg bg-emerald-600 text-white py-2 text-sm font-medium disabled:opacity-50">
+          <MisButton variant="unstyled" size="none" onclick={start} disabled={loading} className="flex-1 rounded-lg bg-emerald-600 text-white py-2 text-sm font-medium disabled:opacity-50">
             {loading ? 'Starting...' : 'Start'}
-          </button>
-          <button onclick={() => (open = false)} class="rounded-lg border px-3 py-2 text-sm">Cancel</button>
+          </MisButton>
+          <MisButton variant="unstyled" size="none" onclick={() => (open = false)} className="rounded-lg border px-3 py-2 text-sm">Cancel</MisButton>
         </div>
       </div>
     {/if}

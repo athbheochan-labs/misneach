@@ -1,0 +1,68 @@
+name: Frontend Builds
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/frontend-builds.yml'
+      - 'apps/web/**'
+      - 'apps/app-web/**'
+      - 'apps/admin-web/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'package-lock.json'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/frontend-builds.yml'
+      - 'apps/web/**'
+      - 'apps/app-web/**'
+      - 'apps/admin-web/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  build:
+    name: Build ${{ matrix.app_id }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app_id: web
+            workspace: web
+            artifact_path: apps/web/build
+          - app_id: app-web
+            workspace: app-web
+            artifact_path: apps/app-web/build
+          - app_id: admin-web
+            workspace: admin-web
+            artifact_path: apps/admin-web/build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build workspace
+        run: npm run build --workspace ${{ matrix.workspace }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app_id }}-build-${{ github.sha }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 14

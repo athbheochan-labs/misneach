@@ -3,7 +3,6 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
 import { NextFunction, Request, Response } from 'express';
 import * as session from 'express-session';
-import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -71,6 +70,7 @@ async function bootstrap() {
     const clientIdHeader = req.headers['x-client-id'];
     const sessionIdHeader = req.headers['x-session-id'];
     const emailHeader = req.headers['x-user-email'];
+    const roleHeader = req.headers['x-user-role'];
 
     const userId =
       typeof userIdHeader === 'string'
@@ -83,6 +83,10 @@ async function bootstrap() {
       sessionId:
         typeof sessionIdHeader === 'string' ? sessionIdHeader : undefined,
       email: typeof emailHeader === 'string' ? emailHeader : undefined,
+      role:
+        roleHeader === 'admin' || roleHeader === 'learner'
+          ? roleHeader
+          : undefined,
     };
 
     return next();
@@ -102,17 +106,6 @@ async function bootstrap() {
       }),
     );
   }
-
-  // Serve static assets from /public
-  app.useStaticAssets(join(__dirname, '..', 'public'));
-
-  // Tell Express to treat .html as raw files (disable view engine)
-  app.setBaseViewsDir(join(__dirname, '..', 'public/pages'));
-  app.engine('html', (_, options, callback) => {
-    const rendered = '';
-    return callback(null, rendered);
-  });
-  app.setViewEngine('html');
 
   await app.listen(8000);
 }

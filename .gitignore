@@ -20,3 +20,21 @@ dist/
 # Docker runtime env files
 docker/env/*.env
 !docker/env/*.env.example
+
+# Secret and credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+*.der
+*.kubeconfig
+*.ovpn
+*.secret
+*.secrets
+*.credentials
+**/secrets/
+**/credentials/

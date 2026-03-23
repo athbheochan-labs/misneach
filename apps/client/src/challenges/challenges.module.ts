@@ -7,5 +7,6 @@ import { ChallengesService } from './challenges.service';
   imports: [AuthModule],
   controllers: [ChallengesController],
   providers: [ChallengesService],
+  exports: [ChallengesService],
 })
 export class ChallengesModule {}
