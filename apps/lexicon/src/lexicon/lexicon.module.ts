@@ -10,7 +10,6 @@ import {
 import { InteractionService } from 'src/interaction/interaction.service';
 import { Statement, StatementToken } from 'src/statement/statement.entity';
 import { StatementModule } from 'src/statement/statement.module';
-import { StatementService } from 'src/statement/statement.service';
 import { LexiconIngestService } from './ingest/lexicon.ingest.service';
 import { LexiconController } from './lexicon.controller';
 import { RedisProfileService } from './profile.service';
@@ -39,7 +38,6 @@ import { WordScoringService } from './scoring.service';
     RedisProfileService,
     InteractionService,
     CefrAssessmentService,
-    StatementService,
     WordScoringService,
   ],
   exports: [],
