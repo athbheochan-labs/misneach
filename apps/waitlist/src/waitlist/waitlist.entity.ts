@@ -11,13 +11,13 @@ export class WaitlistEntry {
   @Column({ length: 320 })
   email!: string;
 
-  @Column({ length: 120, nullable: true })
+  @Column({ type: 'varchar', length: 120, nullable: true })
   name!: string | null;
 
   @Column({ type: 'varchar', length: 40 })
   interest!: WaitlistInterest;
 
-  @Column({ length: 120, nullable: true })
+  @Column({ type: 'varchar', length: 120, nullable: true })
   source!: string | null;
 
   @CreateDateColumn()
