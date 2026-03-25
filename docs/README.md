@@ -7,6 +7,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [Deployment and Operations](./deployment.md)
 - [Project Management (GitHub)](./project-management.md)
 - [System Architecture](./architecture.md)
+- [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
 - [Architecture Decision Records](./adr/README.md)
 
 ## Source of Truth
