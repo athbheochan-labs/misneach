@@ -1,0 +1,21 @@
+version: 1
+applications:
+  - appRoot: .
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build --workspace web
+            # Install runtime dependencies for the SSR compute bundle.
+            - cd apps/web/build/compute/default
+            - npm i --omit=dev
+      artifacts:
+        baseDirectory: apps/web/build
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
