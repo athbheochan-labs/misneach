@@ -40,6 +40,19 @@ Relevant workflows:
 - Never commit real secrets.
 - Keep compose service definitions and env examples synchronized.
 
+### Web Runtime API Variables
+
+`apps/web` should target a single API entrypoint (`client`) for public integration routes.
+
+- `CLIENT_API_URL`: primary upstream for web survey/waitlist routes.
+- `NEST_INTERNAL_URL`: optional fallback upstream (often equal to `CLIENT_API_URL`).
+
+Recommended values by environment:
+
+- host-based local dev: `CLIENT_API_URL=http://localhost:8000`
+- docker local dev: `CLIENT_API_URL=http://client:8000`
+- production: `CLIENT_API_URL=https://api.<your-domain>`
+
 See: [Environment Files README](../deploy/env/README.md)
 
 ## Deployment Runbook

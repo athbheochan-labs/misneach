@@ -17,6 +17,10 @@ This runbook deploys `apps/web` to AWS Amplify Hosting.
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
 4. In Amplify app environment variables, set any `PUBLIC_*` variables needed by `apps/web`.
+5. Set web runtime API variables in Amplify environment:
+   - `CLIENT_API_URL` = public client API URL (for example `https://api.misneach.site`)
+   - `NEST_INTERNAL_URL` = optional fallback (can be same as `CLIENT_API_URL`)
+   - `WEB_APP_URL` / `APP_BASE_URL` = public web URL (for example `https://misneach.site`)
 
 ## Deploy Flows
 

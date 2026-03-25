@@ -50,8 +50,7 @@ flowchart TB
     kafka[(kafka)]
   end
 
-  web --> business
-  web --> waitlist
+  web --> client
   appweb --> client
   adminweb --> client
 
@@ -93,7 +92,7 @@ flowchart TB
 ### Request Flow (User Feature Path)
 
 1. User request hits frontend (`web`, `app-web`, or `admin-web`).
-2. Frontend calls `client` or domain service endpoint.
+2. Frontend calls `client` API endpoints.
 3. `client` orchestrates across domain services (`focus`, `practice`, `courses`, `challenges`, `payment`, `business`, `discounts`).
 4. Services persist/query MariaDB, and some services publish/consume Kafka events.
 5. Response returns through frontend to user.
@@ -109,7 +108,7 @@ flowchart TB
 
 | Service | Depends On | Inbound Interface | Outbound Interface | Data Stores | Owner |
 | --- | --- | --- | --- | --- | --- |
-| `web` | `business`, `waitlist` | HTTP (browser) | HTTP to backend services | None | TBD |
+| `web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `app-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `admin-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `client` | `mariadb`, `kafka`, domain services | HTTP API | HTTP to domain services, Kafka, Redis | MariaDB, Redis | TBD |
@@ -139,12 +138,21 @@ When a PR changes service boundaries, dependencies, integration paths, or core r
 - Update this page, or
 - Add an ADR in `docs/adr/` and link it in the PR.
 
-## Planned Topology Change
+## API Error Contract
 
-An active migration is in progress to consolidate frontend ingress through `client`:
+Public gateway routes exposed via `client` should return normalized error payloads:
 
-- `web` will move from direct `business`/`waitlist` calls to `client` endpoints.
-- Public API ingress will be limited to a single `client` entrypoint.
+- error shape: `{ "error": "<message>" }`
+- status behavior:
+  - preserve downstream 4xx/5xx status when proxying upstream service errors
+  - return `502` for upstream reachability/network failures
+
+## Topology Direction
+
+Frontend ingress is consolidated through `client`:
+
+- `web`, `app-web`, and `admin-web` call `client` endpoints.
+- Public API ingress should remain a single `client` entrypoint.
 - Domain services remain internal-only.
 
 Roadmap: [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
