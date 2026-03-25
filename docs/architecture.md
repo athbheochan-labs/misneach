@@ -138,3 +138,13 @@ When a PR changes service boundaries, dependencies, integration paths, or core r
 
 - Update this page, or
 - Add an ADR in `docs/adr/` and link it in the PR.
+
+## Planned Topology Change
+
+An active migration is in progress to consolidate frontend ingress through `client`:
+
+- `web` will move from direct `business`/`waitlist` calls to `client` endpoints.
+- Public API ingress will be limited to a single `client` entrypoint.
+- Domain services remain internal-only.
+
+Roadmap: [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
