@@ -25,15 +25,24 @@
   let businessName = 'your cafe';
   let submitError = '';
   $: currentQuestion = template ? template.questions[currentStep] : null;
+  $: currentAnswerValue = currentQuestion ? answers[currentQuestion.id] : undefined;
+  $: canContinueNow = currentQuestion
+    ? !currentQuestion.required
+      ? true
+      : currentQuestion.type === 'checkbox'
+        ? Array.isArray(currentAnswerValue) && currentAnswerValue.length > 0
+        : String(currentAnswerValue ?? '').trim().length > 0
+    : false;
 
   function setAnswer(question: Question, option: string) {
+    const normalizedOption = String(option);
     if (question.type === 'checkbox') {
       const current = Array.isArray(answers[question.id]) ? [...(answers[question.id] as string[])] : [];
-      answers[question.id] = current.includes(option)
-        ? current.filter((item) => item !== option)
-        : [...current, option];
+      answers[question.id] = current.includes(normalizedOption)
+        ? current.filter((item) => item !== normalizedOption)
+        : [...current, normalizedOption];
     } else {
-      answers[question.id] = option;
+      answers[question.id] = normalizedOption;
     }
     answers = { ...answers };
   }
@@ -42,8 +51,8 @@
     if (!question.required) return true;
     const value = answers[question.id];
     if (question.type === 'checkbox') return Array.isArray(value) && value.length > 0;
-    if (question.type === 'text') return typeof value === 'string' ? value.trim().length > 0 : false;
-    return typeof value === 'string' && value.length > 0;
+    if (question.type === 'text') return String(value ?? '').trim().length > 0;
+    return String(value ?? '').trim().length > 0;
   }
 
   function next(question: Question) {
@@ -155,9 +164,9 @@
       {/if}
 
       {#if currentStep < template.questions.length - 1}
-        <button type="button" class="btn" disabled={!currentQuestion || !canContinue(currentQuestion)} on:click={() => currentQuestion && next(currentQuestion)}>Next</button>
+        <button type="button" class="btn" disabled={!canContinueNow} on:click={() => currentQuestion && next(currentQuestion)}>Next</button>
       {:else}
-        <button type="button" class="btn" disabled={!currentQuestion || !canContinue(currentQuestion)} on:click={submit}>Submit</button>
+        <button type="button" class="btn" disabled={!canContinueNow} on:click={submit}>Submit</button>
       {/if}
     </section>
   {/if}
