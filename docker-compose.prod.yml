@@ -231,37 +231,6 @@ services:
     ports:
       - "8000:8000"
 
-  web:
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-web:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    depends_on:
-      - business
-      - waitlist
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/web.env
-    ports:
-      - "5173:5173"
-
-  app-web:
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-app-web:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    depends_on:
-      - client
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/app-web.env
-    ports:
-      - "5175:5175"
-
-  admin-web:
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-admin-web:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    depends_on:
-      - client
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/admin-web.env
-    ports:
-      - "5174:5174"
-
 volumes:
   mariadb_data:
   redis_data:
