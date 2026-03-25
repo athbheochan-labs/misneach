@@ -20,6 +20,7 @@ import { PracticeModule } from './practice/practice.module';
 import { BusinessModule } from './business/business.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DiscountsModule } from './discounts/discounts.module';
+import { WaitlistModule } from './waitlist/waitlist.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { DiscountsModule } from './discounts/discounts.module';
     BusinessModule,
     PaymentsModule,
     DiscountsModule,
+    WaitlistModule,
     CoursesModule,
     ChallengesModule,
     AdminModule,
