@@ -34,12 +34,19 @@ Target:
 
 - `web` has no direct runtime dependency on `WAITLIST_API_URL`/`BUSINESS_API_URL`.
 - All web integration traffic goes through `client`.
-- Public ingress policy exposes only intended entrypoints.
+- Public ingress policy exposes only intended entrypoints (`api-proxy` for API).
 - Staging and production smoke tests pass for waitlist/survey flows.
+
+## Infrastructure Baseline
+
+Production compose baseline includes:
+
+- `api-proxy` (nginx) as single public API ingress.
+- `client` exposed only on the internal Docker network.
+- Healthchecks for `mariadb`, `redis`, `client`, and `api-proxy`.
 
 ## Rollback Strategy
 
 - Keep old web proxy handlers behind feature flag or branch fallback during migration.
 - Revert web endpoint targets to previous service URLs if `client` proxy routes regress.
 - Roll back `client` endpoint changes by image tag if required.
-

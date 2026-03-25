@@ -22,6 +22,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
 import { SurveysModule } from './surveys/surveys.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -57,6 +58,6 @@ import { SurveysModule } from './surveys/surveys.module';
     ChallengesModule,
     AdminModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
 })
 export class AppModule {}
