@@ -1,4 +1,4 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from 'amplify-adapter';
 
 const config = {
   kit: {
