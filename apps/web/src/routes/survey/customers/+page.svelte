@@ -96,22 +96,24 @@
   const total = questions.length;
 
   function isSelected(question: Question, option: string) {
+    const normalizedOption = String(option);
     const value = answers[question.id];
     if (question.type === 'checkbox') {
-      return Array.isArray(value) && value.includes(option);
+      return Array.isArray(value) && value.includes(normalizedOption);
     }
-    return value === option;
+    return value === normalizedOption;
   }
 
   function toggleAnswer(question: Question, option: string) {
+    const normalizedOption = String(option);
     if (question.type === 'checkbox') {
       const currentValues = Array.isArray(answers[question.id]) ? [...(answers[question.id] as string[])] : [];
-      const has = currentValues.includes(option);
+      const has = currentValues.includes(normalizedOption);
       answers[question.id] = has
-        ? currentValues.filter((entry) => entry !== option)
-        : [...currentValues, option];
+        ? currentValues.filter((entry) => entry !== normalizedOption)
+        : [...currentValues, normalizedOption];
     } else {
-      answers[question.id] = option;
+      answers[question.id] = normalizedOption;
     }
     answers = { ...answers };
   }
@@ -122,7 +124,7 @@
     if (question.type === 'checkbox') {
       return Array.isArray(value) && value.length > 0;
     }
-    return typeof value === 'string' && value.length > 0;
+    return String(value ?? '').trim().length > 0;
   }
 
   function next() {

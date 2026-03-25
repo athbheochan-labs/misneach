@@ -32,24 +32,34 @@
   let showResults = false;
   let aggregate: AggregatePayload | null = null;
   $: currentQuestion = template ? template.questions[current] : null;
+  $: currentAnswerValue = currentQuestion ? answers[currentQuestion.id] : undefined;
+  $: canContinueNow = currentQuestion
+    ? !currentQuestion.required
+      ? true
+      : currentQuestion.type === 'checkbox'
+        ? Array.isArray(currentAnswerValue) && currentAnswerValue.length > 0
+        : String(currentAnswerValue ?? '').trim().length > 0
+    : false;
 
   function isSelected(question: Question, option: string) {
+    const normalizedOption = String(option);
     const value = answers[question.id];
     if (question.type === 'checkbox') {
-      return Array.isArray(value) && value.includes(option);
+      return Array.isArray(value) && value.includes(normalizedOption);
     }
-    return value === option;
+    return value === normalizedOption;
   }
 
   function toggleAnswer(question: Question, option: string) {
+    const normalizedOption = String(option);
     if (question.type === 'checkbox') {
       const currentValues = Array.isArray(answers[question.id]) ? [...(answers[question.id] as string[])] : [];
-      const has = currentValues.includes(option);
+      const has = currentValues.includes(normalizedOption);
       answers[question.id] = has
-        ? currentValues.filter((entry) => entry !== option)
-        : [...currentValues, option];
+        ? currentValues.filter((entry) => entry !== normalizedOption)
+        : [...currentValues, normalizedOption];
     } else {
-      answers[question.id] = option;
+      answers[question.id] = normalizedOption;
     }
     answers = { ...answers };
   }
@@ -60,12 +70,12 @@
     const value = answers[question.id];
     if (!question.required) return true;
     if (question.type === 'checkbox') return Array.isArray(value) && value.length > 0;
-    if (question.type === 'text') return typeof value === 'string' && value.trim().length > 0;
-    return typeof value === 'string' && value.length > 0;
+    if (question.type === 'text') return String(value ?? '').trim().length > 0;
+    return String(value ?? '').trim().length > 0;
   }
 
   function next() {
-    if (!template || !canContinue()) return;
+    if (!template || !canContinueNow) return;
     current = Math.min(template.questions.length - 1, current + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -181,9 +191,9 @@
       {/if}
 
       {#if current < template.questions.length - 1}
-        <button type="button" class="next" disabled={!canContinue()} on:click={next}>Next</button>
+        <button type="button" class="next" disabled={!canContinueNow} on:click={next}>Next</button>
       {:else}
-        <button type="button" class="next" disabled={!canContinue() || isSubmitting} on:click={submit}>
+        <button type="button" class="next" disabled={!canContinueNow || isSubmitting} on:click={submit}>
           {isSubmitting ? 'Submitting...' : 'See results'}
         </button>
       {/if}

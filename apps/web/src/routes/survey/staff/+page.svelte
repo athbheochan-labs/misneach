@@ -61,12 +61,12 @@
   let submitError = '';
 
   function pick(option: string) {
-    answers[steps[currentStep].id] = option;
+    answers[steps[currentStep].id] = String(option);
     answers = { ...answers };
   }
 
   function canContinue() {
-    return Boolean(answers[steps[currentStep].id]);
+    return String(answers[steps[currentStep].id] ?? '').trim().length > 0;
   }
 
   function next() {
