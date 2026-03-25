@@ -4,16 +4,30 @@ import { HttpException, Injectable } from '@nestjs/common';
 export class SurveysGatewayService {
   private readonly businessUrl = process.env.BUSINESS_SERVICE_URL || 'http://business:3018';
 
+  private async request(path: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(`${this.businessUrl}${path}`, init);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new HttpException(
+        { error: `Survey service unreachable: ${message}` },
+        502,
+      );
+    }
+  }
+
   private async parseResponse(res: Response) {
     const contentType = res.headers.get('content-type') || '';
     if (!res.ok) {
       const body = contentType.includes('application/json')
         ? await res.json()
         : { error: await res.text() };
+      const errorMessage =
+        body?.error ||
+        body?.message ||
+        `Survey service error (${res.status})`;
       throw new HttpException(
-        body?.error
-          ? { error: body.error }
-          : { error: `Survey service error (${res.status})` },
+        { error: String(errorMessage) },
         res.status,
       );
     }
@@ -50,14 +64,14 @@ export class SurveysGatewayService {
   }
 
   async get(path: string, query?: Record<string, string | undefined>) {
-    const res = await fetch(`${this.businessUrl}${this.buildPath(path, query)}`, {
+    const res = await this.request(this.buildPath(path, query), {
       method: 'GET',
     });
     return this.parseResponse(res);
   }
 
   async post(path: string, body?: unknown, query?: Record<string, string | undefined>) {
-    const res = await fetch(`${this.businessUrl}${this.buildPath(path, query)}`, {
+    const res = await this.request(this.buildPath(path, query), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: body == null ? undefined : JSON.stringify(body),
@@ -66,7 +80,7 @@ export class SurveysGatewayService {
   }
 
   async adminGet(path: string) {
-    const res = await fetch(`${this.businessUrl}${path}`, {
+    const res = await this.request(path, {
       method: 'GET',
       headers: this.internalHeaders(),
     });
@@ -74,7 +88,7 @@ export class SurveysGatewayService {
   }
 
   async adminPost(path: string, body?: unknown) {
-    const res = await fetch(`${this.businessUrl}${path}`, {
+    const res = await this.request(path, {
       method: 'POST',
       headers: this.internalHeaders({ 'Content-Type': 'application/json' }),
       body: body == null ? undefined : JSON.stringify(body),
@@ -83,7 +97,7 @@ export class SurveysGatewayService {
   }
 
   async adminPut(path: string, body?: unknown) {
-    const res = await fetch(`${this.businessUrl}${path}`, {
+    const res = await this.request(path, {
       method: 'PUT',
       headers: this.internalHeaders({ 'Content-Type': 'application/json' }),
       body: body == null ? undefined : JSON.stringify(body),
@@ -92,7 +106,7 @@ export class SurveysGatewayService {
   }
 
   async adminDelete(path: string) {
-    const res = await fetch(`${this.businessUrl}${path}`, {
+    const res = await this.request(path, {
       method: 'DELETE',
       headers: this.internalHeaders(),
     });

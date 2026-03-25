@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+} from '@nestjs/common';
 
 type JoinWaitlistInput = {
   email?: string;
@@ -24,11 +28,11 @@ export class WaitlistGatewayService {
     const source = String(body?.source || '').trim();
 
     if (!email) {
-      throw new BadRequestException('Email is required');
+      throw new BadRequestException({ error: 'Email is required' });
     }
 
     if (!this.allowedInterests.has(interest)) {
-      throw new BadRequestException('Invalid waitlist interest');
+      throw new BadRequestException({ error: 'Invalid waitlist interest' });
     }
 
     return {
@@ -50,21 +54,30 @@ export class WaitlistGatewayService {
         body: JSON.stringify(payload),
       });
     } catch (error) {
-      throw new Error(
-        `Waitlist service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      throw new HttpException(
+        {
+          error: `Waitlist service unreachable: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+        502,
       );
     }
 
     const responseBody = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(
-        responseBody?.error
-          ? `Waitlist service error (${res.status}): ${responseBody.error}`
-          : `Waitlist service error (${res.status})`,
+      const errorMessage =
+        responseBody?.error ||
+        responseBody?.message ||
+        `Waitlist service error (${res.status})`;
+      throw new HttpException(
+        {
+          error: String(errorMessage),
+        },
+        res.status,
       );
     }
 
     return responseBody;
   }
 }
-
