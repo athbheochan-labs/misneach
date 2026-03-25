@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class SurveysGatewayService {
@@ -8,9 +8,14 @@ export class SurveysGatewayService {
     const contentType = res.headers.get('content-type') || '';
     if (!res.ok) {
       const body = contentType.includes('application/json')
-        ? JSON.stringify(await res.json())
-        : await res.text();
-      throw new Error(`Survey service error (${res.status}): ${body}`);
+        ? await res.json()
+        : { error: await res.text() };
+      throw new HttpException(
+        body?.error
+          ? { error: body.error }
+          : { error: `Survey service error (${res.status})` },
+        res.status,
+      );
     }
 
     if (res.status === 204) return null;
@@ -24,6 +29,40 @@ export class SurveysGatewayService {
       headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
     }
     return headers;
+  }
+
+  private buildPath(
+    path: string,
+    query?: Record<string, string | undefined>,
+  ) {
+    if (!query) return path;
+
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value != null && value !== '') {
+        params.set(key, value);
+      }
+    }
+
+    const qs = params.toString();
+    if (!qs) return path;
+    return `${path}${path.includes('?') ? '&' : '?'}${qs}`;
+  }
+
+  async get(path: string, query?: Record<string, string | undefined>) {
+    const res = await fetch(`${this.businessUrl}${this.buildPath(path, query)}`, {
+      method: 'GET',
+    });
+    return this.parseResponse(res);
+  }
+
+  async post(path: string, body?: unknown, query?: Record<string, string | undefined>) {
+    const res = await fetch(`${this.businessUrl}${this.buildPath(path, query)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body == null ? undefined : JSON.stringify(body),
+    });
+    return this.parseResponse(res);
   }
 
   async adminGet(path: string) {

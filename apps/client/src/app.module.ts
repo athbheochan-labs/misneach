@@ -21,6 +21,7 @@ import { BusinessModule } from './business/business.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
+import { SurveysModule } from './surveys/surveys.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { WaitlistModule } from './waitlist/waitlist.module';
     PaymentsModule,
     DiscountsModule,
     WaitlistModule,
+    SurveysModule,
     CoursesModule,
     ChallengesModule,
     AdminModule,
