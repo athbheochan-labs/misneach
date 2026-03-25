@@ -1,7 +1,9 @@
 version: 1
 applications:
-  - appRoot: .
+  - appRoot: apps/web
     frontend:
+      # Run commands from repo root so npm workspace scripts resolve correctly.
+      buildPath: /
       phases:
         preBuild:
           commands:
