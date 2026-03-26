@@ -70,6 +70,18 @@ export class CoursesGatewayService {
     return this.parseResponse(res);
   }
 
+  async getPublic(path: string, query?: Record<string, string | undefined>) {
+    let res: Response;
+    try {
+      res = await this.fetchWithRetry(this.buildUrl(path, undefined, query));
+    } catch (error) {
+      throw new Error(
+        `Courses service unreachable: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    return this.parseResponse(res);
+  }
+
   async post(path: string, clientId: string, body?: unknown, query?: Record<string, string | undefined>) {
     let res: Response;
     try {

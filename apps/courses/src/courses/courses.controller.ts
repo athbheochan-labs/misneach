@@ -21,6 +21,11 @@ export class CoursesController {
     return this.coursesService.getCatalog(this.requireClientId(clientId), previewToken);
   }
 
+  @Get('taster')
+  getTaster() {
+    return this.coursesService.getTaster();
+  }
+
   @Get(':courseSlug/lessons/:lessonSlug')
   getLesson(
     @Query('clientId') clientId: string,

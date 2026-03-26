@@ -27,6 +27,11 @@ export class CoursesController {
     });
   }
 
+  @Get('taster')
+  async getTaster() {
+    return this.coursesService.getPublic('/courses/taster');
+  }
+
   @Get(':courseSlug/lessons/:lessonSlug')
   async getLesson(
     @Req() req: AuthenticatedRequest,
