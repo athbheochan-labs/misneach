@@ -1,9 +1,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
+import { INTERNAL_AUTH_SECRET, NEST_INTERNAL_URL, NEST_INTERNAL_URLS } from '$env/static/private';
 
 function resolveNestBaseUrls(): string[] {
-  const configured = (env.NEST_INTERNAL_URL || '').trim();
-  const configuredList = (env.NEST_INTERNAL_URLS || '')
+  const configured = (NEST_INTERNAL_URL || '').trim();
+  const configuredList = (NEST_INTERNAL_URLS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -42,8 +42,8 @@ export async function nestFetch(
     if (event.locals.auth.role) {
       headers.set('x-user-role', event.locals.auth.role);
     }
-    if (env.INTERNAL_AUTH_SECRET) {
-      headers.set('x-internal-auth', env.INTERNAL_AUTH_SECRET);
+    if (INTERNAL_AUTH_SECRET) {
+      headers.set('x-internal-auth', INTERNAL_AUTH_SECRET);
     }
   }
 
