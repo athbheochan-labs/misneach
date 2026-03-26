@@ -84,6 +84,8 @@ export class CoursesService implements OnModuleInit {
   private readonly previewEnabled = process.env.COURSES_PREVIEW_ENABLED !== 'false';
   private readonly previewSecret =
     process.env.COURSES_PREVIEW_SECRET || process.env.WEB_SESSION_SECRET || 'dev-courses-preview-secret';
+  private readonly tasterCourseSlug = String(process.env.COURSES_TASTER_COURSE_SLUG || '').trim();
+  private readonly tasterLessonSlug = String(process.env.COURSES_TASTER_LESSON_SLUG || '').trim();
   private readonly previewTtlSec = Math.max(
     60,
     Number(process.env.COURSES_PREVIEW_TOKEN_TTL_SEC || 30 * 60),
@@ -1638,6 +1640,89 @@ export class CoursesService implements OnModuleInit {
       generatedAt: manifest.generatedAt,
       contentVersion: manifest.contentVersion,
       courses,
+    };
+  }
+
+  private pickDefaultTasterTarget(manifest: ContentManifest): {
+    courseSlug: string;
+    lessonSlug: string;
+  } | null {
+    if (!manifest.courses.length) return null;
+
+    const bySlug = manifest.courses
+      .slice()
+      .sort((a, b) => a.courseSlug.localeCompare(b.courseSlug));
+
+    let course = bySlug[0];
+
+    if (this.tasterCourseSlug) {
+      const configuredCourse = manifest.courses.find((item) => item.courseSlug === this.tasterCourseSlug);
+      if (!configuredCourse) {
+        throw new NotFoundException(`Configured taster course not found: ${this.tasterCourseSlug}`);
+      }
+      course = configuredCourse;
+    } else {
+      const cafeCourse = manifest.courses.find((item) => item.courseSlug === 'cafe');
+      if (cafeCourse) {
+        course = cafeCourse;
+      }
+    }
+
+    const lessons = course.lessons.slice().sort((a, b) => a.order - b.order);
+    if (!lessons.length) {
+      throw new NotFoundException(`No lessons found for taster course: ${course.courseSlug}`);
+    }
+
+    const lesson =
+      (this.tasterLessonSlug
+        ? lessons.find((item) => item.lessonSlug === this.tasterLessonSlug)
+        : undefined) || lessons[0];
+
+    if (!lesson) {
+      throw new NotFoundException(
+        `Configured taster lesson not found: ${course.courseSlug}/${this.tasterLessonSlug}`,
+      );
+    }
+
+    return {
+      courseSlug: course.courseSlug,
+      lessonSlug: lesson.lessonSlug,
+    };
+  }
+
+  async getTaster() {
+    const manifest = await this.manifestForRead();
+    const target = this.pickDefaultTasterTarget(manifest);
+    if (!target) {
+      throw new NotFoundException('Taster content is unavailable');
+    }
+
+    const lesson = await this.lessonForRead(target.courseSlug, target.lessonSlug);
+    if (!lesson) {
+      throw new NotFoundException('Taster lesson not found');
+    }
+
+    const pedagogy = buildPedagogyView(lesson);
+
+    return {
+      lesson,
+      progress: {
+        status: 'not_started',
+        progressPercent: 0,
+        lastBlockId: this.resolveBlockId(lesson, null),
+        completedAt: null,
+        timeSpentSec: 0,
+        lastSeenAt: null,
+        contentVersion: lesson.contentVersion,
+        swapQuizState: {},
+      },
+      micro: this.microProgressForLesson(lesson, null),
+      pedagogy,
+      taster: {
+        public: true,
+        courseSlug: target.courseSlug,
+        lessonSlug: target.lessonSlug,
+      },
     };
   }
 
