@@ -86,7 +86,22 @@ Operational checks:
 docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml ps api-proxy client
 docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml exec api-proxy wget -q -O - http://127.0.0.1/healthz
 docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml exec client node -e "fetch('http://127.0.0.1:8000/health').then(r=>{console.log(r.status);process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"
+docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml exec client node -e "fetch('http://127.0.0.1:8000/courses/taster').then(async r=>{console.log(r.status);const j=await r.json();process.exit(r.ok&&j?.lesson?0:1)}).catch(()=>process.exit(1))"
 ```
+
+### Taster Content Verification
+
+`/courses/taster` is the public source for web taster content.
+
+- Endpoint smoke: `GET /courses/taster` should return `200` with `lesson`.
+- Web smoke: `GET /taster` should return `200` and render screens.
+
+If you need to pin a specific taster target in `courses`:
+
+- `COURSES_TASTER_COURSE_SLUG`
+- `COURSES_TASTER_LESSON_SLUG`
+
+Defaults use the first lesson in `cafe` when available.
 
 ## Rollback Runbook
 

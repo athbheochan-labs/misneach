@@ -36,6 +36,7 @@ Target:
 - All web integration traffic goes through `client`.
 - Public ingress policy exposes only intended entrypoints (`api-proxy` for API).
 - Staging and production smoke tests pass for waitlist/survey flows.
+- Staging and production smoke tests pass for taster endpoint/page (`/api/courses/taster`, `/taster`).
 
 ## Infrastructure Baseline
 
