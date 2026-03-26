@@ -28,6 +28,7 @@ flowchart TB
   end
 
   subgraph Backend
+    apiproxy[api-proxy]
     client[client]
     business[business]
     payment[payment]
@@ -50,9 +51,10 @@ flowchart TB
     kafka[(kafka)]
   end
 
-  web --> client
+  web --> apiproxy
   appweb --> client
   adminweb --> client
+  apiproxy --> client
 
   client --> flashcards
   client --> focus
@@ -111,7 +113,8 @@ flowchart TB
 | `web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `app-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `admin-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
-| `client` | `mariadb`, `kafka`, domain services | HTTP API | HTTP to domain services, Kafka, Redis | MariaDB, Redis | TBD |
+| `api-proxy` | `client` | HTTP API ingress | HTTP proxy to `client` | None | TBD |
+| `client` | `mariadb`, `kafka`, domain services | internal HTTP API | HTTP to domain services, Kafka, Redis | MariaDB, Redis | TBD |
 | `translator` | `mariadb`, `kafka`, `nlp` | HTTP API | HTTP to `nlp`, Kafka/DB interactions | MariaDB | TBD |
 | `nlp` | none | HTTP API | none | None | TBD |
 | `lexicon` | `mariadb`, `kafka` | HTTP/API/consumer | Kafka + DB operations | MariaDB | TBD |

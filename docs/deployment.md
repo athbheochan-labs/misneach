@@ -72,6 +72,22 @@ See: [Environment Files README](../deploy/env/README.md)
    - external endpoints
    - Kafka/DB dependent services
 
+### Single API Entrypoint (Production Compose)
+
+Production exposes backend API traffic through `api-proxy` only:
+
+- `api-proxy` listens on host `:8000` and proxies to `client:8000`.
+- `client` is internal-only (`expose`), not host-published.
+- Domain services remain internal-only.
+
+Operational checks:
+
+```bash
+docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml ps api-proxy client
+docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml exec api-proxy wget -q -O - http://127.0.0.1/healthz
+docker compose --env-file /opt/misneach/.env -f /opt/misneach/docker-compose.prod.yml exec client node -e "fetch('http://127.0.0.1:8000/health').then(r=>{console.log(r.status);process.exit(r.ok?0:1)}).catch(()=>process.exit(1))"
+```
+
 ## Rollback Runbook
 
 1. Identify last known good image tags per impacted service.
@@ -79,6 +95,12 @@ See: [Environment Files README](../deploy/env/README.md)
 3. Redeploy compose stack.
 4. Validate dependent services and user-facing paths.
 5. If issue persists, disable affected feature path and open `type:infra` incident issue with recovery notes.
+
+Proxy topology rollback (if needed):
+
+1. Re-publish `client` port mapping in compose (`8000:8000`) and remove/disable `api-proxy`.
+2. Redeploy stack.
+3. Verify API availability and service health.
 
 ## Documentation Contract
 
