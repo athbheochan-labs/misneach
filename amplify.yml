@@ -11,8 +11,11 @@ applications:
         build:
           commands:
             - rm -f apps/web/.env.production
-            - touch apps/web/.env.production
-            - for key in NEST_INTERNAL_URL NEST_INTERNAL_URLS CLIENT_API_URL APP_BASE_URL WEB_APP_URL; do value="$(printenv "$key" || true)"; if [ -n "$value" ]; then printf '%s=%s\n' "$key" "$value" >> apps/web/.env.production; fi; done
+            - printf 'NEST_INTERNAL_URL=%s\n' "${NEST_INTERNAL_URL:-}" >> apps/web/.env.production
+            - printf 'NEST_INTERNAL_URLS=%s\n' "${NEST_INTERNAL_URLS:-}" >> apps/web/.env.production
+            - printf 'CLIENT_API_URL=%s\n' "${CLIENT_API_URL:-}" >> apps/web/.env.production
+            - printf 'APP_BASE_URL=%s\n' "${APP_BASE_URL:-}" >> apps/web/.env.production
+            - printf 'WEB_APP_URL=%s\n' "${WEB_APP_URL:-}" >> apps/web/.env.production
             - npm run build --workspace web
             # Install runtime dependencies for the SSR compute bundle.
             - cd apps/web/build/compute/default
