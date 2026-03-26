@@ -8,7 +8,6 @@ import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async (event) => {
   let courseTitle = 'Coffee Shop Encounters';
-
   let screens: LessonScreen[] = [];
 
   try {
