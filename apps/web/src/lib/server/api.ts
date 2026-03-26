@@ -1,8 +1,9 @@
 import type { RequestEvent } from '@sveltejs/kit';
+import { NEST_INTERNAL_URL, NEST_INTERNAL_URLS } from '$env/static/private';
 
 function resolveNestBaseUrls(): string[] {
-  const configured = (process.env.NEST_INTERNAL_URL || '').trim();
-  const configuredList = (process.env.NEST_INTERNAL_URLS || '')
+  const configured = (NEST_INTERNAL_URL || '').trim();
+  const configuredList = (NEST_INTERNAL_URLS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
