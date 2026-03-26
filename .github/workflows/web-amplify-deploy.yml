@@ -58,6 +58,7 @@ jobs:
           npm i --omit=dev
 
       - name: Upload artifact and start Amplify deployment
+        id: deploy
         env:
           APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -89,4 +90,104 @@ jobs:
             --job-id "$JOB_ID" \
             --region "$AWS_REGION"
 
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
           echo "Started Amplify deployment job $JOB_ID for branch $BRANCH_NAME"
+
+      - name: Wait for Amplify deployment to complete
+        id: wait
+        env:
+          APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          BRANCH_NAME: ${{ steps.deploy.outputs.branch_name }}
+          JOB_ID: ${{ steps.deploy.outputs.job_id }}
+        run: |
+          set -euo pipefail
+
+          attempt=0
+          max_attempts=60
+          sleep_seconds=10
+
+          while true; do
+            status="$(aws amplify get-job \
+              --app-id "$APP_ID" \
+              --branch-name "$BRANCH_NAME" \
+              --job-id "$JOB_ID" \
+              --region "$AWS_REGION" \
+              --query 'job.summary.status' \
+              --output text)"
+
+            echo "Amplify job status: $status"
+            if [ "$status" = "SUCCEED" ]; then
+              break
+            fi
+
+            if [ "$status" = "FAILED" ] || [ "$status" = "CANCELLED" ]; then
+              echo "Amplify deployment failed with status: $status"
+              exit 1
+            fi
+
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "Timed out waiting for Amplify deployment to finish"
+              exit 1
+            fi
+            sleep "$sleep_seconds"
+          done
+
+          BRANCH_WEB_URL="$(aws amplify get-branch \
+            --app-id "$APP_ID" \
+            --branch-name "$BRANCH_NAME" \
+            --region "$AWS_REGION" \
+            --query 'branch.webUrl' \
+            --output text)"
+
+          if [ -z "$BRANCH_WEB_URL" ] || [ "$BRANCH_WEB_URL" = "None" ]; then
+            BRANCH_WEB_URL="https://${BRANCH_NAME}.${APP_ID}.amplifyapp.com"
+          fi
+
+          echo "deploy_url=$BRANCH_WEB_URL" >> "$GITHUB_OUTPUT"
+          echo "Deployment URL: $BRANCH_WEB_URL"
+
+      - name: Smoke checks (web business flows)
+        env:
+          DEPLOY_URL: ${{ steps.wait.outputs.deploy_url }}
+        run: |
+          set -euo pipefail
+
+          require_status() {
+            local expected="$1"
+            local path="$2"
+            local method="${3:-GET}"
+            local data="${4:-}"
+            local tmp
+            tmp="$(mktemp)"
+
+            local code
+            if [ "$method" = "POST" ]; then
+              code="$(curl -sS -o "$tmp" -w "%{http_code}" \
+                -X POST \
+                -H "content-type: application/json" \
+                -d "$data" \
+                "$DEPLOY_URL$path")"
+            else
+              code="$(curl -sS -o "$tmp" -w "%{http_code}" "$DEPLOY_URL$path")"
+            fi
+
+            if [ "$code" != "$expected" ]; then
+              echo "Smoke check failed for $method $path: expected $expected, got $code"
+              echo "Response body:"
+              cat "$tmp"
+              rm -f "$tmp"
+              exit 1
+            fi
+
+            echo "Smoke check passed: $method $path -> $code"
+            rm -f "$tmp"
+          }
+
+          require_status 200 "/"
+          require_status 200 "/survey/setup"
+          require_status 200 "/api/surveys/templates/public/appetite"
+          require_status 400 "/api/surveys/campaigns" "POST" '{"businessName":"Smoke Test Cafe","town":"Galway"}'
+          require_status 400 "/api/waitlist" "POST" '{"email":"smoke@example.com","interest":"invalid_interest"}'
