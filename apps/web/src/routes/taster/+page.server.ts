@@ -1,85 +1,57 @@
-import { readFile, readdir } from 'node:fs/promises';
-import path from 'node:path';
 import {
   buildLessonScreensFromPayload,
   type LessonPayload,
   type LessonScreen,
 } from '@decyphr/misneach-ui';
+import { nestFetch } from '$lib/server/api';
 import type { PageServerLoad } from './$types';
 
-async function resolveLessonsDir() {
-  const relative = 'apps/courses/src/content/lessons/cafe';
-  const candidates = [
-    path.resolve('/app', relative),
-    path.resolve(process.cwd(), relative),
-    path.resolve(process.cwd(), '..', relative),
-    path.resolve(process.cwd(), '..', '..', relative),
-    path.resolve(process.cwd(), '..', '..', '..', relative),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      await readdir(candidate);
-      return candidate;
-    } catch {
-      // try next
-    }
-  }
-
-  return null;
-}
-
-function parseOrderFromSlug(fileName: string) {
-  const match = fileName.match(/lesson-(\d+)-(\d+)/i);
-  if (!match) return Number.MAX_SAFE_INTEGER;
-  return Number.parseInt(match[1] || '0', 10) * 100 + Number.parseInt(match[2] || '0', 10);
-}
-
-export const load: PageServerLoad = async () => {
-  const lessonsDir = await resolveLessonsDir();
-  const courseTitle = 'Coffee Shop Encounters';
+export const load: PageServerLoad = async (event) => {
+  let courseTitle = 'Coffee Shop Encounters';
 
   let screens: LessonScreen[] = [];
 
   try {
-    if (!lessonsDir) {
-      throw new Error('Unable to locate compiled course lesson content directory');
+    const response = await nestFetch(event, '/courses/taster', { method: 'GET' }, false);
+    if (!response.ok) {
+      throw new Error(`Failed to load taster content (${response.status})`);
     }
 
-    const files = (await readdir(lessonsDir))
-      .filter((name) => /^cafe-first-encounters-lesson-1-\d+.*\.json$/i.test(name))
-      .sort((a, b) => parseOrderFromSlug(a) - parseOrderFromSlug(b));
+    const payload = (await response.json()) as {
+      lesson?: Record<string, unknown>;
+      progress?: LessonPayload['progress'];
+      pedagogy?: LessonPayload['pedagogy'];
+    };
 
-    if (!files.length) {
-      throw new Error(`No lesson JSON files found in ${lessonsDir}`);
+    const lesson = payload.lesson || {};
+    const blocks = Array.isArray(lesson['blocks']) ? (lesson['blocks'] as LessonPayload['blocks']) : [];
+
+    if (!blocks.length) {
+      throw new Error('Taster lesson returned no content blocks');
     }
 
-    const lessonPayloads: LessonPayload[] = [];
+    courseTitle = String(lesson.courseTitle || courseTitle);
 
-    for (const file of files) {
-      const fullPath = path.join(lessonsDir, file);
-      const source = await readFile(fullPath, 'utf8');
-      const raw = JSON.parse(source) as Record<string, unknown>;
-
-      lessonPayloads.push({
+    const lessonPayloads: LessonPayload[] = [
+      {
         lesson: {
-          courseSlug: String(raw.courseSlug || 'cafe'),
-          courseTitle: String(raw.courseTitle || courseTitle),
-          lessonSlug: String(raw.lessonSlug || file.replace(/\.json$/i, '')),
-          lessonTitle: String(raw.lessonTitle || raw.title || file.replace(/\.json$/i, '')),
-          estimatedMinutes: Number(raw.estimatedMinutes || 4),
-          contentVersion: 'static-json',
+          courseSlug: String(lesson.courseSlug || 'cafe'),
+          courseTitle,
+          lessonSlug: String(lesson.lessonSlug || 'taster'),
+          lessonTitle: String(lesson.lessonTitle || 'Taster Lesson'),
+          estimatedMinutes: Number(lesson.estimatedMinutes || 4),
+          contentVersion: String(lesson.contentVersion || 'taster'),
         },
-        progress: {
+        progress: payload.progress || {
           status: 'not_started',
           progressPercent: 0,
           lastBlockId: null,
-          contentVersion: 'static-json',
+          contentVersion: String(lesson.contentVersion || 'taster'),
         },
-        pedagogy: raw.pedagogy as LessonPayload['pedagogy'],
-        blocks: (raw.blocks || []) as LessonPayload['blocks'],
-      });
-    }
+        pedagogy: payload.pedagogy,
+        blocks,
+      },
+    ];
 
     const intro: LessonScreen = {
       kind: 'intro',
@@ -90,8 +62,8 @@ export const load: PageServerLoad = async () => {
       chips: ['Greetings', 'Ordering', 'Payment', 'Add-ons', 'Milk swaps', 'Real world challenge'],
     };
 
-    const allLessonScreens = lessonPayloads.flatMap((payload, idx) =>
-      buildLessonScreensFromPayload(payload, {
+    const allLessonScreens = lessonPayloads.flatMap((lessonPayload, idx) =>
+      buildLessonScreensFromPayload(lessonPayload, {
         idPrefix: `unit1-${idx + 1}`,
         includeIntro: false,
         includeRecap: false,
