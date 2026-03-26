@@ -187,7 +187,9 @@ jobs:
           }
 
           require_status 200 "/"
+          require_status 200 "/taster"
           require_status 200 "/survey/setup"
+          require_status 200 "/api/courses/taster"
           require_status 200 "/api/surveys/templates/public/appetite"
           require_status 400 "/api/surveys/campaigns" "POST" '{"businessName":"Smoke Test Cafe","town":"Galway"}'
           require_status 400 "/api/waitlist" "POST" '{"email":"smoke@example.com","interest":"invalid_interest"}'

@@ -26,6 +26,10 @@ This runbook deploys `apps/web` to AWS Amplify Hosting.
 
 - Automatic: pushes to `main` that touch `apps/web/**` trigger [`web-amplify-deploy.yml`](../.github/workflows/web-amplify-deploy.yml).
 - Manual: run `Web Deploy (Amplify)` workflow and set branch input.
+- Deploy workflow smoke checks validate:
+  - `GET /taster`
+  - `GET /api/courses/taster`
+  - survey and waitlist API flows
 
 ## Notes
 
