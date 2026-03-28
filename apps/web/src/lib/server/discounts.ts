@@ -1,3 +1,5 @@
+import * as privateEnv from '$env/static/private';
+
 type DiscountQuoteInput = {
   code: string;
   audience: 'learner' | 'business';
@@ -18,8 +20,8 @@ type DiscountQuoteResponse = {
 };
 
 function resolveClientBaseUrls(): string[] {
-  const configured = (process.env.DISCOUNT_SERVICE_URL || '').trim();
-  const configuredList = (process.env.DISCOUNT_SERVICE_URLS || '')
+  const configured = (privateEnv.DISCOUNT_SERVICE_URL || '').trim();
+  const configuredList = (privateEnv.DISCOUNT_SERVICE_URLS || '')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
@@ -42,8 +44,8 @@ export async function quoteDiscount(input: DiscountQuoteInput): Promise<Discount
   for (const baseUrl of baseUrls) {
     try {
       const headers = new Headers({ 'content-type': 'application/json' });
-      if (process.env.INTERNAL_AUTH_SECRET) {
-        headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+      if (privateEnv.INTERNAL_AUTH_SECRET) {
+        headers.set('x-internal-auth', privateEnv.INTERNAL_AUTH_SECRET);
       }
 
       const res = await fetch(`${baseUrl}/discounts/quote`, {

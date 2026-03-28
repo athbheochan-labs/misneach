@@ -1,9 +1,10 @@
 import { json } from '@sveltejs/kit';
+import * as privateEnv from '$env/static/private';
 import type { RequestHandler } from './$types';
 
 function baseUrls() {
-  const configured = (process.env.CLIENT_API_URL || '').trim();
-  const configuredNest = (process.env.NEST_INTERNAL_URL || '').trim();
+  const configured = (privateEnv.CLIENT_API_URL || '').trim();
+  const configuredNest = (privateEnv.NEST_INTERNAL_URL || '').trim();
   const candidates = [
     configured,
     configuredNest,
