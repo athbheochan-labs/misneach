@@ -14,6 +14,9 @@ applications:
             - printf 'NEST_INTERNAL_URL=%s\n' "${NEST_INTERNAL_URL:-}" >> apps/web/.env.production
             - printf 'NEST_INTERNAL_URLS=%s\n' "${NEST_INTERNAL_URLS:-}" >> apps/web/.env.production
             - printf 'CLIENT_API_URL=%s\n' "${CLIENT_API_URL:-}" >> apps/web/.env.production
+            - printf 'INTERNAL_AUTH_SECRET=%s\n' "${INTERNAL_AUTH_SECRET:-}" >> apps/web/.env.production
+            - printf 'DISCOUNT_SERVICE_URL=%s\n' "${DISCOUNT_SERVICE_URL:-}" >> apps/web/.env.production
+            - printf 'DISCOUNT_SERVICE_URLS=%s\n' "${DISCOUNT_SERVICE_URLS:-}" >> apps/web/.env.production
             - printf 'APP_BASE_URL=%s\n' "${APP_BASE_URL:-}" >> apps/web/.env.production
             - printf 'WEB_APP_URL=%s\n' "${WEB_APP_URL:-}" >> apps/web/.env.production
             - npm run build --workspace web
