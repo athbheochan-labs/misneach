@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
+  import { clearAuthSession } from '$lib/mobile/session-storage';
   import {
     MisButton,
     MisCard,
@@ -697,6 +698,7 @@
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    await clearAuthSession();
     await goto('/auth/login');
   }
 
