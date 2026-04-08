@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   Res,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AUTH_COOKIE } from './auth.constants';
@@ -44,6 +45,54 @@ export class AuthController {
       return res
         .status(HttpStatus.BAD_REQUEST)
         .json({ error: err.message });
+    }
+  }
+
+  /**
+   * Mobile-friendly login flow:
+   * - `{ email }` -> send magic link (pending verification)
+   * - `{ email, token }` -> verify token and issue access/refresh pair
+   */
+  @Post('login')
+  async login(
+    @Body() body: { email: string; token?: string },
+    @Res() res: Response,
+  ) {
+    const email = String(body?.email || '').trim().toLowerCase();
+    const token = String(body?.token || '').trim();
+
+    if (!email) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Email is required' });
+    }
+
+    if (!token) {
+      await this.authService.handleMagicLink(email);
+      return res.status(HttpStatus.OK).json({
+        ok: true,
+        status: 'pending_verification',
+        message: 'Login link sent if account is eligible',
+      });
+    }
+
+    const tokenPair = await this.authService.issueTokenPairFromMagicLink(email, token);
+    return res.status(HttpStatus.OK).json(tokenPair);
+  }
+
+  @Post('refresh')
+  async refresh(@Body() body: { refreshToken: string }, @Res() res: Response) {
+    const refreshToken = String(body?.refreshToken || '').trim();
+    if (!refreshToken) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: 'refreshToken is required' });
+    }
+
+    try {
+      const tokenPair = await this.authService.refreshTokenPair(refreshToken);
+      return res.status(HttpStatus.OK).json(tokenPair);
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        return res.status(HttpStatus.UNAUTHORIZED).json({ error: err.message });
+      }
+      throw err;
     }
   }
 
@@ -128,6 +177,26 @@ export class AuthController {
    */
   @Get('me')
   async getMe(@Req() req: AuthenticatedRequest) {
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      try {
+        const user = await this.authService.getUserFromAccessToken(token);
+        return {
+          loggedIn: true,
+          user: {
+            id: user.id,
+            clientId: user.clientId,
+            email: user.email,
+            role: user.role,
+            signupComplete: user.hasCompletedSignup,
+          },
+        };
+      } catch {
+        return { loggedIn: false, user: null };
+      }
+    }
+
     try {
       const user = await this.authService.getUserFromSession(req);
       return {
@@ -149,7 +218,7 @@ export class AuthController {
    * Logs the user out and clears the session.
    */
   @Post('logout')
-  logout(@Res() res: Response) {
+  logout(@Body() _body: { refreshToken?: string }, @Res() res: Response) {
     res.clearCookie(AUTH_COOKIE, {
       path: '/',
       httpOnly: true,

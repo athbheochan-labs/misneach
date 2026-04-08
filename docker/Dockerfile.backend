@@ -80,6 +80,7 @@ COPY --from=build /usr/src/app/apps/waitlist/dist ./apps/waitlist/dist
 COPY --from=build /usr/src/app/apps/client/package.json ./apps/client/package.json
 COPY --from=build /usr/src/app/apps/client/dist ./apps/client/dist
 COPY --from=build /usr/src/app/apps/client/node_modules ./apps/client/node_modules
+COPY --from=build /usr/src/app/apps/client/public ./apps/client/public
 
 RUN chmod +x /usr/src/app/apps/lexicon/entrypoint.sh \
     && chmod +x /usr/src/app/apps/phrasebook/entrypoint.sh \
