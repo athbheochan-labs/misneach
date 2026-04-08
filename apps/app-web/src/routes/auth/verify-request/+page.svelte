@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { saveAuthSession } from '$lib/mobile/session-storage';
+  import { exchangeMagicLink } from '$lib/api/auth-client';
 
   let message = 'Verifying your secure login link...';
   let state: 'loading' | 'error' = 'loading';
@@ -16,11 +16,7 @@
       return;
     }
 
-    const res = await apiFetch('/api/auth/verify-request', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token, email })
-    });
+    const res = await exchangeMagicLink(email, token);
 
     const data = await res.json().catch(() => ({}));
 
@@ -30,17 +26,21 @@
       return;
     }
 
-    // Token bundle is optional for current web flow, but supported for mobile clients.
-    if (data?.accessToken && data?.refreshToken) {
-      await saveAuthSession({
-        accessToken: String(data.accessToken),
-        refreshToken: String(data.refreshToken),
-        expiresInSec: Number(data.expiresInSec || 0) || undefined,
-        issuedAtEpochSec: Math.floor(Date.now() / 1000),
-      });
+    if (!data?.accessToken || !data?.refreshToken) {
+      message = 'Verification succeeded but token bundle was missing';
+      state = 'error';
+      return;
     }
 
-    await goto(data?.next || '/dashboard');
+    await saveAuthSession({
+      accessToken: String(data.accessToken),
+      refreshToken: String(data.refreshToken),
+      expiresInSec: Number(data.expiresInSec || 0) || undefined,
+      issuedAtEpochSec: Math.floor(Date.now() / 1000),
+    });
+
+    const signupComplete = Boolean(data?.user?.signupComplete);
+    await goto(signupComplete ? '/dashboard' : '/auth/signup');
   }
 
   onMount(async () => {

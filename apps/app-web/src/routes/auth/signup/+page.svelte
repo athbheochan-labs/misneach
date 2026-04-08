@@ -2,6 +2,7 @@
   import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { trackEvent } from '$lib/analytics';
+  import { requestMagicLink } from '$lib/api/auth-client';
 
   type Plan = 'monthly' | 'annual';
 
@@ -80,11 +81,7 @@
     step1Loading = true;
 
     try {
-      const res = await apiFetch('/api/auth/magic-link', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: nextEmail })
-      });
+      const res = await requestMagicLink(nextEmail);
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

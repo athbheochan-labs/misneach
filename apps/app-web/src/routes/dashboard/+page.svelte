@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
+  import { getAuthMe, requestLogout } from '$lib/api/auth-client';
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
   import { clearAuthSession } from '$lib/mobile/session-storage';
@@ -644,11 +645,10 @@
 
   async function loadProfileContext() {
     try {
-      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
-      if (!res.ok) return;
-      const payload = await res.json();
-      profileClientId = String(payload?.clientId || '').trim();
-      profileEmail = String(payload?.email || '').trim();
+      const auth = await getAuthMe();
+      if (!auth.loggedIn || !auth.user) return;
+      profileClientId = String(auth.user.clientId || '').trim();
+      profileEmail = String(auth.user.email || '').trim();
     } catch {
       profileClientId = '';
       profileEmail = '';
@@ -697,7 +697,7 @@
   }
 
   async function logout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
+    await requestLogout();
     await clearAuthSession();
     await goto('/auth/login');
   }

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { apiFetch } from '$lib/api/client';
   import { MisButton, MisInput } from '@decyphr/misneach-ui';
+  import { requestMagicLink } from '$lib/api/auth-client';
 
   type ViewState = 'unsent' | 'success' | 'error';
 
@@ -31,11 +31,7 @@
 
     loading = true;
     try {
-      const res = await apiFetch('/api/auth/magic-link', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: nextEmail })
-      });
+      const res = await requestMagicLink(nextEmail);
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

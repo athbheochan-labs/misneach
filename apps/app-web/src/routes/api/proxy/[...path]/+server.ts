@@ -5,9 +5,11 @@ import { nestFetch } from '$lib/server/api';
 async function forward(event: Parameters<RequestHandler>[0], method: string) {
   let attemptedPath = '/' + (event.params.path || '');
   try {
-    const upstreamPath = '/' + (event.params.path || '');
+    const rawPath = event.params.path || '';
+    const upstreamPath = '/' + rawPath;
     const upstreamUrl = new URL(`http://internal${upstreamPath}${event.url.search}`);
-    const isCoursesPath = (event.params.path || '').startsWith('courses/');
+    const isCoursesPath = rawPath.startsWith('courses/');
+    const isAuthPath = rawPath.startsWith('auth/');
     const previewToken = event.locals.auth?.role === 'admin' ? event.locals.previewToken : null;
     if (isCoursesPath && previewToken && !upstreamUrl.searchParams.has('previewToken')) {
       upstreamUrl.searchParams.set('previewToken', previewToken);
@@ -44,7 +46,7 @@ async function forward(event: Parameters<RequestHandler>[0], method: string) {
       event,
       attemptedPath,
       init,
-      true,
+      !isAuthPath,
     );
     const contentType = response.headers.get('content-type') || '';
 
