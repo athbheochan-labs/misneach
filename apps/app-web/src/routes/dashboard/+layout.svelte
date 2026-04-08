@@ -3,6 +3,7 @@
   import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
+  import { clearAuthSession } from '$lib/mobile/session-storage';
 
   let { data, children } = $props();
 
@@ -50,6 +51,7 @@
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
+    await clearAuthSession();
     await goto('/auth/login');
   }
 </script>

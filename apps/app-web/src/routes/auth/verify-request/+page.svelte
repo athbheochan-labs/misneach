@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { saveAuthSession } from '$lib/mobile/session-storage';
 
   let message = 'Verifying your secure login link...';
   let state: 'loading' | 'error' = 'loading';
@@ -26,6 +27,16 @@
       message = data?.error || 'Verification failed';
       state = 'error';
       return;
+    }
+
+    // Token bundle is optional for current web flow, but supported for mobile clients.
+    if (data?.accessToken && data?.refreshToken) {
+      await saveAuthSession({
+        accessToken: String(data.accessToken),
+        refreshToken: String(data.refreshToken),
+        expiresInSec: Number(data.expiresInSec || 0) || undefined,
+        issuedAtEpochSec: Math.floor(Date.now() / 1000),
+      });
     }
 
     await goto(data?.next || '/dashboard');
