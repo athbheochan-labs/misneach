@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { ClientKafka } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
@@ -22,10 +28,18 @@ export class StatementService implements OnModuleInit {
     private readonly statementRepository: Repository<Statement>,
     @InjectRepository(StatementToken)
     private readonly tokenRepository: Repository<StatementToken>,
-    @Inject('STATEMENT_PRODUCER') private readonly kafkaProducer: ClientKafka,
+    @Optional()
+    @Inject('STATEMENT_PRODUCER')
+    private readonly kafkaProducer?: ClientKafka,
   ) { }
 
   async onModuleInit() {
+    if (!this.kafkaProducer) {
+      this.logger.warn(
+        'STATEMENT_PRODUCER is not configured; statement.updated events will not be emitted.',
+      );
+      return;
+    }
     await this.kafkaProducer.connect();
   }
 
@@ -245,6 +259,13 @@ export class StatementService implements OnModuleInit {
       'TOKENS BEFORE EMIT',
       JSON.stringify(statement.tokens, null, 2),
     );
+
+    if (!this.kafkaProducer) {
+      this.logger.warn(
+        `Skipping statement.updated emit for statementId=${statement.id} because STATEMENT_PRODUCER is not configured.`,
+      );
+      return;
+    }
 
     await lastValueFrom(
       this.kafkaProducer.emit('statement.updated', {
