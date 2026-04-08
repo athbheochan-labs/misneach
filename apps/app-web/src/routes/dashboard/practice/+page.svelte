@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { MisButton, MisModeCard, MisProgressStrip, MisTextarea } from '@decyphr/misneach-ui';
@@ -224,7 +225,7 @@
   async function loadAuthContext() {
     authClientId = '';
     try {
-      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (!res.ok) return;
       const payload = await res.json();
       authClientId = String(payload?.clientId || '').trim();
@@ -245,7 +246,7 @@
 
   async function fetchDueCount() {
     try {
-      const res = await fetch('/api/proxy/practice/progress', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/practice/progress', { cache: 'no-store' });
       if (!res.ok) return null;
       const payload = await res.json();
       const rawCount = Number(payload?.dueCount);
@@ -469,7 +470,7 @@
 
     submitting = true;
     try {
-      const res = await fetch('/api/proxy/practice/attempt', {
+      const res = await apiFetch('/api/proxy/practice/attempt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
@@ -50,7 +51,7 @@
   afterNavigate(initIcons);
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     await clearAuthSession();
     await goto('/auth/login');
   }

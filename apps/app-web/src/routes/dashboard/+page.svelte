@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
   import { clearAuthSession } from '$lib/mobile/session-storage';
@@ -299,7 +300,7 @@
     journeyLoading = true;
     journeyError = '';
     try {
-      const catalogRes = await fetch('/api/proxy/courses/catalog', { cache: 'no-store' });
+      const catalogRes = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
       if (!catalogRes.ok) throw new Error('Failed to load your course journey.');
 
       const catalogPayload = await catalogRes.json();
@@ -324,7 +325,7 @@
     phraseLoading = true;
     phraseError = '';
     try {
-      const phraseHealthRes = await fetch('/api/proxy/practice/phrase-health?limit=5&lookbackDays=30', {
+      const phraseHealthRes = await apiFetch('/api/proxy/practice/phrase-health?limit=5&lookbackDays=30', {
         cache: 'no-store',
       });
 
@@ -367,8 +368,7 @@
     flashcardsLoading = true;
     flashcardsError = '';
     try {
-      const flashcardsHealthRes = await fetch(
-        '/api/proxy/flashcards/health?limit=5&lookbackDays=30',
+      const flashcardsHealthRes = await apiFetch('/api/proxy/flashcards/health?limit=5&lookbackDays=30',
         { cache: 'no-store' },
       );
 
@@ -394,7 +394,7 @@
           .filter(Boolean) as Array<{ irish: string; meta: string; due: boolean }>;
       } else {
         // Backward-compatible fallback for environments where /flashcards/health is not deployed yet.
-        const dueRes = await fetch('/api/proxy/flashcards/study/due?limit=5', { cache: 'no-store' });
+        const dueRes = await apiFetch('/api/proxy/flashcards/study/due?limit=5', { cache: 'no-store' });
         if (!dueRes.ok) throw new Error('Failed to load flashcards.');
         const dueCards = await dueRes.json();
         const items = Array.isArray(dueCards) ? dueCards : [];
@@ -472,7 +472,7 @@
     goalsLoading = true;
     goalsError = '';
     try {
-      const res = await fetch('/api/proxy/goals', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/goals', { cache: 'no-store' });
       if (!res.ok) throw new Error(await readError(res, 'Failed to load goals'));
 
       const payload = await res.json();
@@ -497,7 +497,7 @@
     challengeLoading = true;
     challengeError = '';
     try {
-      const res = await fetch('/api/proxy/challenges', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/challenges', { cache: 'no-store' });
       if (!res.ok) throw new Error(await readError(res, 'Failed to load challenge'));
 
       const payload = await res.json();
@@ -644,7 +644,7 @@
 
   async function loadProfileContext() {
     try {
-      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (!res.ok) return;
       const payload = await res.json();
       profileClientId = String(payload?.clientId || '').trim();
@@ -697,7 +697,7 @@
   }
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     await clearAuthSession();
     await goto('/auth/login');
   }

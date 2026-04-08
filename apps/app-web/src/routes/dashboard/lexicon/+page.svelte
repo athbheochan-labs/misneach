@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
 
   type SnapshotStats = { score?: number | string; updatedAt?: string };
@@ -224,7 +225,7 @@
 
   async function submitImport() {
     if (!parsedImportWords.length) return;
-    const res = await fetch('/api/proxy/lexicon/import', {
+    const res = await apiFetch('/api/proxy/lexicon/import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ words: parsedImportWords }),
@@ -246,7 +247,7 @@
     fcNotes = `POS: ${POS_LABELS[item.pos] || item.pos} · Confidence: ${Math.round(item.score * 100)}%`;
     newDeckName = '';
 
-    const decksRes = await fetch('/api/proxy/flashcards/decks', { cache: 'no-store' });
+    const decksRes = await apiFetch('/api/proxy/flashcards/decks', { cache: 'no-store' });
     if (!decksRes.ok) {
       alert(await readError(decksRes, 'Failed to load decks'));
       return;
@@ -274,7 +275,7 @@
         const name = newDeckName.trim();
         if (!name) throw new Error('New deck name is required');
 
-        const createRes = await fetch('/api/proxy/flashcards/decks', {
+        const createRes = await apiFetch('/api/proxy/flashcards/decks', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -311,7 +312,7 @@
 
   onMount(async () => {
     try {
-      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' });
+      const sessionRes = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (!sessionRes.ok) throw new Error(await readError(sessionRes, 'Not authenticated'));
       const session = await sessionRes.json();
       clientId = String(session?.clientId || '').trim();

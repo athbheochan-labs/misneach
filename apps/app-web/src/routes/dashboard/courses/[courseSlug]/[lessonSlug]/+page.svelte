@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
@@ -64,7 +65,7 @@
       finishUnitHref: '/dashboard',
     };
 
-    const res = await fetch('/api/proxy/courses/catalog', { cache: 'no-store' });
+    const res = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
     if (!res.ok) return fallback;
 
     const catalog = await res.json();

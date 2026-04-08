@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { MisButton, MisInput, MisSelect, MisTextarea } from '@decyphr/misneach-ui';
@@ -38,7 +39,7 @@
   async function loadDecks() {
     loading = true;
     try {
-      const res = await fetch('/api/proxy/flashcards/decks', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/flashcards/decks', { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch decks');
       decks = await res.json();
     } catch (err) {
@@ -103,7 +104,7 @@
     deckError = '';
 
     try {
-      const res = await fetch('/api/proxy/flashcards/decks', {
+      const res = await apiFetch('/api/proxy/flashcards/decks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

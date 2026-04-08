@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
 
   onMount(async () => {
     try {
-      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' });
+      const sessionRes = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (sessionRes.ok) {
         await goto('/dashboard');
         return;

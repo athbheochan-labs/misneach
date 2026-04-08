@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { MisButton } from '@decyphr/misneach-ui';
@@ -98,7 +99,7 @@
   async function loadAuthContext() {
     authClientId = '';
     try {
-      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (!res.ok) return;
       const payload = await res.json();
       authClientId = String(payload?.clientId || '').trim();

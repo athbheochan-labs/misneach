@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { trackEvent } from '$lib/analytics';
   import { MisButton, MisChipInput, MisInput } from '@decyphr/misneach-ui';
@@ -129,7 +130,7 @@
   }
 
   async function saveStep1() {
-    const response = await fetch('/api/proxy/business/onboarding/details', {
+    const response = await apiFetch('/api/proxy/business/onboarding/details', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +151,7 @@
   }
 
   async function saveStep2() {
-    const response = await fetch('/api/proxy/business/onboarding/staff', {
+    const response = await apiFetch('/api/proxy/business/onboarding/staff', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -199,7 +200,7 @@
     const code = promoInput.trim().toUpperCase();
     if (!code) return;
 
-    const response = await fetch('/api/proxy/business/onboarding/promo/validate', {
+    const response = await apiFetch('/api/proxy/business/onboarding/promo/validate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -255,7 +256,7 @@
           throw new Error('Please complete your card details.');
         }
 
-        const intentResponse = await fetch('/api/proxy/business/onboarding/payment-intent', {
+        const intentResponse = await apiFetch('/api/proxy/business/onboarding/payment-intent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -273,7 +274,7 @@
         }
       }
 
-      const activateResponse = await fetch('/api/proxy/business/onboarding/activate', {
+      const activateResponse = await apiFetch('/api/proxy/business/onboarding/activate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -311,7 +312,7 @@
       const draft = loadDraft();
       applyDraft(draft);
 
-      const onboardingResponse = await fetch('/api/proxy/business/onboarding', { cache: 'no-store' });
+      const onboardingResponse = await apiFetch('/api/proxy/business/onboarding', { cache: 'no-store' });
 
       if (onboardingResponse.ok) {
         const onboarding = await onboardingResponse.json();
@@ -350,7 +351,7 @@
         }
 
         if (currentStep >= 4) {
-          const assetsResponse = await fetch('/api/proxy/business/onboarding/kit-assets', {
+          const assetsResponse = await apiFetch('/api/proxy/business/onboarding/kit-assets', {
             cache: 'no-store',
           });
           if (assetsResponse.ok) {

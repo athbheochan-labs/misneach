@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { trackEvent } from '$lib/analytics';
 
@@ -79,7 +80,7 @@
     step1Loading = true;
 
     try {
-      const res = await fetch('/api/auth/magic-link', {
+      const res = await apiFetch('/api/auth/magic-link', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ email: nextEmail })
@@ -110,7 +111,7 @@
   }
 
   async function requotePromo(code: string, silent = false) {
-    const response = await fetch('/api/auth/signup/discount-quote', {
+    const response = await apiFetch('/api/auth/signup/discount-quote', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -167,7 +168,7 @@
 
     payLoading = true;
     try {
-      const res = await fetch('/api/auth/signup/payment', {
+      const res = await apiFetch('/api/auth/signup/payment', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

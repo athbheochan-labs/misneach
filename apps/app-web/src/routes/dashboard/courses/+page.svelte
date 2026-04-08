@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { compareLessonsByHierarchy } from '$lib/course-order';
   import { onMount } from 'svelte';
@@ -71,7 +72,7 @@
     error = '';
 
     try {
-      const res = await fetch('/api/proxy/courses/catalog', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
       if (!res.ok) {
         throw new Error(await res.text());
       }

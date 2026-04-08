@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { afterUpdate, onDestroy, onMount } from 'svelte';
   import { MisButton, MisTextarea } from '@decyphr/misneach-ui';
 
@@ -89,7 +90,7 @@
   async function loadExistingTranslations() {
     loading = true;
     try {
-      const res = await fetch('/api/proxy/translations/list');
+      const res = await apiFetch('/api/proxy/translations/list');
       if (!res.ok) throw new Error(await readError(res, 'Failed to fetch list'));
 
       const payload = await res.json();
@@ -118,7 +119,7 @@
 
     loading = true;
     try {
-      const res = await fetch('/api/proxy/translate', {
+      const res = await apiFetch('/api/proxy/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,7 +205,7 @@
 
   onMount(async () => {
     try {
-      const sessRes = await fetch('/api/auth/session');
+      const sessRes = await apiFetch('/api/auth/session');
       if (!sessRes.ok) throw new Error(await readError(sessRes, 'Failed to load session'));
 
       const sess = (await sessRes.json()) as SessionResponse;
