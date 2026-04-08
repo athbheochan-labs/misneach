@@ -4,6 +4,8 @@ import { sessionCookieName, verifySession } from '$lib/server/auth';
 const COURSE_PREVIEW_COOKIE = 'courses_preview_token';
 
 export const handle: Handle = async ({ event, resolve }) => {
+  const authMode = (process.env.AUTH_MODE || 'token').toLowerCase();
+  const tokenModeEnabled = authMode !== 'session';
   const token = event.cookies.get(sessionCookieName());
   event.locals.auth = token ? await verifySession(token) : null;
   const isDashboardRoute = event.url.pathname.startsWith('/dashboard');
@@ -12,28 +14,28 @@ export const handle: Handle = async ({ event, resolve }) => {
   const isLearner = (event.locals.auth?.role ?? 'learner') === 'learner';
   const signupComplete = event.locals.auth?.signupComplete !== false;
 
-  if ((isDashboardRoute || isBusinessRoute) && !event.locals.auth) {
+  if (!tokenModeEnabled && (isDashboardRoute || isBusinessRoute) && !event.locals.auth) {
     return new Response(null, {
       status: 302,
       headers: { Location: '/auth/login' }
     });
   }
 
-  if (isDashboardRoute && event.locals.auth && isLearner && !signupComplete) {
+  if (!tokenModeEnabled && isDashboardRoute && event.locals.auth && isLearner && !signupComplete) {
     return new Response(null, {
       status: 302,
       headers: { Location: '/auth/signup' }
     });
   }
 
-  if (isSignupRoute && event.locals.auth && isLearner && signupComplete) {
+  if (!tokenModeEnabled && isSignupRoute && event.locals.auth && isLearner && signupComplete) {
     return new Response(null, {
       status: 302,
       headers: { Location: '/dashboard' }
     });
   }
 
-  if (event.locals.auth?.role === 'admin') {
+  if (!tokenModeEnabled && event.locals.auth?.role === 'admin') {
     const previewToken = event.url.searchParams.get('previewToken');
     if (previewToken === 'off') {
       event.cookies.delete(COURSE_PREVIEW_COOKIE, { path: '/' });

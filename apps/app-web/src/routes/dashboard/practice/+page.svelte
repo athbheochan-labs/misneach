@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
+  import { getAuthMe } from '$lib/api/auth-client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { MisButton, MisModeCard, MisProgressStrip, MisTextarea } from '@decyphr/misneach-ui';
@@ -225,10 +226,9 @@
   async function loadAuthContext() {
     authClientId = '';
     try {
-      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
-      if (!res.ok) return;
-      const payload = await res.json();
-      authClientId = String(payload?.clientId || '').trim();
+      const auth = await getAuthMe();
+      if (!auth.loggedIn || !auth.user) return;
+      authClientId = String(auth.user.clientId || '').trim();
     } catch {
       authClientId = '';
     }

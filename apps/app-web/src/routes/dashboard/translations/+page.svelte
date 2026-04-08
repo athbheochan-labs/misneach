@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
+  import { getAuthMe } from '$lib/api/auth-client';
   import { afterUpdate, onDestroy, onMount } from 'svelte';
   import { MisButton, MisTextarea } from '@decyphr/misneach-ui';
 
@@ -24,10 +25,6 @@
     createdAt: string;
     sentences: Sentence[];
     flatTokens: Token[];
-  };
-
-  type SessionResponse = {
-    clientId?: string;
   };
 
   let text = '';
@@ -205,11 +202,9 @@
 
   onMount(async () => {
     try {
-      const sessRes = await apiFetch('/api/auth/session');
-      if (!sessRes.ok) throw new Error(await readError(sessRes, 'Failed to load session'));
-
-      const sess = (await sessRes.json()) as SessionResponse;
-      clientId = (sess.clientId || '').trim();
+      const auth = await getAuthMe();
+      if (!auth.loggedIn || !auth.user) throw new Error('Failed to load session');
+      clientId = String(auth.user.clientId || '').trim();
       if (!clientId) throw new Error('Client ID missing');
 
       await loadExistingTranslations();

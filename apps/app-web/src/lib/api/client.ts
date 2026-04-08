@@ -12,8 +12,7 @@ function resolveApiBaseUrl(): string {
 }
 
 function shouldStayOnAppWeb(input: string): boolean {
-  // Keep app-web owned auth routes local until auth-route extraction ticket lands.
-  return input.startsWith('/api/auth/');
+  return input.startsWith('/api/auth/signup/');
 }
 
 function normalizeGatewayPath(input: string): string {

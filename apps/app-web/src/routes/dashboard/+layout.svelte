@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { apiFetch } from '$lib/api/client';
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import { clearAuthSession } from '$lib/mobile/session-storage';
+  import { getAuthMe, requestLogout } from '$lib/api/auth-client';
 
   let { data, children } = $props();
 
@@ -47,11 +47,21 @@
     if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons();
   }
 
-  onMount(initIcons);
+  onMount(async () => {
+    initIcons();
+    const auth = await getAuthMe().catch(() => ({ loggedIn: false, user: null }));
+    if (!auth.loggedIn) {
+      await goto('/auth/login');
+      return;
+    }
+    if (auth.user?.role !== 'admin' && auth.user?.signupComplete === false) {
+      await goto('/auth/signup');
+    }
+  });
   afterNavigate(initIcons);
 
   async function logout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
+    await requestLogout();
     await clearAuthSession();
     await goto('/auth/login');
   }

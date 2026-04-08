@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
+  import { getAuthMe } from '$lib/api/auth-client';
   import { onMount } from 'svelte';
 
   type SnapshotStats = { score?: number | string; updatedAt?: string };
@@ -312,10 +313,9 @@
 
   onMount(async () => {
     try {
-      const sessionRes = await apiFetch('/api/auth/session', { cache: 'no-store' });
-      if (!sessionRes.ok) throw new Error(await readError(sessionRes, 'Not authenticated'));
-      const session = await sessionRes.json();
-      clientId = String(session?.clientId || '').trim();
+      const auth = await getAuthMe();
+      if (!auth.loggedIn || !auth.user) throw new Error('Not authenticated');
+      clientId = String(auth.user.clientId || '').trim();
       if (!clientId) throw new Error('Missing client ID');
       await loadSnapshot(clientId);
     } catch (err) {

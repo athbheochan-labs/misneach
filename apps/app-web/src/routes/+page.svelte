@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { getAuthMe } from '$lib/api/auth-client';
 
   onMount(async () => {
     try {
-      const sessionRes = await apiFetch('/api/auth/session', { cache: 'no-store' });
-      if (sessionRes.ok) {
+      const auth = await getAuthMe();
+      if (auth.loggedIn) {
         await goto('/dashboard');
         return;
       }
