@@ -24,6 +24,22 @@ export class AuthController {
     private readonly authService: AuthService,
   ) { }
 
+  private assertInternalRequest(req: AuthenticatedRequest) {
+    const provided = req.headers['x-internal-auth'];
+    const expected = process.env.INTERNAL_AUTH_SECRET;
+
+    if (!expected) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new ForbiddenException('Forbidden');
+      }
+      return;
+    }
+
+    if (provided !== expected) {
+      throw new ForbiddenException('Forbidden');
+    }
+  }
+
   /**
    * Sends a magic login link to the given email address.
    */
@@ -170,6 +186,45 @@ export class AuthController {
           signupComplete: user.hasCompletedSignup,
         },
       };
+  }
+
+  @Post('internal/resolve-email')
+  async resolveEmail(
+    @Body() body: { email: string },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.assertInternalRequest(req);
+
+    const user = await this.authService.ensureUserByEmail(String(body?.email || ''));
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        clientId: user.clientId,
+        role: user.role,
+        signupComplete: user.hasCompletedSignup,
+      },
+    };
+  }
+
+  @Post('internal/mark-signup-complete')
+  async markSignupComplete(
+    @Body() body: { userId: number },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.assertInternalRequest(req);
+
+    const user = await this.authService.markSignupCompleteByUserId(Number(body?.userId || 0));
+    return {
+      ok: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        clientId: user.clientId,
+        role: user.role,
+        signupComplete: user.hasCompletedSignup,
+      },
+    };
   }
 
   /**

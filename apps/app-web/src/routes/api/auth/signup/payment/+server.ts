@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { quoteDiscount } from '$lib/server/discounts';
-import { ensureUserByEmail, markSignupCompleteByUserId } from '$lib/server/magic-link';
+import { nestFetch } from '$lib/server/api';
 
 type Plan = 'monthly' | 'annual';
 
@@ -68,6 +68,61 @@ async function postPayment(path: string, body: unknown): Promise<Response> {
     : new Error('All payment upstreams failed');
 }
 
+async function resolveSignupUser(event: Parameters<RequestHandler>[0], email: string) {
+  const headers = new Headers({ 'content-type': 'application/json' });
+  if (process.env.INTERNAL_AUTH_SECRET) {
+    headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+  }
+
+  const response = await nestFetch(
+    event,
+    '/auth/internal/resolve-email',
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email }),
+    },
+    false,
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Unable to resolve signup user: ${text}`);
+  }
+
+  const payload = (await response.json()) as {
+    user?: { id: number; email: string; clientId: string; signupComplete: boolean };
+  };
+  const user = payload?.user;
+  if (!user?.id || !user?.clientId) {
+    throw new Error('Resolved signup user payload was invalid');
+  }
+  return user;
+}
+
+async function markSignupComplete(event: Parameters<RequestHandler>[0], userId: number) {
+  const headers = new Headers({ 'content-type': 'application/json' });
+  if (process.env.INTERNAL_AUTH_SECRET) {
+    headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+  }
+
+  const response = await nestFetch(
+    event,
+    '/auth/internal/mark-signup-complete',
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ userId }),
+    },
+    false,
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Unable to mark signup complete: ${text}`);
+  }
+}
+
 export const POST: RequestHandler = async (event) => {
   try {
     const body = await event.request.json();
@@ -79,7 +134,7 @@ export const POST: RequestHandler = async (event) => {
       return json({ error: 'Invalid signup payment request' }, { status: 400 });
     }
 
-    const user = await ensureUserByEmail(email);
+    const user = await resolveSignupUser(event, email);
     const baseCents = plan === 'monthly' ? 499 : 4900;
     const quote = promoCode
       ? await quoteDiscount({
@@ -100,7 +155,7 @@ export const POST: RequestHandler = async (event) => {
     const amountCents = quote.totalCents;
 
     if (amountCents === 0) {
-      await markSignupCompleteByUserId(user.id);
+      await markSignupComplete(event, user.id);
       return json({
         ok: true,
         payment: {
@@ -142,12 +197,12 @@ export const POST: RequestHandler = async (event) => {
     const checkout = (await checkoutRes.json()) as IntentResponse;
 
     if (checkout.status === 'succeeded') {
-      await markSignupCompleteByUserId(user.id);
+      await markSignupComplete(event, user.id);
       return json({ ok: true, payment: checkout });
     }
 
     if (checkout.url) {
-      await markSignupCompleteByUserId(user.id);
+      await markSignupComplete(event, user.id);
       return json({
         ok: true,
         payment: checkout,
