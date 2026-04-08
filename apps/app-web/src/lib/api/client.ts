@@ -11,12 +11,28 @@ function resolveApiBaseUrl(): string {
   return trimTrailingSlash(fromPublic);
 }
 
+function shouldStayOnAppWeb(input: string): boolean {
+  // Keep app-web owned auth routes local until auth-route extraction ticket lands.
+  return input.startsWith('/api/auth/');
+}
+
+function normalizeGatewayPath(input: string): string {
+  // When calling client gateway directly, strip the SvelteKit proxy prefix.
+  if (input.startsWith('/api/proxy/')) {
+    return `/${input.slice('/api/proxy/'.length)}`;
+  }
+  return input;
+}
+
 function resolveUrl(input: string): string {
   const base = resolveApiBaseUrl();
-  if (!base) return input;
+  if (!base || shouldStayOnAppWeb(input)) return input;
+
+  const normalized = normalizeGatewayPath(input);
+
   if (/^https?:\/\//i.test(input)) return input;
-  if (!input.startsWith('/')) return `${base}/${input}`;
-  return `${base}${input}`;
+  if (!normalized.startsWith('/')) return `${base}/${normalized}`;
+  return `${base}${normalized}`;
 }
 
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
