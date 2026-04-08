@@ -8,6 +8,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [Project Management (GitHub)](./project-management.md)
 - [System Architecture](./architecture.md)
 - [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
+- [Mobile Auth Token Contract](./mobile-auth-token-contract.md)
 - [Architecture Decision Records](./adr/README.md)
 
 ## Source of Truth
