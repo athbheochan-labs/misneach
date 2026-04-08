@@ -380,6 +380,68 @@ export class AuthService {
     return user;
   }
 
+  async ensureUserByEmail(email: string): Promise<User> {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('Email is required');
+    }
+
+    let user = await this.userRepo.findOne({
+      where: { email: normalized },
+      relations: ['languageSettings'],
+    });
+
+    if (!user) {
+      user = this.userRepo.create({
+        email: normalized,
+        clientId: uuidv4(),
+        role: 'learner',
+        hasCompletedSignup: false,
+      });
+      await this.userRepo.save(user);
+      user = await this.userRepo.findOne({
+        where: { id: user.id },
+        relations: ['languageSettings'],
+      });
+    } else if (!user.clientId) {
+      user.clientId = uuidv4();
+      await this.userRepo.save(user);
+      user = await this.userRepo.findOne({
+        where: { id: user.id },
+        relations: ['languageSettings'],
+      });
+    }
+
+    if (!user) {
+      throw new InternalServerErrorException('Unable to resolve user');
+    }
+
+    await this.ensureDefaultLanguageSettings(user);
+
+    return user;
+  }
+
+  async markSignupCompleteByUserId(userId: number): Promise<User> {
+    if (!Number.isFinite(userId) || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ['languageSettings'],
+    });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.hasCompletedSignup) {
+      user.hasCompletedSignup = true;
+      await this.userRepo.save(user);
+    }
+
+    return user;
+  }
+
   async findUserByClientId(clientId: string): Promise<User | null> {
     return this.userRepo.findOne({ where: { clientId }, relations: ['languageSettings'], });
   }
