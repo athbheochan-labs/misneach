@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { flip } from 'svelte/animate';
   import { goto } from '$app/navigation';
   import { fade, fly } from 'svelte/transition';
@@ -120,7 +121,7 @@
   async function loadAuthContext() {
     authClientId = '';
     try {
-      const res = await fetch('/api/auth/session', { cache: 'no-store' });
+      const res = await apiFetch('/api/auth/session', { cache: 'no-store' });
       if (!res.ok) return;
       const payload = await res.json();
       authClientId = String(payload?.clientId || '').trim();
@@ -161,7 +162,7 @@
 
       session = loaded;
 
-      const catalogRes = await fetch('/api/proxy/courses/catalog', { cache: 'no-store' });
+      const catalogRes = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
       if (catalogRes.ok) {
         const payload = await catalogRes.json();
         const courses = (payload?.courses ?? []) as StudyCatalogCourse[];

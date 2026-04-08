@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onDestroy, onMount } from 'svelte';
 
   type Phrase = {
@@ -100,7 +101,7 @@
   async function loadPhrases() {
     loading = true;
     try {
-      const res = await fetch('/api/proxy/phrasebook/list', { cache: 'no-store' });
+      const res = await apiFetch('/api/proxy/phrasebook/list', { cache: 'no-store' });
       if (!res.ok) throw new Error(await readErrorMessage(res, 'Failed to load phrasebook'));
       const data = await res.json();
       phrases = Array.isArray(data) ? data.map((item) => normalizePhrase(item)) : [];
@@ -299,7 +300,7 @@
 
         showToast('Phrase updated');
       } else {
-        const res = await fetch('/api/proxy/phrasebook', {
+        const res = await apiFetch('/api/proxy/phrasebook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

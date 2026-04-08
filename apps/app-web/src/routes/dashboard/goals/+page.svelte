@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onDestroy, onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { MisButton, MisInput, MisSelect } from '@decyphr/misneach-ui';
@@ -353,11 +354,11 @@
     error = '';
     try {
       const [goalsRes, summaryRes, catalogRes, practiceRes, flashcardsRes] = await Promise.all([
-        fetch('/api/proxy/goals', { cache: 'no-store' }),
-        fetch('/api/proxy/goals/progress/summary', { cache: 'no-store' }),
-        fetch('/api/proxy/courses/catalog', { cache: 'no-store' }),
-        fetch('/api/proxy/practice/progress', { cache: 'no-store' }),
-        fetch('/api/proxy/flashcards/health?limit=50&lookbackDays=365', { cache: 'no-store' }),
+        apiFetch('/api/proxy/goals', { cache: 'no-store' }),
+        apiFetch('/api/proxy/goals/progress/summary', { cache: 'no-store' }),
+        apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' }),
+        apiFetch('/api/proxy/practice/progress', { cache: 'no-store' }),
+        apiFetch('/api/proxy/flashcards/health?limit=50&lookbackDays=365', { cache: 'no-store' }),
       ]);
 
       if (!goalsRes.ok) throw new Error(await readError(goalsRes, 'Failed to load goals'));
@@ -411,7 +412,7 @@
   }
 
   async function createGoalFromValues(name: string, type: 'checkbox' | 'count', target: number, period: 'week' | 'month' | 'ongoing') {
-    const res = await fetch('/api/proxy/goals', {
+    const res = await apiFetch('/api/proxy/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildCreatePayload(name, type, target, period)),

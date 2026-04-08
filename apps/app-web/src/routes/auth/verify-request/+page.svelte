@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiFetch } from '$lib/api/client';
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { saveAuthSession } from '$lib/mobile/session-storage';
@@ -15,7 +16,7 @@
       return;
     }
 
-    const res = await fetch('/api/auth/verify-request', {
+    const res = await apiFetch('/api/auth/verify-request', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token, email })
