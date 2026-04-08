@@ -51,6 +51,8 @@ const translations = {
 @Injectable()
 export class AuthService {
   private resend;
+  private readonly accessTokenTtlSec = 15 * 60;
+  private readonly refreshTokenTtlSec = 30 * 24 * 60 * 60;
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -62,6 +64,157 @@ export class AuthService {
     private readonly settingsService: SettingsService,
   ) {
     this.resend = new Resend(this.config.get<string>('RESEND_API_KEY'));
+  }
+
+  private getTokenSecret(): string {
+    return (
+      this.config.get<string>('AUTH_TOKEN_SECRET') ||
+      this.config.get<string>('SESSION_SECRET') ||
+      'dev-insecure-auth-token-secret'
+    );
+  }
+
+  private base64UrlEncode(input: Buffer | string): string {
+    const value = Buffer.isBuffer(input) ? input.toString('base64') : Buffer.from(input).toString('base64');
+    return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
+  private base64UrlDecode(input: string): string {
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return Buffer.from(padded, 'base64').toString('utf8');
+  }
+
+  private signJwt(payload: Record<string, unknown>): string {
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const headerEncoded = this.base64UrlEncode(JSON.stringify(header));
+    const payloadEncoded = this.base64UrlEncode(JSON.stringify(payload));
+    const data = `${headerEncoded}.${payloadEncoded}`;
+    const signature = crypto
+      .createHmac('sha256', this.getTokenSecret())
+      .update(data)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+    return `${data}.${signature}`;
+  }
+
+  private verifyJwt(token: string): Record<string, unknown> {
+    const [headerEncoded, payloadEncoded, signature] = token.split('.');
+    if (!headerEncoded || !payloadEncoded || !signature) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const data = `${headerEncoded}.${payloadEncoded}`;
+    const expectedSig = crypto
+      .createHmac('sha256', this.getTokenSecret())
+      .update(data)
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    if (expectedSig !== signature) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const payloadRaw = this.base64UrlDecode(payloadEncoded);
+    const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
+    const exp = Number(payload.exp || 0);
+    if (!Number.isFinite(exp) || exp <= Math.floor(Date.now() / 1000)) {
+      throw new UnauthorizedException('Token expired');
+    }
+    return payload;
+  }
+
+  private buildTokenPayload(user: User, tokenType: 'access' | 'refresh', ttlSec: number) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    return {
+      sub: String(user.id),
+      clientId: user.clientId,
+      email: user.email,
+      role: user.role,
+      signupComplete: user.hasCompletedSignup,
+      tokenType,
+      iat: nowSec,
+      exp: nowSec + ttlSec,
+    };
+  }
+
+  issueTokenPair(user: User) {
+    const accessPayload = this.buildTokenPayload(user, 'access', this.accessTokenTtlSec);
+    const refreshPayload = this.buildTokenPayload(user, 'refresh', this.refreshTokenTtlSec);
+
+    return {
+      ok: true as const,
+      accessToken: this.signJwt(accessPayload),
+      refreshToken: this.signJwt(refreshPayload),
+      expiresInSec: this.accessTokenTtlSec,
+      user: {
+        id: user.id,
+        email: user.email,
+        clientId: user.clientId,
+        role: user.role,
+        signupComplete: user.hasCompletedSignup,
+      },
+    };
+  }
+
+  async issueTokenPairFromMagicLink(email: string, token: string) {
+    const user = await this.verifyMagicLinkToken(token, email);
+    return this.issueTokenPair(user);
+  }
+
+  async refreshTokenPair(refreshToken: string) {
+    if (!refreshToken) {
+      throw new BadRequestException('refreshToken is required');
+    }
+
+    const payload = this.verifyJwt(refreshToken);
+    if (payload.tokenType !== 'refresh') {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const userId = Number(payload.sub || 0);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ['languageSettings'],
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.issueTokenPair(user);
+  }
+
+  async getUserFromAccessToken(token: string): Promise<User> {
+    if (!token) {
+      throw new UnauthorizedException('Missing access token');
+    }
+
+    const payload = this.verifyJwt(token);
+    if (payload.tokenType !== 'access') {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    const userId = Number(payload.sub || 0);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ['languageSettings'],
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
   }
 
   private getHeader(req: AuthenticatedRequest, key: string): string | undefined {
