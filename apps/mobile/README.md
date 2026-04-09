@@ -1,6 +1,6 @@
 # apps/mobile
 
-Capacitor container bootstrap for Misneach mobile delivery (Phase 1 hosted-web shell).
+Capacitor container for Misneach mobile delivery (Phase 2 bundled local assets).
 
 ## Prerequisites
 
@@ -14,7 +14,8 @@ Create `apps/mobile/.env` from `.env.example` and set:
 
 - `MOBILE_APP_NAME`
 - `MOBILE_APP_ID`
-- `MOBILE_WEB_URL` (hosted web target)
+- `MOBILE_USE_HOSTED_WEB` (`false` by default)
+- `MOBILE_WEB_URL` (optional rollback target when hosted mode is enabled)
 
 ## Setup
 
@@ -29,7 +30,7 @@ From `apps/mobile`:
 ```bash
 npm run cap:add:ios
 npm run cap:add:android
-npm run cap:sync
+npm run cap:sync:bundled
 ```
 
 ## Run
@@ -48,5 +49,6 @@ npm run cap:open:android
 
 ## Notes
 
-- This is hosted-web mode (`server.url` in `capacitor.config.ts`).
-- Bundled-assets mode is planned for later phase once server-coupling extraction is complete.
+- Default mode is bundled assets from `apps/app-web/build`.
+- `npm run cap:sync:bundled` rebuilds app-web in mobile static mode, then syncs native projects.
+- Hosted-web fallback can be enabled by setting `MOBILE_USE_HOSTED_WEB=true` and providing `MOBILE_WEB_URL`.

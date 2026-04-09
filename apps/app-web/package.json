@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 5175",
     "build": "svelte-kit sync && vite build",
+    "build:mobile": "MOBILE_BUNDLED=1 svelte-kit sync && MOBILE_BUNDLED=1 vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5175",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.2.12",
+    "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.17.2",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "autoprefixer": "^10.4.15",
