@@ -2,6 +2,8 @@
 
 This runbook bootstraps `apps/mobile` as the Phase 1 hosted-web Capacitor container.
 
+> Superseded for current delivery by `docs/mobile-capacitor-bundled-assets.md` (Phase 3 local assets).
+
 ## Goal
 
 - Create iOS and Android shell projects from Capacitor.

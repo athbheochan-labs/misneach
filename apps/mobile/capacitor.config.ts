@@ -2,17 +2,23 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const appName = process.env.MOBILE_APP_NAME || 'Misneach';
 const appId = process.env.MOBILE_APP_ID || 'site.misneach.mobile';
-const hostedWebUrl = process.env.MOBILE_WEB_URL || 'https://www.misneach.site';
+const hostedWebUrl = (process.env.MOBILE_WEB_URL || '').trim();
+const useHostedWeb = process.env.MOBILE_USE_HOSTED_WEB === 'true' && hostedWebUrl.length > 0;
 
 const config: CapacitorConfig = {
   appId,
   appName,
-  webDir: 'www',
-  server: {
-    // Phase 1 hosted-web shell mode.
-    url: hostedWebUrl,
-    cleartext: false,
-  },
+  // Phase 2 bundled-assets mode: load local app-web build output.
+  webDir: '../app-web/build',
+  ...(useHostedWeb
+    ? {
+        // Optional rollback path to hosted-web mode.
+        server: {
+          url: hostedWebUrl,
+          cleartext: false,
+        },
+      }
+    : {}),
   ios: {
     contentInset: 'always',
   },
