@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Misneach</string>
+    <string name="title_activity_main">Misneach</string>
+    <string name="package_name">site.misneach.mobile</string>
+    <string name="custom_url_scheme">site.misneach.mobile</string>
+</resources>

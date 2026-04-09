@@ -9,6 +9,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [System Architecture](./architecture.md)
 - [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
 - [Mobile Auth Token Contract](./mobile-auth-token-contract.md)
+- [Mobile Capacitor Bootstrap](./mobile-capacitor-bootstrap.md)
 - [Architecture Decision Records](./adr/README.md)
 - [ADR 0002: Mobile Session Storage Strategy](./adr/0002-mobile-session-storage-strategy.md)
 
