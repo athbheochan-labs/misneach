@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { saveAuthSession } from '$lib/mobile/session-storage';
   import { exchangeMagicLink } from '$lib/api/auth-client';
 
@@ -8,6 +9,7 @@
   let state: 'loading' | 'error' = 'loading';
   let token = '';
   let email = '';
+  let lastQuery = '';
 
   async function verify() {
     if (!token || !email) {
@@ -43,11 +45,25 @@
     await goto(signupComplete ? '/dashboard' : '/auth/signup');
   }
 
-  onMount(async () => {
-    const params = new URLSearchParams(window.location.search);
+  async function verifyFromUrl(url: URL) {
+    const params = url.searchParams;
     token = params.get('token') || '';
     email = params.get('email') || '';
+    message = 'Verifying your secure login link...';
+    state = 'loading';
     await verify();
+  }
+
+  onMount(() => {
+    const unsubscribe = page.subscribe(($page) => {
+      if ($page.url.pathname !== '/auth/verify-request') return;
+      const query = $page.url.search;
+      if (query === lastQuery) return;
+      lastQuery = query;
+      void verifyFromUrl($page.url);
+    });
+
+    return () => unsubscribe();
   });
 </script>
 

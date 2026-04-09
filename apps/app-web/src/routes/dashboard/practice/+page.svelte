@@ -370,7 +370,7 @@
         }
       }
 
-      const res = await fetch(`/api/proxy/practice/due?limit=${sessionLimit}`, { cache: 'no-store' });
+      const res = await apiFetch(`/api/proxy/practice/due?limit=${sessionLimit}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(await readError(res, 'Failed to load practice session'));
       const payload = await res.json();
       beginSession(payload?.items || [], 'lesson');
@@ -389,7 +389,7 @@
     if (loading) return;
     loading = true;
     try {
-      const res = await fetch(`/api/proxy/practice/mistakes?limit=${sessionLimit}`, { cache: 'no-store' });
+      const res = await apiFetch(`/api/proxy/practice/mistakes?limit=${sessionLimit}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(await readError(res, 'Failed to load mistakes session'));
       const payload = await res.json();
       beginSession(payload?.items || [], 'fix_mistakes');

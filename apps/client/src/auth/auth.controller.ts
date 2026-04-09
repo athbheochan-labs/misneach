@@ -72,10 +72,14 @@ export class AuthController {
   @Post('login')
   async login(
     @Body() body: { email: string; token?: string },
+    @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
     const email = String(body?.email || '').trim().toLowerCase();
-    const token = String(body?.token || '').trim();
+    const tokenFromHeader = Array.isArray(req.headers['x-magic-token'])
+      ? req.headers['x-magic-token'][0]
+      : req.headers['x-magic-token'];
+    const token = String(body?.token || tokenFromHeader || '').trim();
 
     if (!email) {
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'Email is required' });

@@ -473,6 +473,18 @@ export class AuthService {
       if (fromHeader) return fromHeader;
     }
 
+    const authHeader = this.getHeader(req, 'authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.slice(7).trim();
+      if (token) {
+        try {
+          return await this.getUserFromAccessToken(token);
+        } catch {
+          // Fall through to session-based auth checks.
+        }
+      }
+    }
+
     const sessionUser = req.session?.user;
     if (!sessionUser?.id) {
       throw new UnauthorizedException('User not authenticated');

@@ -19,7 +19,10 @@ export async function requestMagicLink(email: string): Promise<Response> {
 export async function exchangeMagicLink(email: string, token: string): Promise<Response> {
   return apiFetch('/api/proxy/auth/login', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      'x-magic-token': token,
+    },
     body: JSON.stringify({ email, token }),
   });
 }
