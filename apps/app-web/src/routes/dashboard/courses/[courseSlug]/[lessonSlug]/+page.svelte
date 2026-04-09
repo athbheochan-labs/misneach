@@ -128,7 +128,7 @@
   }
 
   async function fetchLessonResult(courseSlug: string, lessonSlug: string): Promise<LessonLoadResult> {
-    const res = await fetch(`/api/proxy/courses/${encodeURIComponent(courseSlug)}/lessons/${encodeURIComponent(lessonSlug)}`, {
+    const res = await apiFetch(`/api/proxy/courses/${encodeURIComponent(courseSlug)}/lessons/${encodeURIComponent(lessonSlug)}`, {
       cache: 'no-store',
     });
     if (!res.ok) throw new Error(await res.text());
@@ -158,7 +158,7 @@
       contentVersion: payload.lesson.contentVersion || payload.progress.contentVersion || 'fallback',
     };
 
-    const res = await fetch(
+    const res = await apiFetch(
       `/api/proxy/courses/${encodeURIComponent(payload.lesson.courseSlug)}/lessons/${encodeURIComponent(payload.lesson.lessonSlug)}/progress`,
       {
         method: 'POST',
