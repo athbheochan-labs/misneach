@@ -13,6 +13,7 @@
   } from '@decyphr/misneach-ui';
   import AppModal from '$lib/components/ui/AppModal.svelte';
   import { compareLessonsByHierarchy } from '$lib/course-order';
+  import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
   import { readDashboardCache, writeDashboardCache } from '$lib/stores/dashboard-cache';
 
   type LessonItem = {
@@ -297,6 +298,13 @@
     }
   }
 
+  function resolveLoadError(err: unknown, fallback: string) {
+    if (isLikelyNetworkError(err)) {
+      return 'Network request failed. Check your connection and retry.';
+    }
+    return err instanceof Error ? err.message : fallback;
+  }
+
   async function loadJourneySection() {
     journeyLoading = true;
     journeyError = '';
@@ -316,7 +324,7 @@
       );
       saveDashboardCache();
     } catch (err) {
-      journeyError = err instanceof Error ? err.message : 'Failed to load your course journey.';
+      journeyError = resolveLoadError(err, 'Failed to load your course journey.');
     } finally {
       journeyLoading = false;
     }
@@ -357,7 +365,7 @@
 
       saveDashboardCache();
     } catch (err) {
-      phraseError = err instanceof Error ? err.message : 'Failed to load phrase health.';
+      phraseError = resolveLoadError(err, 'Failed to load phrase health.');
       phraseHealthRows = [];
       duePracticeCount = 0;
     } finally {
@@ -414,7 +422,7 @@
       }
       saveDashboardCache();
     } catch (err) {
-      flashcardsError = err instanceof Error ? err.message : 'Failed to load flashcards.';
+      flashcardsError = resolveLoadError(err, 'Failed to load flashcards.');
       flashcardPreview = [];
       dueFlashcardCount = 0;
     } finally {
@@ -486,7 +494,7 @@
         .slice(0, 3) as GoalPreviewItem[];
       saveDashboardCache();
     } catch (err) {
-      goalsError = err instanceof Error ? err.message : 'Failed to load goals.';
+      goalsError = resolveLoadError(err, 'Failed to load goals.');
       goalsPreview = [];
       activeGoalsCount = 0;
     } finally {
@@ -514,7 +522,7 @@
         challengeError = 'No challenge is available yet. Complete a lesson to unlock one.';
       }
     } catch (err) {
-      challengeError = err instanceof Error ? err.message : 'Failed to load challenge.';
+      challengeError = resolveLoadError(err, 'Failed to load challenge.');
     } finally {
       challengeLoading = false;
     }
@@ -594,7 +602,7 @@
       showChallengeDone = true;
       showToast('Challenge completed');
     } catch (err) {
-      challengeError = err instanceof Error ? err.message : 'Failed to save challenge completion.';
+      challengeError = resolveLoadError(err, 'Failed to save challenge completion.');
       showToast('Unable to save challenge');
     } finally {
       challengeSaving = false;
@@ -736,6 +744,13 @@
 <svelte:window onclick={onWindowClick} onkeydown={onWindowKeydown} />
 
 <section class="dashboard-shell">
+  {#if !$isOnline}
+    <div class="offline-dashboard-banner" role="status">
+      <span>You are offline. Data syncing is paused.</span>
+      <button type="button" onclick={loadDashboard}>Retry all</button>
+    </div>
+  {/if}
+
   {#if journeyError}
     <div class="journey-error-banner">{journeyError}</div>
   {/if}
@@ -1270,6 +1285,34 @@
     color: #8a2323;
     padding: 10px 12px;
     font-size: 12px;
+  }
+
+  .offline-dashboard-banner {
+    width: min(1080px, calc(100% - 80px));
+    margin: 16px auto 0;
+    border-radius: 12px;
+    border: 1px solid rgba(180, 83, 9, 0.3);
+    background: rgba(180, 83, 9, 0.12);
+    color: #9a3412;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.45;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .offline-dashboard-banner button {
+    border-radius: 9px;
+    border: 1px solid rgba(180, 83, 9, 0.42);
+    background: rgba(255, 255, 255, 0.54);
+    color: #7c2d12;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 10px;
+    white-space: nowrap;
+    cursor: pointer;
   }
 
   .page {
@@ -2179,6 +2222,10 @@
 
     .journey-error-banner {
       margin: 12px 20px 0;
+    }
+
+    .offline-dashboard-banner {
+      width: calc(100% - 40px);
     }
   }
 

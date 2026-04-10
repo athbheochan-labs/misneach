@@ -2,6 +2,7 @@
   import { apiFetch } from '$lib/api/client';
   import { goto } from '$app/navigation';
   import { compareLessonsByHierarchy } from '$lib/course-order';
+  import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
   import { onMount } from 'svelte';
 
   type LessonItem = {
@@ -88,7 +89,11 @@
         }
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load courses';
+      error = isLikelyNetworkError(err)
+        ? 'You appear to be offline. Reconnect and retry.'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to load courses';
       courses = [];
     } finally {
       loading = false;
@@ -140,6 +145,12 @@
 
 <section class="py-8">
   <div class="mx-auto max-w-6xl space-y-6">
+    {#if !$isOnline}
+      <div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        You are offline. Course data may be stale until you reconnect.
+      </div>
+    {/if}
+
     <div>
       <h1 class="text-4xl font-extrabold tracking-tight">Courses</h1>
       <p class="mt-2 text-slate-600">Markdown-authored modules with synced progress and lexicon tracking.</p>
@@ -148,7 +159,16 @@
     {#if loading}
       <div class="rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Loading courses...</div>
     {:else if error}
-      <div class="rounded-xl border border-rose-200 bg-rose-50 p-6 text-rose-700">{error}</div>
+      <div class="rounded-xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+        <p>{error}</p>
+        <button
+          type="button"
+          class="mt-3 inline-flex rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+          onclick={loadCatalog}
+        >
+          Retry
+        </button>
+      </div>
     {:else if courses.length === 0}
       <div class="rounded-xl border border-slate-200 bg-white p-6 text-slate-600">No course content has been synced yet.</div>
     {:else}

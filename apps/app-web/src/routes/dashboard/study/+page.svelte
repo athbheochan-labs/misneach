@@ -6,6 +6,7 @@
   import { fade, fly } from 'svelte/transition';
   import { onDestroy, onMount } from 'svelte';
   import { MisButton } from '@decyphr/misneach-ui';
+  import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
   import {
     applyLessonProgressFromCatalog,
     endStudySession,
@@ -172,7 +173,11 @@
         }
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load study session.';
+      error = isLikelyNetworkError(err)
+        ? 'You appear to be offline. Reconnect and retry.'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to load study session.';
     } finally {
       loading = false;
     }
@@ -233,6 +238,12 @@
 </script>
 
 <section class="mx-auto max-w-3xl space-y-5 pb-8 pt-0 sm:py-8">
+  {#if !$isOnline}
+    <div class="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+      You are offline. Study progress sync is temporarily unavailable.
+    </div>
+  {/if}
+
   <header class="-mx-4 -mt-4 rounded-none border border-emerald-200 bg-gradient-to-r from-emerald-600 to-teal-500 p-7 text-white shadow sm:mx-0 sm:mt-0 sm:rounded-2xl">
     <h1 class="text-3xl font-bold">Guided Study Session</h1>
     <p class="mt-2 text-emerald-50">Follow the recommended path or jump between steps as needed.</p>
@@ -241,7 +252,16 @@
   {#if loading}
     <div class="rounded-2xl border bg-white p-6 text-slate-600">Loading study session...</div>
   {:else if error}
-    <div class="rounded-2xl border border-rose-300 bg-rose-50 p-6 text-rose-700">{error}</div>
+    <div class="rounded-2xl border border-rose-300 bg-rose-50 p-6 text-rose-700">
+      <p>{error}</p>
+      <button
+        type="button"
+        class="mt-3 inline-flex rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-100"
+        onclick={loadSessionAndRefresh}
+      >
+        Retry
+      </button>
+    </div>
   {:else if !session}
     <div class="rounded-2xl border bg-white p-6 shadow-sm space-y-3">
       <h2 class="text-2xl font-bold text-slate-900">No active session</h2>

@@ -4,6 +4,7 @@
   import { goto } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
   import { compareLessonsByHierarchy } from '$lib/course-order';
+  import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
   import {
     readLessonPlayerCache,
     writeLessonPlayerCache,
@@ -252,7 +253,11 @@
         cachedAt: Date.now(),
       });
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load lesson';
+      error = isLikelyNetworkError(err)
+        ? 'You appear to be offline. Reconnect and try loading this lesson again.'
+        : err instanceof Error
+          ? err.message
+          : 'Failed to load lesson';
     } finally {
       loading = false;
     }
@@ -302,6 +307,9 @@
     <div class="state state-error" role="alert">
       <div class="state-title">Couldn&apos;t load lesson</div>
       <div class="state-sub">{error}</div>
+      <button class="state-retry" type="button" onclick={loadLesson} disabled={!$isOnline && !screens.length}>
+        {$isOnline ? 'Retry' : 'Offline'}
+      </button>
     </div>
   {:else if payload && screens.length}
     {#key `${payload.lesson.lessonSlug}-${screens.length}`}
@@ -380,6 +388,23 @@
     font-size: 13px;
     line-height: 1.55;
     color: #5a7a64;
+  }
+
+  .state-retry {
+    margin-top: 16px;
+    border: 1px solid rgba(245, 240, 232, 0.26);
+    border-radius: 10px;
+    padding: 8px 14px;
+    color: #f5f0e8;
+    background: rgba(245, 240, 232, 0.08);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .state-retry:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   @keyframes state-spin {

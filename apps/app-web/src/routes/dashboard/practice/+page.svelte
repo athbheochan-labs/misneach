@@ -14,6 +14,7 @@
     type StudySession,
   } from '$lib/study-session';
   import { incrementJourneyGoalCounter } from '$lib/stores/journey-goals';
+  import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
 
   type ExerciseType = 'typed_translation' | 'sentence_builder' | 'cloze';
   const SESSION_SIZE = 15;
@@ -244,6 +245,12 @@
     showInfoModal = false;
   }
 
+  function ensureOnline(action: string) {
+    if ($isOnline) return true;
+    openInfoModal('You are offline', `Reconnect to ${action} and try again.`);
+    return false;
+  }
+
   async function fetchDueCount() {
     try {
       const res = await apiFetch('/api/proxy/practice/progress', { cache: 'no-store' });
@@ -360,6 +367,7 @@
 
   async function startLesson(skipNoDueDecision = false) {
     if (loading) return;
+    if (!ensureOnline('start practice')) return;
     loading = true;
     try {
       if (!skipNoDueDecision) {
@@ -378,7 +386,11 @@
       console.error(error);
       openInfoModal(
         'Unable to start practice',
-        error instanceof Error ? error.message : 'Failed to start practice session',
+        isLikelyNetworkError(error)
+          ? 'Network request failed. Check your connection and retry.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to start practice session',
       );
     } finally {
       loading = false;
@@ -387,6 +399,7 @@
 
   async function startFixMistakes() {
     if (loading) return;
+    if (!ensureOnline('start mistakes review')) return;
     loading = true;
     try {
       const res = await apiFetch(`/api/proxy/practice/mistakes?limit=${sessionLimit}`, { cache: 'no-store' });
@@ -397,7 +410,11 @@
       console.error(error);
       openInfoModal(
         'Unable to start mistakes review',
-        error instanceof Error ? error.message : 'Failed to start mistakes session',
+        isLikelyNetworkError(error)
+          ? 'Network request failed. Check your connection and retry.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to start mistakes session',
       );
     } finally {
       loading = false;
@@ -456,6 +473,7 @@
 
   async function submitAttempt() {
     if (!current || !canSubmit) return;
+    if (!ensureOnline('submit your answer')) return;
 
     const body: Record<string, unknown> = {
       exerciseType: current.exerciseType,
@@ -518,7 +536,11 @@
       console.error(error);
       openInfoModal(
         'Unable to submit answer',
-        error instanceof Error ? error.message : 'Failed to submit answer',
+        isLikelyNetworkError(error)
+          ? 'Network request failed while submitting. Reconnect and try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to submit answer',
       );
     } finally {
       submitting = false;
@@ -573,6 +595,10 @@
 </script>
 
 <section class="practice-wrap">
+  {#if !$isOnline}
+    <div class="offline-banner" role="status">You are offline. Some actions are temporarily unavailable.</div>
+  {/if}
+
   <MisProgressStrip
     visible={sessionMode === 'lesson' || sessionMode === 'fix_mistakes'}
     masteredLabel={`${completedCount} mastered`}
@@ -820,6 +846,17 @@
     border: 1px solid rgba(45, 122, 80, 0.2);
     background: rgba(45, 122, 80, 0.08);
     padding: 12px 14px;
+  }
+
+  .offline-banner {
+    margin-top: 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(180, 83, 9, 0.28);
+    background: rgba(180, 83, 9, 0.11);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #9a3412;
+    line-height: 1.5;
   }
 
   .study-title {
