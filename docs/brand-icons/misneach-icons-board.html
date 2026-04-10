@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Misneach — Icons & Favicon</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#1a1a1a;color:#eee;padding:40px 24px;min-height:100vh}
+h1{font-size:20px;font-weight:700;margin-bottom:6px;color:white}
+.sub{font-size:13px;color:#777;margin-bottom:48px}
+
+.section{margin-bottom:48px}
+.section-label{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#555;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #2a2a2a}
+
+.icon-row{display:flex;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:32px}
+.icon-item{display:flex;flex-direction:column;align-items:center;gap:8px}
+.icon-item svg,.icon-item canvas{display:block}
+.icon-label{font-size:10px;color:#555;text-align:center}
+
+.on-check{background:repeating-conic-gradient(#333 0% 25%, #1a1a1a 0% 50%) 0 0 / 12px 12px;padding:8px;border-radius:4px}
+.on-white{background:white;padding:8px;border-radius:4px}
+.on-parchment{background:#f5f0e8;padding:8px;border-radius:4px}
+
+.hint{font-size:12px;color:#555;margin-top:16px;line-height:1.6}
+.hint code{background:#222;padding:2px 6px;border-radius:3px;color:#7ec99a;font-size:11px}
+</style>
+</head>
+<body>
+
+<h1>Misneach — Icons & Favicon</h1>
+<div class="sub">Speech bubble with fada mark · Forest background · All sizes generated from SVG source</div>
+
+<div class="section">
+  <div class="section-label">The mark — SVG source</div>
+  <div class="icon-row">
+    <div class="icon-item">
+      <div class="on-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="128" height="128"><rect width="32" height="32" rx="7" fill="#1c2b22"/><path d="M6 5 C6 5, 6 3, 8 3 L24 3 C26 3, 26 5, 26 5 L26 19 C26 21, 24 21, 24 21 L19 21 L16 26 L13 21 L8 21 C6 21, 6 19, 6 19 Z" fill="#2d7a50"/><path d="M13 15 C14.5 10, 18 8, 20 6" stroke="#7ec99a" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="13" cy="15" r="1.5" fill="#7ec99a"/></svg></div>
+      <div class="icon-label">128px preview</div>
+    </div>
+    <div class="icon-item">
+      <div class="on-white"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64"><rect width="32" height="32" rx="7" fill="#1c2b22"/><path d="M6 5 C6 5, 6 3, 8 3 L24 3 C26 3, 26 5, 26 5 L26 19 C26 21, 24 21, 24 21 L19 21 L16 26 L13 21 L8 21 C6 21, 6 19, 6 19 Z" fill="#2d7a50"/><path d="M13 15 C14.5 10, 18 8, 20 6" stroke="#7ec99a" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="13" cy="15" r="1.5" fill="#7ec99a"/></svg></div>
+      <div class="icon-label">On white</div>
+    </div>
+    <div class="icon-item">
+      <div class="on-parchment"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64"><rect width="32" height="32" rx="7" fill="#1c2b22"/><path d="M6 5 C6 5, 6 3, 8 3 L24 3 C26 3, 26 5, 26 5 L26 19 C26 21, 24 21, 24 21 L19 21 L16 26 L13 21 L8 21 C6 21, 6 19, 6 19 Z" fill="#2d7a50"/><path d="M13 15 C14.5 10, 18 8, 20 6" stroke="#7ec99a" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle cx="13" cy="15" r="1.5" fill="#7ec99a"/></svg></div>
+      <div class="icon-label">On parchment</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-label">PWA manifest.json snippet</div>
+  <pre style="background:#111;padding:16px;border-radius:8px;font-size:12px;color:#7ec99a;overflow-x:auto;line-height:1.6">{
+  "name": "Misneach",
+  "short_name": "Misneach",
+  "description": "Irish, out loud.",
+  "theme_color": "#1c2b22",
+  "background_color": "#1c2b22",
+  "display": "standalone",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}</pre>
+</div>
+
+<div class="section">
+  <div class="section-label">How to generate PNG files from the SVG</div>
+  <div class="hint" style="line-height:2">
+    Canonical SVG source: <code>docs/brand-icons/misneach-mark.svg</code><br>
+    To generate PNGs at each size:<br><br>
+    <strong>Node (sharp):</strong> <code>sharp('misneach-mark.svg').resize(512).png().toFile('icon-512.png')</code><br>
+    <strong>Inkscape:</strong> <code>inkscape misneach-mark.svg --export-png=icon-512.png --export-width=512</code><br>
+    <strong>ImageMagick:</strong> <code>convert -background none misneach-mark.svg -resize 512x512 icon-512.png</code><br><br>
+    For <code>favicon.ico</code>, generate 16/32/48 PNGs then combine with:<br>
+    <code>convert icon-16.png icon-32.png icon-48.png favicon.ico</code>
+  </div>
+</div>
+
+</body>
+</html>
