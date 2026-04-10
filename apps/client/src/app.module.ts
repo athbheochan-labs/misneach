@@ -23,6 +23,7 @@ import { DiscountsModule } from './discounts/discounts.module';
 import { WaitlistModule } from './waitlist/waitlist.module';
 import { SurveysModule } from './surveys/surveys.module';
 import { HealthController } from './health.controller';
+import { MobileModule } from './mobile/mobile.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { HealthController } from './health.controller';
     CoursesModule,
     ChallengesModule,
     AdminModule,
+    MobileModule,
   ],
   controllers: [HealthController],
 })
