@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { goto } from '$app/navigation';
+import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { enableAutoPageviews } from '$lib/analytics';
   import { toInAppPath } from '$lib/mobile/deep-links';
@@ -14,6 +14,11 @@
     let removeListener: (() => void) | undefined;
     let removeBackListener: (() => void) | undefined;
     let removeViewportListeners: (() => void) | undefined;
+    let removeTelemetry: (() => void) | undefined;
+    let trackTelemetryEvent: (event: string, meta?: Record<string, unknown>) => void = () => undefined;
+    let trackTelemetryRoute: (route: string) => void = () => undefined;
+    let trackTelemetryError: (event: string, error: unknown, meta?: Record<string, unknown>) => void = () =>
+      undefined;
 
     const setKeyboardOffset = (offsetPx: number) => {
       const root = document.documentElement;
@@ -45,6 +50,7 @@
     const openDeepLink = async (url: string) => {
       const inAppPath = toInAppPath(url);
       if (!inAppPath) return;
+      trackTelemetryEvent('deep_link_opened', { url, inAppPath });
       await goto(inAppPath, { replaceState: true });
     };
 
@@ -54,10 +60,21 @@
     document.documentElement.setAttribute('data-native-mobile', 'true');
     document.body.setAttribute('data-native-mobile', 'true');
     setupViewportKeyboardTracking();
+    trackTelemetryRoute(`${window.location.pathname}${window.location.search}`);
+    afterNavigate((nav) => {
+      if (!nav.to?.url) return;
+      trackTelemetryRoute(`${nav.to.url.pathname}${nav.to.url.search}`);
+    });
 
     void (async () => {
       try {
         const { App } = await import('@capacitor/app');
+        const telemetry = await import('$lib/mobile/telemetry');
+        const telemetryApi = await telemetry.startMobileTelemetry();
+        trackTelemetryEvent = telemetryApi.trackEvent;
+        trackTelemetryRoute = telemetryApi.trackRouteView;
+        trackTelemetryError = telemetryApi.trackError;
+        removeTelemetry = telemetryApi.stop;
 
         const launch = await App.getLaunchUrl();
         if (launch?.url) {
@@ -75,20 +92,24 @@
         const backListener = await App.addListener('backButton', () => {
           const path = window.location.pathname;
           if (window.history.length > 1 && !rootPaths.has(path)) {
+            trackTelemetryEvent('hardware_back', { behavior: 'history_back', path });
             window.history.back();
             return;
           }
+          trackTelemetryEvent('hardware_back', { behavior: 'exit_app', path });
           void App.exitApp();
         });
         removeBackListener = () => backListener.remove();
       } catch (error) {
         console.warn('Deep link setup failed', error);
+        trackTelemetryError('mobile_init_failed', error);
       }
     })();
 
     return () => {
       removeListener?.();
       removeBackListener?.();
+      removeTelemetry?.();
       removeViewportListeners?.();
       setKeyboardOffset(0);
       document.body.classList.remove('mobile-keyboard-open');

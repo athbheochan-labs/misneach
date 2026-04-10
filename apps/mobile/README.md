@@ -67,3 +67,19 @@ adb shell am start -a android.intent.action.VIEW -d "site.misneach.mobile://auth
 - `npm run cap:sync:bundled` rebuilds app-web in mobile static mode, then syncs native projects.
 - Hosted-web fallback can be enabled by setting `MOBILE_USE_HOSTED_WEB=true` and providing `MOBILE_WEB_URL`.
 - Deep links are handled in `apps/app-web/src/routes/+layout.svelte` using the Capacitor App plugin.
+
+## Mobile telemetry (events + crashes)
+
+- Native runtime sends telemetry to `POST /mobile/telemetry`.
+- Captured signals include:
+  - app open
+  - route views
+  - deep-link opens
+  - hardware back actions
+  - window errors
+  - unhandled promise rejections
+- To watch ingestion locally:
+
+```bash
+docker compose logs -f client | rg -i "MobileTelemetryController|mobile_app|window_error|unhandled_rejection"
+```
