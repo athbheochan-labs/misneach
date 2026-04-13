@@ -10,6 +10,7 @@
   let token = '';
   let email = '';
   let lastQuery = '';
+  let lastAttemptKey = '';
 
   async function verify() {
     if (!token || !email) {
@@ -47,8 +48,22 @@
 
   async function verifyFromUrl(url: URL) {
     const params = url.searchParams;
-    token = params.get('token') || '';
-    email = params.get('email') || '';
+    token = (params.get('token') || '')
+      .trim()
+      .replace(/[^a-f0-9]/gi, '')
+      .toLowerCase();
+    email = (params.get('email') || '')
+      .trim()
+      .replace(/^mailto:/i, '')
+      .toLowerCase();
+    const attemptKey = `${email}|${token}`;
+    if (!token || !email) {
+      lastAttemptKey = '';
+    } else if (attemptKey === lastAttemptKey) {
+      return;
+    } else {
+      lastAttemptKey = attemptKey;
+    }
     message = 'Verifying your secure login link...';
     state = 'loading';
     await verify();

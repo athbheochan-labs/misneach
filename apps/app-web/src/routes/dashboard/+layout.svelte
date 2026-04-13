@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { page } from '$app/state';
   import { afterNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
@@ -40,7 +41,12 @@
     return /^\/dashboard\/courses\/[^/]+\/[^/]+$/.test(pathname);
   }
 
+  function isMobileShellRoute(pathname: string) {
+    return pathname === '/dashboard/mobile';
+  }
+
   const immersiveLessonRoute = $derived(isImmersiveLessonRoute(page.url.pathname));
+  const mobileShellRoute = $derived(isMobileShellRoute(page.url.pathname));
 
   function initIcons() {
     // @ts-ignore
@@ -57,6 +63,17 @@
     if (auth.user?.role !== 'admin' && auth.user?.signupComplete === false) {
       await goto('/auth/signup');
     }
+
+    const isNativeMobile = browser && (window as any)?.Capacitor?.isNativePlatform?.();
+    const isCapacitorWebViewOrigin =
+      browser && window.location.protocol === 'https:' && window.location.hostname === 'localhost';
+    if (
+      (isNativeMobile || isCapacitorWebViewOrigin) &&
+      page.url.pathname.startsWith('/dashboard') &&
+      page.url.pathname !== '/dashboard/mobile'
+    ) {
+      await goto('/dashboard/mobile', { replaceState: true });
+    }
   });
   afterNavigate(initIcons);
 
@@ -68,7 +85,7 @@
 </script>
 
 <div class="dash-app">
-  {#if !immersiveLessonRoute}
+  {#if !immersiveLessonRoute && !mobileShellRoute}
     <nav class="dash-nav">
       <a href="/dashboard" class="nav-brand">
           <svg width="22" height="22" viewBox="0 0 80 80" fill="none" aria-hidden="true">
