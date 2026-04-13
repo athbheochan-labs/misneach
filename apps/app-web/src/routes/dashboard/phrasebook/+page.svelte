@@ -268,7 +268,7 @@
 
     try {
       if (editingPhraseId != null) {
-        const res = await fetch(`/api/proxy/phrasebook/${editingPhraseId}`, {
+        const res = await apiFetch(`/api/proxy/phrasebook/${editingPhraseId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -353,7 +353,7 @@
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/proxy/phrasebook/${editingPhraseId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/proxy/phrasebook/${editingPhraseId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(await readErrorMessage(res, 'Failed to delete phrase'));
       closePhraseModal();
       showToast('Phrase removed');
@@ -364,7 +364,7 @@
   }
 
   async function patchPhrase(id: number | string, patch: Partial<Phrase>) {
-    const res = await fetch(`/api/proxy/phrasebook/${id}`, {
+    const res = await apiFetch(`/api/proxy/phrasebook/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch)
