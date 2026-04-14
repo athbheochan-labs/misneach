@@ -367,14 +367,14 @@
 
     max-width: 560px;
     margin: 0 auto;
-    padding: 0 20px 80px;
+    padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .top-nav {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 0 28px;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 0 28px;
   }
 
   :global(.nav-back) {
