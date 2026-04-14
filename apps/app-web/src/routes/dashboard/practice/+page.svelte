@@ -3,7 +3,7 @@
   import { getAuthMe } from '$lib/api/auth-client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { MisButton, MisModeCard, MisProgressStrip, MisTextarea } from '@decyphr/misneach-ui';
+  import { MisButton, MisModeCard, MisTextarea } from '@decyphr/misneach-ui';
   import AppModal from '$lib/components/ui/AppModal.svelte';
   import {
     incrementPracticeProgress,
@@ -219,6 +219,8 @@
       ? selectedSentenceTokens.length > 0
       : freeTextAnswer.trim().length > 0
     : false;
+  $: masteredLabel = `${completedCount}`;
+  $: leftLabel = `${remainingCount} left`;
 
   function parseSessionLimit(raw: string | null) {
     const parsed = Number(raw || SESSION_SIZE);
@@ -489,6 +491,17 @@
     sentenceSelectionCounter = 0;
   }
 
+  function removeSelectedToken(selectionIndex: number) {
+    const selected = sentenceChoices
+      .map((token, tokenIndex) => ({ token, tokenIndex }))
+      .filter((entry) => entry.token.selectedAt != null)
+      .sort((a, b) => Number(a.token.selectedAt) - Number(b.token.selectedAt));
+
+    const target = selected[selectionIndex];
+    if (!target) return;
+    toggleSentenceToken(target.tokenIndex);
+  }
+
   function nextQuestion() {
     index += 1;
     if (index >= queue.length) {
@@ -628,12 +641,17 @@
     <div class="offline-banner" role="status">You are offline. Some actions are temporarily unavailable.</div>
   {/if}
 
-  <MisProgressStrip
-    visible={sessionMode === 'lesson' || sessionMode === 'fix_mistakes'}
-    masteredLabel={`${completedCount} mastered`}
-    remainingLabel={`${remainingCount} left`}
-    value={progress}
-  />
+  {#if sessionMode === 'lesson' || sessionMode === 'fix_mistakes'}
+    <section class="session-bar" aria-label="Session progress">
+      <div class="session-progress-track">
+        <div class="session-progress-fill" style={`width:${progress}%`}></div>
+      </div>
+      <div class="session-score">
+        <span class="score-mastered">{masteredLabel}</span>
+        <span class="score-left">{leftLabel}</span>
+      </div>
+    </section>
+  {/if}
 
   {#if studyMode}
     <section class="study-banner">
@@ -758,7 +776,14 @@
                 <span class="answer-tray-placeholder">Tap words below to build your answer…</span>
               {:else}
                 {#each selectedSentenceTokens as token, tokenIndex (`${token}-${tokenIndex}`)}
-                  <span class="word-token placed">{token}</span>
+                  <MisButton
+                    variant="unstyled"
+                    size="none"
+                    onclick={() => removeSelectedToken(tokenIndex)}
+                    className="word-token placed"
+                  >
+                    {token}
+                  </MisButton>
                 {/each}
               {/if}
             </div>
@@ -895,6 +920,45 @@
     margin: 0 auto;
     padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
     color: var(--ink);
+  }
+
+  .session-bar {
+    margin-top: 12px;
+    margin-bottom: 14px;
+  }
+
+  .session-progress-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--parch-dark);
+    overflow: hidden;
+  }
+
+  .session-progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--green);
+    transition: width 0.35s ease;
+  }
+
+  .session-score {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .score-mastered {
+    color: var(--green);
+  }
+
+  .score-left {
+    color: var(--muted);
   }
 
   .study-banner {
@@ -1207,7 +1271,12 @@
     background: var(--forest);
     border-color: var(--forest);
     color: var(--parchment);
-    cursor: default;
+    cursor: pointer;
+  }
+
+  :global(.word-token.placed:hover) {
+    background: var(--forest-mid);
+    border-color: var(--forest-mid);
   }
 
   :global(.btn-clear) {
