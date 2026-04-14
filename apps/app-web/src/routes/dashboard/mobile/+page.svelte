@@ -21,8 +21,8 @@
   let unitsDone = 2;
   let progressPct = 40;
   let progressStrokeOffset = 105;
-  let continueTitle = 'Unit 3 -- Taking your order';
-  let continueSub = 'Lesson 2 of 6 = Sizes and alternatives';
+  let continueTitle = 'Unit 3 - Taking your order';
+  let continueSub = 'Lesson 2 of 6 - Sizes and alternatives';
   let continueHref = '/dashboard/courses?view=all';
 
   let units: Array<{
@@ -31,11 +31,11 @@
     status: 'complete' | 'progress' | 'locked';
     progress: number;
   }> = [
-    { title: 'Greeting & being greeted', subtitle: '6 lessons = 8 phrases', status: 'complete', progress: 100 },
-    { title: 'Ordering a drink', subtitle: '7 lessons = 10 phrases', status: 'complete', progress: 100 },
-    { title: 'Taking your order', subtitle: '6 lessons = 9 phrases', status: 'progress', progress: 33 },
-    { title: 'Paying & wrapping up', subtitle: '5 lessons = 7 phrases', status: 'locked', progress: 0 },
-    { title: 'Real world challenge', subtitle: 'Full interaction = 24 phrases', status: 'locked', progress: 0 }
+    { title: 'Greeting & being greeted', subtitle: '6 lessons - 8 phrases', status: 'complete', progress: 100 },
+    { title: 'Ordering a drink', subtitle: '7 lessons - 10 phrases', status: 'complete', progress: 100 },
+    { title: 'Taking your order', subtitle: '6 lessons - 9 phrases', status: 'progress', progress: 33 },
+    { title: 'Paying & wrapping up', subtitle: '5 lessons - 7 phrases', status: 'locked', progress: 0 },
+    { title: 'Real world challenge', subtitle: 'Full interaction - 24 phrases', status: 'locked', progress: 0 }
   ];
 
   let dueCards: Array<{ irish: string; english: string; dueLabel: string; dueNow: boolean }> = [
@@ -174,7 +174,7 @@
           const idx = currentIdx >= 0 ? currentIdx : lessons.length - 1;
           const current = lessons[idx];
           continueTitle = String(current?.lessonTitle || continueTitle);
-          continueSub = `${String(selected?.courseTitle || 'Course')} = next lesson`;
+          continueSub = `${String(selected?.courseTitle || 'Course')} - next lesson`;
           if (selected?.courseSlug && current?.lessonSlug) {
             continueHref = `/dashboard/courses/${encodeURIComponent(selected.courseSlug)}/${encodeURIComponent(current.lessonSlug)}`;
           }
@@ -397,7 +397,7 @@
       <div style="height:var(--status-h)"></div>
       <div class="me-avatar"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7ec99a" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
       <div class="me-name">{greetingName}</div>
-      <div class="me-sub">Early adopter = Joined March 2025</div>
+      <div class="me-sub">Early adopter - Joined March 2025</div>
     </div>
 
     <div class="me-stats">
@@ -428,17 +428,17 @@
       <div class="lesson-prog-track"><div class="lesson-prog-fill"></div></div>
     </div>
     <div class="lesson-body">
-      <div class="lesson-step-label">Unit 3 = Lesson 2</div>
+      <div class="lesson-step-label">Unit 3 - Lesson 2</div>
       <div class="lesson-phrase">An bhfuil bainne uait?</div>
       <div class="lesson-translation">Do you want milk?</div>
       <div class="lesson-context">The customer has ordered a tea. You need to ask if they want milk. <strong>An bhfuil</strong> is how you ask "is there / do you want" -- it's one of the most useful constructions in the whole course.</div>
       <div class="lesson-options">
         <button class={`lesson-opt ${picked === false ? 'wrong' : ''}`} type="button" on:click={() => pickOpt(false)}>Ar mhaith leat bainne?</button>
         <button class={`lesson-opt ${picked === true ? 'correct' : ''}`} type="button" on:click={() => pickOpt(true)}>An bhfuil bainne uait?</button>
-        <button class={`lesson-opt ${picked === false ? 'wrong' : ''}`} type="button" on:click={() => pickOpt(false)}>C= mh=ad bainne?</button>
+        <button class={`lesson-opt ${picked === false ? 'wrong' : ''}`} type="button" on:click={() => pickOpt(false)}>Cá mhéad bainne?</button>
       </div>
     </div>
-    <div class="lesson-footer"><button class="lesson-continue" type="button" on:click={hideLesson}>Lean ar aghaidh =</button></div>
+    <div class="lesson-footer"><button class="lesson-continue" type="button" on:click={hideLesson}>Lean ar aghaidh</button></div>
   </div>
 
   <div class={`flash-screen ${flashOpen ? 'active' : ''}`} id="flash-screen">
@@ -457,8 +457,8 @@
       </button>
     </div>
     <div class="flash-actions" id="flash-actions" style={`display:${flashRevealed ? 'flex' : 'none'}`}>
-      <button class="flash-action wrong" type="button" on:click={nextFlash}>N=or thuig m=</button>
-      <button class="flash-action right" type="button" on:click={nextFlash}>Thuig m= =</button>
+      <button class="flash-action wrong" type="button" on:click={nextFlash}>Níor thuig mé</button>
+      <button class="flash-action right" type="button" on:click={nextFlash}>Thuig mé</button>
     </div>
   </div>
 
