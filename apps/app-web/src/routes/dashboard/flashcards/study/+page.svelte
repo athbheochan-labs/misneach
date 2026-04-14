@@ -224,6 +224,10 @@
     }
   }
 
+  function rateKnown(knew: boolean) {
+    rate(knew ? 'good' : 'again').catch(() => undefined);
+  }
+
   async function nextCard() {
     revealed = false;
     if (currentIndex < cards.length - 1) {
@@ -256,10 +260,9 @@
   <div class="prog-bar-wrap">
     <div class="prog-bar-top">
       <MisButton variant="unstyled" size="none" type="button" className="btn-back" onclick={backFromStudy}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        Flashcards
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
       </MisButton>
-      <div class="deck-label">{deck.name}</div>
+      <div class="deck-label">Flashcards</div>
       <div class="card-counter">{cardCounter}</div>
     </div>
     <div class="prog-track">
@@ -313,7 +316,11 @@
       </MisButton>
     </div>
   {:else}
-    <div class="flashcard-shell">
+    <button
+      class={`flashcard-shell ${revealed ? 'revealed' : ''}`}
+      type="button"
+      onclick={() => !revealed && reveal()}
+    >
       <div class="ex-header">
         <div class="ex-label">Irish</div>
         <div class="ex-prompt">{currentCard.text}</div>
@@ -332,31 +339,19 @@
           </div>
         {:else}
           <div class="reveal-area">
-            <div class="reveal-pill">Tap "Show answer" when ready</div>
+            <div class="reveal-pill">Tap to reveal</div>
           </div>
         {/if}
-
-        <div class="action-row">
-          {#if !revealed}
-            <MisButton variant="unstyled" size="none" type="button" className="btn-show" onclick={reveal}>Show answer</MisButton>
-          {/if}
-        </div>
       </div>
-    </div>
+    </button>
 
     {#if revealed}
       <div class="flash-rating">
-        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-again" onclick={() => rate('again')}>
-          Again <span>soon</span>
+        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-nope" onclick={() => rateKnown(false)}>
+          Nior thuig me
         </MisButton>
-        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-hard" onclick={() => rate('hard')}>
-          Hard <span>short</span>
-        </MisButton>
-        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-good" onclick={() => rate('good')}>
-          Good <span>normal</span>
-        </MisButton>
-        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-easy" onclick={() => rate('easy')}>
-          Easy <span>long</span>
+        <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-yep" onclick={() => rateKnown(true)}>
+          Thuig me
         </MisButton>
       </div>
     {/if}
@@ -405,21 +400,24 @@
   }
 
   :global(.btn-back) {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
     border: none;
-    background: none;
+    border-radius: 999px;
+    background: rgba(28, 43, 34, 0.08);
+    width: 30px;
+    height: 30px;
     padding: 0;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
 
   :global(.btn-back svg) {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
   }
 
   .deck-label {
@@ -484,9 +482,17 @@
 
   .flashcard-shell {
     animation: cardIn 0.25s ease both;
+    width: 100%;
+    border: none;
+    text-align: left;
+    cursor: pointer;
     border-radius: 20px;
     overflow: hidden;
     background: var(--forest);
+  }
+
+  .flashcard-shell.revealed {
+    cursor: default;
   }
 
   .ex-header {
@@ -516,11 +522,11 @@
     flex-direction: column;
     gap: 0;
     background: var(--forest);
-    padding: 0 24px 24px;
+    padding: 0 24px 26px;
   }
 
   .reveal-area {
-    min-height: 120px;
+    min-height: 140px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -544,6 +550,7 @@
   .answer-area.visible {
     display: block;
     animation: fadeUp 0.2s ease both;
+    min-height: 140px;
   }
 
   .answer-meaning {
@@ -575,29 +582,10 @@
     line-height: 1.6;
   }
 
-  .action-row {
-    margin-top: 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  :global(.btn-show) {
-    border: 1.5px solid var(--parch-dark);
-    border-radius: 10px;
-    background: #fff;
-    padding: 11px 18px;
-    color: var(--forest);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
   .flash-rating {
     margin-top: 10px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
     animation: fadeUp 0.2s ease both;
   }
@@ -616,32 +604,8 @@
     cursor: pointer;
   }
 
-  :global(.rating-btn span) {
-    font-size: 10px;
-    font-weight: 500;
-    opacity: 0.65;
-    letter-spacing: 0.04em;
-  }
-
-  :global(.btn-again) {
-    background: #fde8e8;
-    color: #b91c1c;
-  }
-
-  :global(.btn-hard) {
-    background: #fef3cd;
-    color: #92400e;
-  }
-
-  :global(.btn-good) {
-    background: rgba(126, 201, 154, 0.2);
-    color: var(--green);
-  }
-
-  :global(.btn-easy) {
-    background: rgba(45, 122, 80, 0.1);
-    color: var(--forest);
-  }
+  :global(.btn-nope) { background: rgba(192, 57, 43, 0.16); color: #ffd6d1; border: 1px solid rgba(192, 57, 43, 0.4); }
+  :global(.btn-yep) { background: rgba(126, 201, 154, 0.22); color: var(--sage-l); border: 1px solid rgba(126, 201, 154, 0.4); }
 
   .complete-card {
     margin-top: 32px;
@@ -810,9 +774,7 @@
       text-align: center;
     }
 
-    .flash-rating {
-      grid-template-columns: repeat(2, 1fr);
-    }
+    .flash-rating { grid-template-columns: repeat(2, 1fr); }
   }
 
   @keyframes fadeUp {
