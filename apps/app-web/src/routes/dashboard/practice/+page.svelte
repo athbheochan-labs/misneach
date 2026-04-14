@@ -40,6 +40,9 @@
   let completedCount = 0;
   let totalPlanned = 0;
   let masteredKeys = new Set<string>();
+  let sessionCorrectCount = 0;
+  let sessionWrongCount = 0;
+  let lastSessionMode: 'lesson' | 'fix_mistakes' = 'lesson';
 
   let freeTextAnswer = '';
   let sentenceChoices: Array<{ id: string; value: string; selectedAt: number | null }> = [];
@@ -221,6 +224,7 @@
     : false;
   $: masteredLabel = `${completedCount}`;
   $: leftLabel = `${remainingCount} left`;
+  $: sessionTotalCount = sessionCorrectCount + sessionWrongCount;
 
   function parseSessionLimit(raw: string | null) {
     const parsed = Number(raw || SESSION_SIZE);
@@ -377,6 +381,9 @@
     completedCount = 0;
     totalPlanned = queue.length;
     masteredKeys = new Set<string>();
+    sessionCorrectCount = 0;
+    sessionWrongCount = 0;
+    lastSessionMode = mode;
     sessionMode = queue.length > 0 ? mode : 'idle';
     studyProgressSavedForRun = false;
     studyProgressPersistedForRun = 0;
@@ -566,6 +573,8 @@
         expectedAnswerHtml: diff.expectedHtml,
       };
       feedbackMessage = isCorrect ? pickRandom(successMessages) : pickRandom(retryMessages);
+      if (isCorrect) sessionCorrectCount += 1;
+      else sessionWrongCount += 1;
 
       if (isCorrect) {
         const key = exerciseMasteryKey(current);
@@ -608,6 +617,8 @@
     queue = [];
     index = 0;
     completedCount = 0;
+    sessionCorrectCount = 0;
+    sessionWrongCount = 0;
     totalPlanned = 0;
     masteredKeys = new Set<string>();
     feedback = null;
@@ -619,6 +630,14 @@
     studyProgressPersistedForRun = 0;
     showContinueStudy = false;
     refreshWarmupStats().catch(() => undefined);
+  }
+
+  function repeatLastSession() {
+    if (lastSessionMode === 'fix_mistakes') {
+      startFixMistakes().catch(() => undefined);
+      return;
+    }
+    startLesson(true).catch(() => undefined);
   }
 
   $: if (sessionMode === 'complete' && studyMode && !studyProgressSavedForRun) {
@@ -736,11 +755,26 @@
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
       </div>
-      <h2 class="complete-title">Críochnaithe. <em>Done.</em></h2>
-      <p class="complete-stat">
-        <strong>{completedCount}</strong> phrase{completedCount === 1 ? '' : 's'} mastered this session.
-      </p>
-      <MisButton variant="unstyled" size="none" onclick={restart} className="btn-restart">Back to practice</MisButton>
+      <h2 class="complete-title">Maith <em>thu.</em></h2>
+      <p class="complete-sub">Session complete. You're building something real.</p>
+
+      <div class="complete-stats">
+        <div class="cs-stat">
+          <div class="cs-num">{sessionCorrectCount}</div>
+          <div class="cs-lbl">Correct</div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-num">{sessionWrongCount}</div>
+          <div class="cs-lbl">Wrong</div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-num">{sessionTotalCount}</div>
+          <div class="cs-lbl">Total</div>
+        </div>
+      </div>
+
+      <MisButton variant="unstyled" size="none" onclick={restart} className="btn-done">Back to practice</MisButton>
+      <MisButton variant="unstyled" size="none" onclick={repeatLastSession} className="btn-again">Go again</MisButton>
       {#if showContinueStudy && studyReturnTo}
         <MisButton variant="unstyled" size="none" onclick={() => goto(studyReturnTo)} className="btn-secondary">
           Continue Study Session
@@ -1451,7 +1485,8 @@
 
   :global(.btn-check),
   :global(.btn-continue),
-  :global(.btn-restart),
+  :global(.btn-done),
+  :global(.btn-again),
   :global(.btn-secondary),
   :global(.btn-modal-primary),
   :global(.btn-modal-soft),
@@ -1518,12 +1553,12 @@
     margin-top: 32px;
     border-radius: 20px;
     background: var(--forest);
-    padding: 52px 32px;
+    padding: 44px 24px;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
   }
 
   .complete-mark {
@@ -1547,7 +1582,7 @@
   .complete-title {
     color: var(--parchment);
     font-family: 'Fraunces', serif;
-    font-size: clamp(30px, 7vw, 44px);
+    font-size: clamp(32px, 8vw, 42px);
     font-weight: 900;
     letter-spacing: -0.04em;
     line-height: 1;
@@ -1559,30 +1594,80 @@
     font-weight: 300;
   }
 
-  .complete-stat {
+  .complete-sub {
     color: var(--muted);
     font-size: 14px;
     line-height: 1.7;
+    max-width: 320px;
   }
 
-  .complete-stat strong {
-    color: var(--sage);
+  .complete-stats {
+    width: 100%;
+    display: flex;
+    gap: 1px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(126, 201, 154, 0.2);
+    margin-top: 2px;
   }
 
-  :global(.btn-restart) {
+  .cs-stat {
+    flex: 1;
+    background: rgba(245, 240, 232, 0.05);
+    padding: 14px 10px;
+    text-align: center;
+  }
+
+  .cs-num {
+    color: var(--parchment);
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .cs-lbl {
+    margin-top: 4px;
+    color: rgba(245, 240, 232, 0.5);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  :global(.btn-done) {
+    width: 100%;
     margin-top: 8px;
     border: none;
     background: var(--sage);
-    padding: 14px 36px;
+    padding: 14px 18px;
     color: var(--forest);
     font-family: 'Fraunces', serif;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
 
-  :global(.btn-restart:hover) {
+  :global(.btn-done:hover) {
     background: var(--sage-l);
+    transform: translateY(-1px);
+  }
+
+  :global(.btn-again) {
+    width: 100%;
+    border: 1.5px solid rgba(126, 201, 154, 0.35);
+    background: rgba(126, 201, 154, 0.12);
+    padding: 12px 18px;
+    color: var(--sage);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  :global(.btn-again:hover) {
+    background: rgba(126, 201, 154, 0.22);
     transform: translateY(-1px);
   }
 
