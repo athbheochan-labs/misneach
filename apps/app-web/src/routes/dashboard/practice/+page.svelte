@@ -511,6 +511,18 @@
     skipInvalidExercises();
   }
 
+  function handleAnswerKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    if (feedback) {
+      continueAfterFeedback();
+      return;
+    }
+    if (canSubmit && !submitting) {
+      submitAttempt().catch(() => undefined);
+    }
+  }
+
   async function submitAttempt() {
     if (!current || !canSubmit) return;
     if (!ensureOnline('submit your answer')) return;
@@ -736,7 +748,7 @@
       {/if}
     </div>
   {:else}
-    <article class="exercise-card">
+    <article class={`exercise-card ${sessionMode === 'fix_mistakes' ? 'fix-mode' : ''}`}>
       <header class="ex-header">
         {#if current?.source === 'retry'}
           <div class="retry-badge">
@@ -748,6 +760,9 @@
           </div>
         {:else}
           <p class="ex-label">{sessionMode === 'fix_mistakes' ? 'Fix Mistakes' : 'Practice'}</p>
+        {/if}
+        {#if sessionMode === 'fix_mistakes'}
+          <div class="fix-focus-chip">Focused retry</div>
         {/if}
 
         {#if current}
@@ -803,16 +818,31 @@
             </div>
           {:else}
             <div class="fill-input-wrap">
-              <MisTextarea
-                id="practice-answer"
-                bind:value={freeTextAnswer}
-                rows={2}
-                className={`answer-textarea fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
-                placeholder="Type your answer…"
-              ></MisTextarea>
+              {#if sessionMode === 'fix_mistakes'}
+                <input
+                  id="practice-answer"
+                  bind:value={freeTextAnswer}
+                  class={`fill-input-single fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
+                  type="text"
+                  placeholder="Type the missing word..."
+                  autocomplete="off"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  on:keydown={handleAnswerKeydown}
+                />
+              {:else}
+                <MisTextarea
+                  id="practice-answer"
+                  bind:value={freeTextAnswer}
+                  rows={2}
+                  className={`answer-textarea fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
+                  placeholder="Type your answer…"
+                  on:keydown={handleAnswerKeydown}
+                ></MisTextarea>
+              {/if}
               <div class="input-hint">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                Press Enter or tap Check to submit
+                {feedback ? 'Press Enter or tap Continue' : 'Press Enter or tap Check to submit'}
               </div>
             </div>
           {/if}
@@ -1080,6 +1110,10 @@
     overflow: hidden;
   }
 
+  .exercise-card.fix-mode {
+    background: linear-gradient(180deg, #24372c 0%, #1c2b22 100%);
+  }
+
   .ex-header {
     padding: 28px 26px 22px;
   }
@@ -1103,6 +1137,21 @@
     background: rgba(180, 83, 9, 0.15);
     padding: 3px 10px;
     color: #d97706;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .fix-focus-chip {
+    margin-bottom: 10px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(126, 201, 154, 0.25);
+    background: rgba(126, 201, 154, 0.15);
+    padding: 3px 10px;
+    color: var(--sage);
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.12em;
@@ -1148,6 +1197,25 @@
     line-height: 1.5;
     resize: none;
     transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .fill-input-single {
+    width: 100%;
+    border: 1.5px solid var(--parch-dark);
+    border-radius: 12px;
+    background: #fff;
+    padding: 14px 16px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 16px;
+    color: var(--ink);
+    line-height: 1.25;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .fill-input-single:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(45, 122, 80, 0.12);
   }
 
   .fill-input-wrap {
