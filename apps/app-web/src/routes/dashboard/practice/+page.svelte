@@ -700,30 +700,35 @@
       {#if current}
         <div class="ex-body">
           {#if current.exerciseType === 'sentence_builder'}
-            <div class={`sentence-stage ${selectedSentenceTokens.length ? 'has-tokens' : ''}`}>
+            <div class="tray-actions">
+              <MisButton variant="unstyled" size="none" onclick={clearSentenceSelection} className="btn-clear" disabled={selectedSentenceTokens.length === 0}>
+                Clear
+              </MisButton>
+            </div>
+
+            <div class={`answer-tray ${selectedSentenceTokens.length ? 'has-words' : ''}`}>
               {#if selectedSentenceTokens.length === 0}
-                <span class="stage-placeholder">Select words below…</span>
+                <span class="answer-tray-placeholder">Tap words below to build your answer…</span>
               {:else}
                 {#each selectedSentenceTokens as token, tokenIndex (`${token}-${tokenIndex}`)}
-                  <span class="stage-token">{token}</span>
+                  <span class="word-token placed">{token}</span>
                 {/each}
               {/if}
             </div>
 
-            <div class="token-pool">
+            <div class="word-bank">
+              <div class="word-bank-label">Word bank</div>
               {#each sentenceChoices as token, tokenIndex (token.id)}
                 <MisButton
                   variant="unstyled"
                   size="none"
                   onclick={() => toggleSentenceToken(tokenIndex)}
-                  className={`token-btn ${token.selectedAt != null ? 'selected' : ''}`}
+                  className={`word-token bank ${token.selectedAt != null ? 'selected' : ''}`}
                 >
                   {token.value}
                 </MisButton>
               {/each}
             </div>
-
-            <MisButton variant="unstyled" size="none" onclick={clearSentenceSelection} className="btn-clear">Clear</MisButton>
           {:else}
             <MisTextarea
               id="practice-answer"
@@ -769,7 +774,7 @@
                 variant="unstyled"
                 size="none"
                 onclick={() => (showAnswer = !showAnswer)}
-                className="btn-reveal"
+                className="btn-show"
               >
                 {showAnswer ? 'Hide answer' : 'Show answer'}
               </MisButton>
@@ -964,82 +969,115 @@
     box-shadow: 0 0 0 3px rgba(45, 122, 80, 0.12);
   }
 
-  .sentence-stage {
+  .tray-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+
+  .answer-tray {
     min-height: 52px;
-    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1.5px solid var(--parch-dark);
+    background: #fff;
+    padding: 10px 12px;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    border-radius: 12px;
-    border: 1.5px solid var(--parch-dark);
-    background: #fff;
-    padding: 10px 14px;
+    margin-bottom: 14px;
     transition: border-color 0.15s;
   }
 
-  .sentence-stage.has-tokens {
-    border-color: var(--green);
+  .answer-tray.has-words {
+    border-color: var(--parch-dark);
   }
 
-  .stage-placeholder {
-    color: #bbb;
+  .answer-tray-placeholder {
+    color: #c7c2b5;
     font-size: 13px;
+    font-style: italic;
   }
 
-  .stage-token {
-    border-radius: 8px;
-    border: 1px solid rgba(45, 122, 80, 0.25);
-    background: rgba(45, 122, 80, 0.12);
-    padding: 4px 10px;
-    color: var(--forest);
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  .token-pool {
-    margin-bottom: 10px;
+  .word-bank {
+    border-radius: 12px;
+    background: var(--parch-dark);
+    padding: 14px;
+    margin-bottom: 14px;
     display: flex;
     flex-wrap: wrap;
-    gap: 7px;
+    gap: 8px;
+    min-height: 56px;
   }
 
-  :global(.token-btn) {
+  .word-bank-label {
+    width: 100%;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  :global(.word-token) {
+    display: inline-flex;
+    align-items: center;
     border-radius: 8px;
-    border: 1.5px solid var(--parch-dark);
-    background: #fff;
-    padding: 7px 14px;
-    color: var(--ink);
+    padding: 7px 12px;
     font-size: 14px;
     font-weight: 600;
+    border: 1.5px solid transparent;
     cursor: pointer;
+    user-select: none;
     transition: all 0.12s;
+    white-space: nowrap;
   }
 
-  :global(.token-btn:hover) {
+  :global(.word-token.bank) {
+    background: #fff;
+    border-color: var(--parch-dark);
+    color: var(--ink);
+  }
+
+  :global(.word-token.bank:hover) {
     border-color: var(--green);
     color: var(--green);
   }
 
-  :global(.token-btn.selected) {
-    border-color: var(--forest);
+  :global(.word-token.bank.selected) {
+    border-color: var(--green);
+    background: rgba(45, 122, 80, 0.08);
+    color: var(--green);
+  }
+
+  :global(.word-token.placed) {
     background: var(--forest);
+    border-color: var(--forest);
     color: var(--parchment);
+    cursor: default;
   }
 
   :global(.btn-clear) {
     border: none;
     background: transparent;
-    padding: 0;
+    padding: 4px 8px;
+    border-radius: 6px;
     color: var(--muted);
     font-size: 12px;
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
   }
 
   :global(.btn-clear:hover) {
     color: var(--forest);
+    background: var(--parch-dark);
+  }
+
+  :global(.btn-clear:disabled) {
+    opacity: 0.35;
+    cursor: not-allowed;
   }
 
   .reveal-box {
@@ -1129,7 +1167,7 @@
   :global(.btn-modal-primary),
   :global(.btn-modal-soft),
   :global(.btn-modal-ghost),
-  :global(.btn-reveal) {
+  :global(.btn-show) {
     border-radius: 10px;
     cursor: pointer;
     transition: background 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
@@ -1157,16 +1195,16 @@
     cursor: not-allowed;
   }
 
-  :global(.btn-reveal) {
+  :global(.btn-show) {
     border: 1.5px solid var(--parch-dark);
-    background: transparent;
+    background: #fff;
     padding: 11px 18px;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
   }
 
-  :global(.btn-reveal:hover) {
+  :global(.btn-show:hover) {
     border-color: var(--forest);
     color: var(--forest);
   }
@@ -1339,7 +1377,7 @@
     }
 
     :global(.btn-check),
-    :global(.btn-reveal),
+    :global(.btn-show),
     :global(.btn-continue) {
       width: 100%;
       justify-content: center;
