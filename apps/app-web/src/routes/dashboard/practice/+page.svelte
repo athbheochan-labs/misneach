@@ -730,13 +730,19 @@
               {/each}
             </div>
           {:else}
-            <MisTextarea
-              id="practice-answer"
-              bind:value={freeTextAnswer}
-              rows={3}
-              className="answer-textarea"
-              placeholder="Type your answer…"
-            ></MisTextarea>
+            <div class="fill-input-wrap">
+              <MisTextarea
+                id="practice-answer"
+                bind:value={freeTextAnswer}
+                rows={2}
+                className={`answer-textarea fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
+                placeholder="Type your answer…"
+              ></MisTextarea>
+              <div class="input-hint">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Press Enter or tap Check to submit
+              </div>
+            </div>
           {/if}
 
           {#if showAnswer && !feedback}
@@ -951,7 +957,7 @@
 
   :global(.answer-textarea) {
     width: 100%;
-    min-height: 80px;
+    min-height: 72px;
     border-radius: 12px;
     border: 1.5px solid var(--parch-dark);
     background: #fff;
@@ -962,6 +968,36 @@
     line-height: 1.5;
     resize: none;
     transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .fill-input-wrap {
+    margin-bottom: 8px;
+  }
+
+  :global(.fill-input) {
+    font-size: 16px;
+  }
+
+  :global(.fill-input.correct-input) {
+    border-color: rgba(45, 122, 80, 0.45);
+    background: rgba(45, 122, 80, 0.08);
+    color: var(--green);
+  }
+
+  :global(.fill-input.error-input) {
+    border-color: rgba(180, 60, 40, 0.35);
+    background: rgba(180, 60, 40, 0.08);
+    color: #7a1f10;
+    animation: shake 0.28s cubic-bezier(.36,.07,.19,.97);
+  }
+
+  .input-hint {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
   }
 
   :global(.answer-textarea:focus) {
@@ -1404,6 +1440,13 @@
       opacity: 1;
       transform: none;
     }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    50% { transform: translateX(4px); }
+    75% { transform: translateX(-2px); }
   }
 
   @keyframes popIn {
