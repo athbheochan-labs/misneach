@@ -68,6 +68,8 @@
   let infoModalTitle = '';
   let infoModalMessage = '';
   let showNoDueChoiceModal = false;
+  let warmupDueToday = 0;
+  let warmupMistakesToFix = 0;
 
   const successMessages = [
     'Great job. That was spot on.',
@@ -261,6 +263,31 @@
       return Math.max(0, Math.round(rawCount));
     } catch {
       return null;
+    }
+  }
+
+  async function refreshWarmupStats() {
+    try {
+      const [progressRes, mistakesRes] = await Promise.all([
+        apiFetch('/api/proxy/practice/progress', { cache: 'no-store' }),
+        apiFetch('/api/proxy/practice/mistakes?limit=100', { cache: 'no-store' }),
+      ]);
+
+      if (progressRes.ok) {
+        const payload = await progressRes.json();
+        const dueCount = Number(payload?.dueCount);
+        if (Number.isFinite(dueCount)) {
+          warmupDueToday = Math.max(0, Math.round(dueCount));
+        }
+      }
+
+      if (mistakesRes.ok) {
+        const payload = await mistakesRes.json();
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        warmupMistakesToFix = items.length;
+      }
+    } catch {
+      // Keep UI usable even if warm-up stats fail to load.
     }
   }
 
@@ -566,6 +593,7 @@
     studyProgressSavedForRun = false;
     studyProgressPersistedForRun = 0;
     showContinueStudy = false;
+    refreshWarmupStats().catch(() => undefined);
   }
 
   $: if (sessionMode === 'complete' && studyMode && !studyProgressSavedForRun) {
@@ -587,6 +615,7 @@
   onMount(() => {
     loadAuthContext().finally(() => {
       loadStudyQueryConfig();
+      refreshWarmupStats().catch(() => undefined);
       if (studyAutoStartDue) {
         startLesson(true).catch(() => undefined);
       }
@@ -621,6 +650,24 @@
   {/if}
 
   {#if sessionMode === 'idle'}
+    <section class="warmup-wrap">
+      <p class="warmup-eyebrow">Practice session</p>
+      <h1 class="warmup-headline">Ready to <em>cleachtadh?</em></h1>
+      <p class="warmup-sub">Pick a mode and start your review session.</p>
+
+      <div class="due-strip" aria-label="Practice warm-up summary">
+        <div class="due-pill primary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          {warmupDueToday} due today
+        </div>
+        <div class="due-pill secondary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+          {warmupMistakesToFix} mistakes to fix
+        </div>
+        <div class="due-pill dim">{sessionLimit} phrase session</div>
+      </div>
+    </section>
+
     <div class="mode-grid">
       <MisModeCard
         onclick={startLesson}
@@ -889,7 +936,76 @@
     display: flex;
     flex-direction: column;
     gap: 11px;
-    padding-top: 32px;
+    padding-top: 20px;
+  }
+
+  .warmup-wrap {
+    padding-top: 20px;
+  }
+
+  .warmup-eyebrow {
+    margin: 0;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .warmup-headline {
+    margin: 10px 0 6px;
+    color: var(--forest);
+    font-family: 'Fraunces', serif;
+    font-size: clamp(28px, 7vw, 40px);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+  }
+
+  .warmup-headline em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--green);
+  }
+
+  .warmup-sub {
+    margin: 0;
+    color: #777;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .due-strip {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .due-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .due-pill.primary {
+    background: var(--forest);
+    color: var(--parchment);
+  }
+
+  .due-pill.secondary {
+    border: 1px solid var(--parch-dark);
+    background: #fff;
+    color: var(--forest);
+  }
+
+  .due-pill.dim {
+    background: var(--parch-dark);
+    color: var(--muted);
   }
 
 
