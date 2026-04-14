@@ -382,18 +382,18 @@
 
     max-width: 560px;
     margin: 0 auto;
-    padding: 0 20px 80px;
+    padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
     color: var(--ink);
   }
 
   .prog-bar-wrap {
     position: sticky;
-    top: 0;
+    top: env(safe-area-inset-top, 0px);
     z-index: 40;
     margin-bottom: 4px;
     background: rgba(245, 240, 232, 0.95);
     backdrop-filter: blur(10px);
-    padding: 14px 0 12px;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 0 12px;
   }
 
   .prog-bar-top {

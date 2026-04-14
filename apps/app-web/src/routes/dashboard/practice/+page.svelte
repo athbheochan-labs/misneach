@@ -846,7 +846,7 @@
 
     max-width: 560px;
     margin: 0 auto;
-    padding: 0 20px 80px;
+    padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
     color: var(--ink);
   }
 
