@@ -298,12 +298,22 @@
       <div class="complete-stat">
         You reviewed <strong>{attemptedInSession}</strong> cards.
       </div>
+      <div class="complete-stats">
+        <div class="cs-stat">
+          <div class="cs-num">{attemptedInSession}</div>
+          <div class="cs-lbl">Reviewed</div>
+        </div>
+        <div class="cs-stat">
+          <div class="cs-num">{totalCards}</div>
+          <div class="cs-lbl">In session</div>
+        </div>
+      </div>
       <MisButton variant="unstyled" size="none" type="button" className="btn-done" onclick={backToFlashcards}>
         Back to decks
       </MisButton>
     </div>
   {:else}
-    <div class="exercise-card">
+    <div class="flashcard-shell">
       <div class="ex-header">
         <div class="ex-label">Irish</div>
         <div class="ex-prompt">{currentCard.text}</div>
@@ -321,19 +331,21 @@
             {/if}
           </div>
         {:else}
-          <div class="reveal-area"></div>
+          <div class="reveal-area">
+            <div class="reveal-pill">Tap "Show answer" when ready</div>
+          </div>
         {/if}
 
         <div class="action-row">
           {#if !revealed}
-            <MisButton variant="unstyled" size="none" type="button" className="btn-reveal" onclick={reveal}>Show answer</MisButton>
+            <MisButton variant="unstyled" size="none" type="button" className="btn-show" onclick={reveal}>Show answer</MisButton>
           {/if}
         </div>
       </div>
     </div>
 
     {#if revealed}
-      <div class="rating-grid">
+      <div class="flash-rating">
         <MisButton variant="unstyled" size="none" type="button" className="rating-btn btn-again" onclick={() => rate('again')}>
           Again <span>soon</span>
         </MisButton>
@@ -470,7 +482,7 @@
     color: var(--forest);
   }
 
-  .exercise-card {
+  .flashcard-shell {
     animation: cardIn 0.25s ease both;
     border-radius: 20px;
     overflow: hidden;
@@ -503,15 +515,26 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    background: var(--parchment);
-    padding: 22px 24px 24px;
+    background: var(--forest);
+    padding: 0 24px 24px;
   }
 
   .reveal-area {
-    min-height: 80px;
+    min-height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .reveal-pill {
+    border-radius: 999px;
+    border: 1px solid rgba(126, 201, 154, 0.25);
+    background: rgba(126, 201, 154, 0.12);
+    padding: 8px 14px;
+    color: rgba(245, 240, 232, 0.55);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
   }
 
   .answer-area {
@@ -525,7 +548,7 @@
 
   .answer-meaning {
     margin-bottom: 8px;
-    color: var(--forest);
+    color: var(--parchment);
     font-family: 'Fraunces', serif;
     font-size: clamp(20px, 5vw, 26px);
     font-style: italic;
@@ -536,7 +559,7 @@
 
   .answer-pronunciation {
     margin-bottom: 8px;
-    color: var(--muted);
+    color: rgba(245, 240, 232, 0.55);
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -545,9 +568,9 @@
   .answer-notes {
     margin-top: 10px;
     border-radius: 8px;
-    background: rgba(245, 240, 232, 0.7);
+    background: rgba(245, 240, 232, 0.08);
     padding: 10px 14px;
-    color: var(--muted);
+    color: rgba(245, 240, 232, 0.6);
     font-size: 13px;
     line-height: 1.6;
   }
@@ -560,18 +583,18 @@
     flex-wrap: wrap;
   }
 
-  :global(.btn-reveal) {
+  :global(.btn-show) {
     border: 1.5px solid var(--parch-dark);
     border-radius: 10px;
-    background: none;
+    background: #fff;
     padding: 11px 18px;
-    color: var(--muted);
-    font-size: 13px;
+    color: var(--forest);
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
   }
 
-  .rating-grid {
+  .flash-rating {
     margin-top: 10px;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -630,6 +653,41 @@
     background: var(--forest);
     padding: 52px 32px;
     text-align: center;
+  }
+
+  .complete-stats {
+    width: 100%;
+    display: flex;
+    gap: 1px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(126, 201, 154, 0.18);
+    margin-top: 2px;
+  }
+
+  .cs-stat {
+    flex: 1;
+    background: rgba(245, 240, 232, 0.05);
+    padding: 12px 10px;
+    text-align: center;
+  }
+
+  .cs-num {
+    color: var(--parchment);
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .cs-lbl {
+    margin-top: 4px;
+    color: rgba(245, 240, 232, 0.5);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .complete-mark {
@@ -752,7 +810,7 @@
       text-align: center;
     }
 
-    .rating-grid {
+    .flash-rating {
       grid-template-columns: repeat(2, 1fr);
     }
   }
