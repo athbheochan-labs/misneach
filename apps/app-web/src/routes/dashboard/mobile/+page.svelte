@@ -94,6 +94,10 @@
     await goto(continueHref);
   }
 
+  async function openPracticeSession() {
+    await goto('/dashboard/practice');
+  }
+
   async function logout() {
     await requestLogout().catch(() => undefined);
     await clearAuthSession().catch(() => undefined);
@@ -290,41 +294,57 @@
   </div>
 
   <div class={`screen ${activeTab === 'practice' ? 'active' : ''}`} id="practice-screen">
-    <div class="practice-header">
+    <div class="practice-warmup">
       <div style="height:var(--status-h)"></div>
-      <div class="ph-title">Cleacht. <em>Practice.</em></div>
-      <div class="ph-sub">{phrasesLearned} phrases unlocked</div>
-    </div>
+      <div class="warmup-eyebrow">Practice session</div>
+      <h2 class="warmup-headline">Ready to <em>cleachtadh?</em></h2>
+      <p class="warmup-sub">{dueCards.length} phrases are due for review today. Pick a mode or jump straight in.</p>
 
-    <button class="review-btn" type="button" on:click={showFlash}>
-      <div class="rb-left">
-        <div class="rb-title">Flashcard review</div>
-        <div class="rb-sub">{dueCards.length} phrases due today</div>
-      </div>
-      <div class="rb-badge">{dueCards.length}</div>
-    </button>
-
-    <div class="mode-grid">
-      <button class="mode-card" type="button" on:click={showFlash}>
-        <div class="mc-icon flash"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2d7a50" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-        <div class="mc-title">Flashcards</div>
-        <div class="mc-sub">Irish to English, tap to reveal</div>
-        <div class="mc-count">{phrasesLearned} phrases</div>
-      </button>
-      <div class="mode-card">
-        <div class="mc-icon listen"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2d7a50" stroke-width="2" stroke-linecap="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg></div>
-        <div class="mc-title">Listen & pick</div>
-        <div class="mc-sub">Hear it, find the match</div>
-        <div class="mc-count">{phrasesLearned} phrases</div>
-      </div>
-      <div class="mode-card" style="grid-column:span 2">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="mc-icon speed" style="width:36px;height:36px;flex-shrink:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2d7a50" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-          <div>
-            <div class="mc-title">Speed round</div>
-            <div class="mc-sub">How many can you get in 60 seconds?</div>
-          </div>
+      <div class="due-strip">
+        <div class="due-pill primary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          {dueCards.length} due today
         </div>
+        <div class="due-pill secondary">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+          {Math.min(3, dueCards.length)} mistakes to fix
+        </div>
+        <div class="due-pill dim">{phrasesLearned} total phrases</div>
+      </div>
+
+      <div class="mode-list">
+        <button class="mode-card primary-mode" type="button" on:click={openPracticeSession}>
+          <div class="mc-icon-wrap dark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7ec99a" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <div class="mc-text">
+            <div class="mc-eyebrow">Anytime session</div>
+            <div class="mc-title">Start <em>practice</em></div>
+            <div class="mc-sub">Due phrases first, then saved phrases</div>
+          </div>
+          <div class="mc-badge">{dueCards.length} due</div>
+          <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+        </button>
+
+        <button class="mode-card" type="button" on:click={openPracticeSession}>
+          <div class="mc-icon-wrap light"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2d7a50" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></div>
+          <div class="mc-text">
+            <div class="mc-eyebrow">Targeted review</div>
+            <div class="mc-title">Fix <em>mistakes</em></div>
+            <div class="mc-sub">Retry phrases you got wrong recently</div>
+          </div>
+          <div class="mc-badge amber">{Math.min(3, dueCards.length)} to fix</div>
+          <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+        </button>
+
+        <button class="mode-card" type="button" on:click={showFlash}>
+          <div class="mc-icon-wrap dim"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#5a7a64" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+          <div class="mc-text">
+            <div class="mc-eyebrow">Spaced repetition</div>
+            <div class="mc-title">Flashcard <em>review</em></div>
+            <div class="mc-sub">Open your due flashcards</div>
+          </div>
+          <div class="mc-badge none">{dueCards.length} due</div>
+          <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+        </button>
       </div>
     </div>
 
@@ -620,20 +640,41 @@
 .uc-badge.locked{background:var(--parchment-dark);color:#bbb}
 .uc-progress{height:3px;background:var(--parchment-dark);margin:0 16px 16px}
 .uc-progress-fill{height:100%;background:var(--sage)}
-.practice-header{background:var(--forest);padding:calc(var(--status-h) + 4px) 24px 24px}
-.ph-title{font-family:'Fraunces',serif;font-weight:900;font-size:26px;color:var(--parchment);letter-spacing:-.02em;margin-bottom:4px}
-.ph-title em{font-style:italic;font-weight:300;color:var(--sage)}
-.ph-sub{font-size:13px;color:rgba(245,240,232,.4)}
-.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 16px 0}
-.mode-card{background:white;border-radius:16px;border:1px solid var(--parchment-dark);padding:16px;cursor:pointer;transition:transform .15s,box-shadow .15s;-webkit-tap-highlight-color:transparent}
-.mode-card:active{transform:scale(.97)}
-.mc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
-.mc-icon.flash{background:rgba(45,122,80,.1)}
-.mc-icon.listen{background:rgba(126,201,154,.15)}
-.mc-icon.speed{background:rgba(45,122,80,.08)}
-.mc-title{font-size:13px;font-weight:700;color:var(--forest);margin-bottom:2px}
-.mc-sub{font-size:11px;color:#999;line-height:1.3}
-.mc-count{font-size:10px;font-weight:700;color:var(--sage);margin-top:6px}
+.practice-warmup{padding:calc(var(--status-h) + 8px) 16px 12px}
+.warmup-eyebrow{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.warmup-headline{font-family:'Fraunces',serif;font-weight:900;font-size:32px;letter-spacing:-.03em;line-height:1.05;color:var(--forest);margin-bottom:8px}
+.warmup-headline em{font-style:italic;font-weight:300;color:var(--moss)}
+.warmup-sub{font-size:13px;color:#777;margin-bottom:18px;line-height:1.55}
+.due-strip{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.due-pill{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:18px;font-size:12px;font-weight:600}
+.due-pill.primary{background:var(--forest);color:var(--parchment)}
+.due-pill.secondary{background:white;color:var(--forest);border:1px solid var(--parchment-dark)}
+.due-pill.dim{background:var(--parchment-dark);color:var(--muted)}
+.mode-list{display:flex;flex-direction:column;gap:10px}
+.mode-card{display:flex;align-items:center;gap:12px;padding:16px;background:white;border:1.5px solid var(--parchment-dark);border-radius:16px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s,background .15s;text-align:left;width:100%;font-family:'Instrument Sans',sans-serif;-webkit-tap-highlight-color:transparent}
+.mode-card:active{transform:scale(.98)}
+.mode-card.primary-mode{background:var(--forest);border-color:var(--forest)}
+.mode-card.primary-mode:active{background:#243529}
+.mc-icon-wrap{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mc-icon-wrap.dark{background:rgba(126,201,154,.15)}
+.mc-icon-wrap.light{background:rgba(45,122,80,.08)}
+.mc-icon-wrap.dim{background:var(--parchment-dark)}
+.mc-text{flex:1;min-width:0}
+.mc-eyebrow{font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.mode-card.primary-mode .mc-eyebrow{color:rgba(245,240,232,.45)}
+.mc-title{font-family:'Fraunces',serif;font-weight:700;font-size:17px;color:var(--forest);letter-spacing:-.01em}
+.mc-title em{font-style:italic;font-weight:300;color:var(--moss)}
+.mode-card.primary-mode .mc-title{color:var(--parchment)}
+.mode-card.primary-mode .mc-title em{color:var(--sage)}
+.mc-sub{font-size:12px;color:#8e8e8e;margin-top:1px;line-height:1.35}
+.mode-card.primary-mode .mc-sub{color:rgba(245,240,232,.48)}
+.mc-badge{font-size:11px;font-weight:700;padding:4px 8px;border-radius:10px;white-space:nowrap}
+.mc-badge{background:rgba(126,201,154,.2);color:var(--sage)}
+.mode-card:not(.primary-mode) .mc-badge{background:rgba(45,122,80,.1);color:var(--moss)}
+.mc-badge.amber{background:rgba(200,120,40,.12)!important;color:#c07828!important}
+.mc-badge.none{background:var(--parchment-dark)!important;color:#8f8f8f!important}
+.mc-arrow{color:#c4c4c4;flex-shrink:0}
+.mode-card.primary-mode .mc-arrow{color:rgba(245,240,232,.35)}
 .streak-section{padding:20px 16px 0}
 .streak-cards{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .streak-cards::-webkit-scrollbar{display:none}
