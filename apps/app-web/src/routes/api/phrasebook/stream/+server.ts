@@ -2,20 +2,26 @@ import type { RequestHandler } from './$types';
 import { nestFetch } from '$lib/server/api';
 
 export const GET: RequestHandler = async (event) => {
-  if (!event.locals.auth) {
+  const accessToken = event.url.searchParams.get('accessToken')?.trim() || '';
+  if (!event.locals.auth && !accessToken) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   let upstream: Response;
   try {
+    const headers: Record<string, string> = {
+      Accept: 'text/event-stream',
+    };
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
     upstream = await nestFetch(
       event,
       '/phrasebook/stream',
       {
         method: 'GET',
-        headers: {
-          Accept: 'text/event-stream',
-        },
+        headers,
       },
       true,
     );

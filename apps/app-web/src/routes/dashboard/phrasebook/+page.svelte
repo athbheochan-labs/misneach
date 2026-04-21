@@ -58,7 +58,6 @@
   let source: EventSource | null = null;
   const PHRASE_ACTION_TIMEOUT_MS = 8000;
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  let sseDisabled = false;
 
   function isOwnSource(value?: string | null) {
     const sourceVal = String(value || '').toLowerCase();
@@ -147,7 +146,6 @@
       const current = phrases.find((p) => String(p.id) === String(item.id));
       if (!current?.loading) return;
       setPhraseStateById(item.id, { loading: false, pendingRequestId: null });
-      showToast('Sync delayed. Refreshed phrase status.');
       try {
         await loadPhrases();
       } catch {
@@ -174,9 +172,11 @@
     }
   }
 
-  function connectStream() {
-    if (sseDisabled) return;
-    source = new EventSource('/api/phrasebook/stream');
+  function connectStream(accessToken?: string | null) {
+    const streamUrl = accessToken
+      ? `/api/phrasebook/stream?accessToken=${encodeURIComponent(accessToken)}`
+      : '/api/phrasebook/stream';
+    source = new EventSource(streamUrl);
 
     source.onmessage = (event) => {
       try {
@@ -249,10 +249,7 @@
   onMount(async () => {
     await loadPhrases();
     const session = await loadAuthSession().catch(() => null);
-    // EventSource cannot attach Authorization headers. In token mode, rely on
-    // request timeout + refresh fallback instead of repeatedly reconnecting.
-    sseDisabled = Boolean(session?.accessToken);
-    connectStream();
+    connectStream(session?.accessToken || null);
   });
 
   onDestroy(() => {
