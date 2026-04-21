@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
+  import { loadAuthSession } from '$lib/mobile/session-storage';
   import { onDestroy, onMount } from 'svelte';
 
   type Phrase = {
@@ -45,6 +46,9 @@
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   let source: EventSource | null = null;
+  const PHRASE_ACTION_TIMEOUT_MS = 8000;
+  const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  let sseDisabled = false;
 
   function isOwnSource(value?: string | null) {
     const sourceVal = String(value || '').toLowerCase();
@@ -98,6 +102,52 @@
     }, 2400);
   }
 
+  function setPhraseStateById(id: number | string, patch: Partial<Phrase>) {
+    const idx = phrases.findIndex((item) => String(item.id) === String(id));
+    if (idx === -1) return false;
+    phrases[idx] = { ...phrases[idx], ...patch };
+    phrases = [...phrases];
+    return true;
+  }
+
+  function clearPendingTimer(key: string | null | undefined) {
+    if (!key) return;
+    const existing = pendingTimers.get(key);
+    if (existing) {
+      clearTimeout(existing);
+      pendingTimers.delete(key);
+    }
+  }
+
+  function clearPendingForPhrase(item: Phrase | undefined | null) {
+    if (!item) return;
+    clearPendingTimer(`phrase:${String(item.id)}`);
+    if (item.pendingRequestId) {
+      clearPendingTimer(`request:${item.pendingRequestId}`);
+    }
+  }
+
+  function markPhrasePending(item: Phrase | undefined | null, keySuffix: string) {
+    if (!item) return;
+    const timerKey = keySuffix;
+    clearPendingTimer(timerKey);
+
+    const timer = setTimeout(async () => {
+      pendingTimers.delete(timerKey);
+      const current = phrases.find((p) => String(p.id) === String(item.id));
+      if (!current?.loading) return;
+      setPhraseStateById(item.id, { loading: false, pendingRequestId: null });
+      showToast('Sync delayed. Refreshed phrase status.');
+      try {
+        await loadPhrases();
+      } catch {
+        // ignore refresh failure; loading state has already been released
+      }
+    }, PHRASE_ACTION_TIMEOUT_MS);
+
+    pendingTimers.set(timerKey, timer);
+  }
+
   async function loadPhrases() {
     loading = true;
     try {
@@ -115,6 +165,7 @@
   }
 
   function connectStream() {
+    if (sseDisabled) return;
     source = new EventSource('/api/phrasebook/stream');
 
     source.onmessage = (event) => {
@@ -123,6 +174,8 @@
         if (!msg || !msg.type) return;
 
         if (msg.type === 'phrase.deleted') {
+          const deleted = phrases.find((item) => String(item.id) === String(msg.phraseId));
+          clearPendingForPhrase(deleted);
           phrases = phrases.filter((item) => String(item.id) !== String(msg.phraseId));
           return;
         }
@@ -145,6 +198,8 @@
           : -1;
 
         if (idx !== -1) {
+          clearPendingForPhrase(phrases[idx]);
+          if (msg.requestId) clearPendingTimer(`request:${String(msg.requestId)}`);
           phrases[idx] = {
             ...phrases[idx],
             ...normalized,
@@ -152,6 +207,8 @@
             pendingRequestId: null
           };
         } else if (pendingIdx !== -1) {
+          clearPendingForPhrase(phrases[pendingIdx]);
+          if (msg.requestId) clearPendingTimer(`request:${String(msg.requestId)}`);
           phrases[pendingIdx] = {
             ...phrases[pendingIdx],
             ...normalized,
@@ -170,17 +227,29 @@
 
     source.onerror = () => {
       console.warn('Phrasebook SSE disconnected');
+      for (const item of phrases) {
+        if (!item.loading) continue;
+        clearPendingForPhrase(item);
+        setPhraseStateById(item.id, { loading: false, pendingRequestId: null });
+      }
+      void loadPhrases().catch(() => undefined);
     };
   }
 
   onMount(async () => {
     await loadPhrases();
+    const session = await loadAuthSession().catch(() => null);
+    // EventSource cannot attach Authorization headers. In token mode, rely on
+    // request timeout + refresh fallback instead of repeatedly reconnecting.
+    sseDisabled = Boolean(session?.accessToken);
     connectStream();
   });
 
   onDestroy(() => {
     source?.close();
     source = null;
+    for (const timer of pendingTimers.values()) clearTimeout(timer);
+    pendingTimers.clear();
     if (toastTimer) clearTimeout(toastTimer);
   });
 
@@ -285,6 +354,7 @@
         const data = await res.json();
         const idx = phrases.findIndex((item) => String(item.id) === String(editingPhraseId));
         if (idx !== -1) {
+          clearPendingForPhrase(phrases[idx]);
           phrases[idx] = {
             ...phrases[idx],
             text,
@@ -295,6 +365,10 @@
             loading: true,
             pendingRequestId: data.requestId || null
           };
+          markPhrasePending(
+            phrases[idx],
+            data.requestId ? `request:${String(data.requestId)}` : `phrase:${String(phrases[idx].id)}`,
+          );
           phrases = [...phrases];
         }
 
@@ -332,6 +406,12 @@
           },
           ...phrases
         ];
+        if (phrases[0]) {
+          markPhrasePending(
+            phrases[0],
+            data.requestId ? `request:${String(data.requestId)}` : `phrase:${String(phrases[0].id)}`,
+          );
+        }
 
         const routeLabels = [routePractice ? 'practice' : '', routeFlashcard ? 'flashcards' : ''].filter(Boolean);
         showToast(routeLabels.length ? `Phrase saved -> added to ${routeLabels.join(' & ')}` : 'Phrase saved to phrasebook');
@@ -379,47 +459,55 @@
   }
 
   async function togglePractice(id: number | string) {
-    const idx = phrases.findIndex((item) => String(item.id) === String(id));
-    if (idx === -1) return;
+    const current = phrases.find((item) => String(item.id) === String(id));
+    if (!current) return;
 
-    const previous = Boolean(phrases[idx].inPractice);
+    const previous = Boolean(current.inPractice);
     const next = !previous;
 
-    phrases[idx] = { ...phrases[idx], inPractice: next, loading: true };
-    phrases = [...phrases];
+    setPhraseStateById(id, { inPractice: next, loading: true });
+    markPhrasePending(current, `phrase:${String(id)}`);
 
     try {
       const requestId = await patchPhrase(id, { inPractice: next });
-      phrases[idx] = { ...phrases[idx], pendingRequestId: requestId };
-      phrases = [...phrases];
-      showToast(next ? `Added to practice -> ${phrases[idx].text}` : 'Removed from practice');
+      setPhraseStateById(id, { pendingRequestId: requestId });
+      if (requestId) {
+        markPhrasePending(phrases.find((item) => String(item.id) === String(id)), `request:${requestId}`);
+      }
+      const latest = phrases.find((item) => String(item.id) === String(id));
+      showToast(next ? `Added to practice -> ${latest?.text || 'phrase'}` : 'Removed from practice');
     } catch (err) {
       console.error(err);
-      phrases[idx] = { ...phrases[idx], inPractice: previous, loading: false };
-      phrases = [...phrases];
+      const latest = phrases.find((item) => String(item.id) === String(id));
+      clearPendingForPhrase(latest);
+      setPhraseStateById(id, { inPractice: previous, loading: false, pendingRequestId: null });
       alert(err instanceof Error ? err.message : 'Failed to update practice status');
     }
   }
 
   async function toggleFlashcard(id: number | string) {
-    const idx = phrases.findIndex((item) => String(item.id) === String(id));
-    if (idx === -1) return;
+    const current = phrases.find((item) => String(item.id) === String(id));
+    if (!current) return;
 
-    const previous = Boolean(phrases[idx].inFlashcards);
+    const previous = Boolean(current.inFlashcards);
     const next = !previous;
 
-    phrases[idx] = { ...phrases[idx], inFlashcards: next, loading: true };
-    phrases = [...phrases];
+    setPhraseStateById(id, { inFlashcards: next, loading: true });
+    markPhrasePending(current, `phrase:${String(id)}`);
 
     try {
       const requestId = await patchPhrase(id, { inFlashcards: next });
-      phrases[idx] = { ...phrases[idx], pendingRequestId: requestId };
-      phrases = [...phrases];
-      showToast(next ? `Added to flashcards -> ${phrases[idx].text}` : 'Removed from flashcards');
+      setPhraseStateById(id, { pendingRequestId: requestId });
+      if (requestId) {
+        markPhrasePending(phrases.find((item) => String(item.id) === String(id)), `request:${requestId}`);
+      }
+      const latest = phrases.find((item) => String(item.id) === String(id));
+      showToast(next ? `Added to flashcards -> ${latest?.text || 'phrase'}` : 'Removed from flashcards');
     } catch (err) {
       console.error(err);
-      phrases[idx] = { ...phrases[idx], inFlashcards: previous, loading: false };
-      phrases = [...phrases];
+      const latest = phrases.find((item) => String(item.id) === String(id));
+      clearPendingForPhrase(latest);
+      setPhraseStateById(id, { inFlashcards: previous, loading: false, pendingRequestId: null });
       alert(err instanceof Error ? err.message : 'Failed to update flashcard status');
     }
   }
