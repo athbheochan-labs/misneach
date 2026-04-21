@@ -26,23 +26,28 @@ export async function nestFetch(
 ) {
   const baseUrls = resolveNestBaseUrls();
   const headers = new Headers(init.headers || {});
+  const bearerToken = headers.get('authorization');
+  const hasBearerAuth = Boolean(bearerToken && /^Bearer\s+\S+$/i.test(bearerToken));
 
   if (requireAuth) {
-    if (!event.locals.auth) {
+    if (!event.locals.auth && !hasBearerAuth) {
       throw new Error('Unauthenticated');
     }
 
-    headers.set('x-user-id', String(event.locals.auth.userId));
-    headers.set('x-client-id', event.locals.auth.clientId);
-    headers.set('x-session-id', event.locals.auth.sessionId);
-    if (event.locals.auth.email) {
-      headers.set('x-user-email', event.locals.auth.email);
-    }
-    if (event.locals.auth.role) {
-      headers.set('x-user-role', event.locals.auth.role);
-    }
-    if (process.env.INTERNAL_AUTH_SECRET) {
-      headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+    // Prefer trusted internal identity headers when a verified web session exists.
+    if (event.locals.auth) {
+      headers.set('x-user-id', String(event.locals.auth.userId));
+      headers.set('x-client-id', event.locals.auth.clientId);
+      headers.set('x-session-id', event.locals.auth.sessionId);
+      if (event.locals.auth.email) {
+        headers.set('x-user-email', event.locals.auth.email);
+      }
+      if (event.locals.auth.role) {
+        headers.set('x-user-role', event.locals.auth.role);
+      }
+      if (process.env.INTERNAL_AUTH_SECRET) {
+        headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+      }
     }
   }
 
