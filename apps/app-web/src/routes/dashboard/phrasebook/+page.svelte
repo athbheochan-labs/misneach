@@ -23,6 +23,12 @@
     notes: string;
   };
 
+  type FlashcardDeck = {
+    id: number | string;
+    name: string;
+    cardCount?: number;
+  };
+
   let loading = false;
   let phrases: Phrase[] = [];
   let searchTerm = '';
@@ -40,6 +46,10 @@
 
   let routePractice = true;
   let routeFlashcard = false;
+  let flashcardDecks: FlashcardDeck[] = [];
+  let selectedDeckId = '';
+  let newDeckName = '';
+  let savingPhrase = false;
 
   let toastVisible = false;
   let toastMessage = '';
@@ -48,7 +58,6 @@
   let source: EventSource | null = null;
   const PHRASE_ACTION_TIMEOUT_MS = 8000;
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  let sseDisabled = false;
 
   function isOwnSource(value?: string | null) {
     const sourceVal = String(value || '').toLowerCase();
@@ -137,7 +146,6 @@
       const current = phrases.find((p) => String(p.id) === String(item.id));
       if (!current?.loading) return;
       setPhraseStateById(item.id, { loading: false, pendingRequestId: null });
-      showToast('Sync delayed. Refreshed phrase status.');
       try {
         await loadPhrases();
       } catch {
@@ -164,9 +172,11 @@
     }
   }
 
-  function connectStream() {
-    if (sseDisabled) return;
-    source = new EventSource('/api/phrasebook/stream');
+  function connectStream(accessToken?: string | null) {
+    const streamUrl = accessToken
+      ? `/api/phrasebook/stream?accessToken=${encodeURIComponent(accessToken)}`
+      : '/api/phrasebook/stream';
+    source = new EventSource(streamUrl);
 
     source.onmessage = (event) => {
       try {
@@ -239,10 +249,7 @@
   onMount(async () => {
     await loadPhrases();
     const session = await loadAuthSession().catch(() => null);
-    // EventSource cannot attach Authorization headers. In token mode, rely on
-    // request timeout + refresh fallback instead of repeatedly reconnecting.
-    sseDisabled = Boolean(session?.accessToken);
-    connectStream();
+    connectStream(session?.accessToken || null);
   });
 
   onDestroy(() => {
@@ -295,6 +302,9 @@
     };
     routePractice = true;
     routeFlashcard = false;
+    flashcardDecks = [];
+    selectedDeckId = '';
+    newDeckName = '';
     phraseModalOpen = true;
   }
 
@@ -316,12 +326,34 @@
     editingSource = null;
   }
 
-  function toggleRoute(route: 'practice' | 'flashcard') {
+  async function loadFlashcardDeckOptions() {
+    const decksRes = await apiFetch('/api/proxy/flashcards/decks', { cache: 'no-store' });
+    if (!decksRes.ok) {
+      throw new Error(await readErrorMessage(decksRes, 'Failed to load flashcard decks'));
+    }
+    const decks = await decksRes.json();
+    flashcardDecks = Array.isArray(decks) ? decks : [];
+    if (!selectedDeckId) {
+      selectedDeckId = flashcardDecks[0] ? String(flashcardDecks[0].id) : '__new__';
+    }
+  }
+
+  async function toggleRoute(route: 'practice' | 'flashcard') {
     if (route === 'practice') {
       routePractice = !routePractice;
       return;
     }
     routeFlashcard = !routeFlashcard;
+    if (routeFlashcard) {
+      try {
+        await loadFlashcardDeckOptions();
+      } catch (err) {
+        console.error(err);
+        selectedDeckId = '__new__';
+        flashcardDecks = [];
+        alert(err instanceof Error ? err.message : 'Failed to load flashcard decks');
+      }
+    }
   }
 
   async function savePhrase() {
@@ -335,6 +367,8 @@
       return;
     }
 
+    if (savingPhrase) return;
+    savingPhrase = true;
     try {
       if (editingPhraseId != null) {
         const res = await apiFetch(`/api/proxy/phrasebook/${editingPhraseId}`, {
@@ -374,6 +408,33 @@
 
         showToast('Phrase updated');
       } else {
+        let deckId: string | null = null;
+        if (routeFlashcard) {
+          deckId = selectedDeckId || '';
+          if (!deckId) {
+            await loadFlashcardDeckOptions();
+            deckId = selectedDeckId || '';
+          }
+          if (!deckId) throw new Error('Please select a flashcard deck');
+
+          if (deckId === '__new__') {
+            const deckName = newDeckName.trim();
+            if (!deckName) throw new Error('New deck name is required');
+            const createDeckRes = await apiFetch('/api/proxy/flashcards/decks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: deckName,
+                description: 'Cards created from phrasebook entries',
+                language: 'ga'
+              })
+            });
+            if (!createDeckRes.ok) throw new Error(await readErrorMessage(createDeckRes, 'Failed to create deck'));
+            const createdDeck = await createDeckRes.json();
+            deckId = String(createdDeck.id);
+          }
+        }
+
         const res = await apiFetch('/api/proxy/phrasebook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -391,6 +452,21 @@
         if (!res.ok) throw new Error(await readErrorMessage(res, 'Failed to save phrase'));
 
         const data = await res.json();
+
+        if (routeFlashcard && deckId && deckId !== '__new__') {
+          const cardRes = await apiFetch(`/api/proxy/flashcards/decks/${encodeURIComponent(deckId)}/cards`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              front: text,
+              back: translation,
+              pronunciation: pronunciation || undefined,
+              notes: notes || undefined
+            })
+          });
+          if (!cardRes.ok) throw new Error(await readErrorMessage(cardRes, 'Phrase saved, but failed to create flashcard'));
+        }
+
         phrases = [
           {
             id: `tmp-${data.requestId || Date.now()}`,
@@ -421,6 +497,8 @@
     } catch (err) {
       console.error(err);
       alert(err instanceof Error ? err.message : 'Failed to save phrase');
+    } finally {
+      savingPhrase = false;
     }
   }
 
@@ -812,9 +890,38 @@
             </button>
             <button type="button" class={`route-opt ${routeFlashcard ? 'selected' : ''}`} onclick={() => toggleRoute('flashcard')}>
               <div class="route-opt-name">Flashcards</div>
-              <div class="route-opt-desc">Adds to your default deck for review</div>
+              <div class="route-opt-desc">Add to a deck for spaced repetition</div>
             </button>
           </div>
+
+          {#if routeFlashcard}
+            <div class="deck-options">
+              {#each flashcardDecks as deck}
+                <button
+                  type="button"
+                  class={`deck-opt ${selectedDeckId === String(deck.id) ? 'active' : ''}`}
+                  onclick={() => (selectedDeckId = String(deck.id))}
+                >
+                  <div class="deck-opt-name">{deck.name}</div>
+                  <div class="deck-opt-count">{deck.cardCount ?? 0} cards</div>
+                </button>
+              {/each}
+              <button
+                type="button"
+                class={`deck-opt ${selectedDeckId === '__new__' ? 'active' : ''}`}
+                onclick={() => (selectedDeckId = '__new__')}
+              >
+                <div class="deck-opt-name">+ New deck</div>
+                <div class="deck-opt-count">Create fresh</div>
+              </button>
+            </div>
+            {#if selectedDeckId === '__new__'}
+              <div class="field deck-name-field">
+                <label for="phrase-new-deck">New deck name</label>
+                <input id="phrase-new-deck" type="text" bind:value={newDeckName} placeholder="e.g. Book 1 phrases" />
+              </div>
+            {/if}
+          {/if}
         </div>
       {/if}
 
@@ -823,7 +930,13 @@
           <button class="btn-delete" onclick={deletePhrase}>Delete phrase</button>
         {/if}
         <button class="btn-cancel" onclick={closePhraseModal}>Cancel</button>
-        <button class="btn-confirm" onclick={savePhrase}>{editingPhraseId != null ? 'Save changes' : 'Save phrase'}</button>
+        <button class="btn-confirm" onclick={savePhrase} disabled={savingPhrase}>
+          {#if savingPhrase}
+            Saving...
+          {:else}
+            {editingPhraseId != null ? 'Save changes' : 'Save phrase'}
+          {/if}
+        </button>
       </div>
     </div>
   </div>
@@ -1568,6 +1681,45 @@
     line-height: 1.4;
   }
 
+  .deck-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .deck-opt {
+    background: #fff;
+    border: 1.5px solid var(--parch-dark);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .deck-opt.active {
+    border-color: var(--green);
+    background: rgba(45, 122, 80, 0.05);
+  }
+
+  .deck-opt-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--forest);
+  }
+
+  .deck-opt-count {
+    font-size: 11px;
+    color: #b0b0b0;
+    margin-top: 2px;
+  }
+
+  .deck-name-field {
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
+
   .modal-actions {
     display: flex;
     gap: 10px;
@@ -1608,6 +1760,11 @@
 
   .btn-confirm:hover {
     background: var(--forest-mid);
+  }
+
+  .btn-confirm:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .btn-delete {
@@ -1729,6 +1886,10 @@
 
     .route-options {
       flex-direction: column;
+    }
+
+    .deck-options {
+      grid-template-columns: 1fr;
     }
 
     .modal-sheet {
