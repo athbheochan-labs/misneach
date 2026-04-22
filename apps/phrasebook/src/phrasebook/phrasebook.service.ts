@@ -31,6 +31,43 @@ export class PhrasebookService {
       .trim();
   }
 
+  private normalizeSource(
+    source: string | undefined | null,
+    fallback: 'manual' | 'course' = 'manual',
+  ): 'manual' | 'course' {
+    const normalized = String(source || '')
+      .trim()
+      .toLowerCase();
+
+    if (!normalized) return fallback;
+
+    if (
+      normalized === 'manual' ||
+      normalized === 'own' ||
+      normalized === 'user' ||
+      normalized === 'user_added' ||
+      normalized === 'custom' ||
+      normalized === 'personal' ||
+      normalized === 'direct_input' ||
+      normalized === 'manual_input'
+    ) {
+      return 'manual';
+    }
+
+    if (
+      normalized === 'course' ||
+      normalized === 'nlp' ||
+      normalized === 'lesson' ||
+      normalized === 'course_phrase' ||
+      normalized === 'lexicon' ||
+      normalized === 'import'
+    ) {
+      return 'course';
+    }
+
+    return fallback;
+  }
+
   // Fingerprint must be scoped by client to avoid cross-user collisions.
   private phraseFingerprint(clientId: string, normalizedText: string) {
     return createHash('sha256')
@@ -158,7 +195,7 @@ export class PhrasebookService {
       createdAt: new Date(),
       ...dto,
       text: normalizedText,
-      source: String(dto.source || 'own'),
+      source: this.normalizeSource(dto.source, 'manual'),
       inPractice: Boolean(dto.inPractice),
       inFlashcards: Boolean(dto.inFlashcards),
     });
@@ -241,6 +278,9 @@ export class PhrasebookService {
     if (!phrase) throw new NotFoundException(`Phrase ${id} not found`);
 
     Object.assign(phrase, dto);
+    if (typeof dto.source === 'string') {
+      phrase.source = this.normalizeSource(dto.source, 'manual');
+    }
     await this.phraseRepo.save(phrase);
 
     await this.emitStatementEvent('statement_updated', phrase, dto);
@@ -368,7 +408,7 @@ export class PhrasebookService {
     return {
       id: p.id,
       text: p.text,
-      source: p.source,
+      source: this.normalizeSource(p.source, 'course'),
       translation: p.translation,
       pronunciation: p.pronunciation,
       example: p.example,

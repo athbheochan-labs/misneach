@@ -33,6 +33,37 @@ export class PhrasebookService {
     private readonly authService: AuthService,
   ) {}
 
+  private normalizeSource(source: string | undefined | null): 'manual' | 'course' {
+    const normalized = String(source || '').trim().toLowerCase();
+    if (!normalized) return 'manual';
+
+    if (
+      normalized === 'manual' ||
+      normalized === 'own' ||
+      normalized === 'user' ||
+      normalized === 'user_added' ||
+      normalized === 'custom' ||
+      normalized === 'personal' ||
+      normalized === 'direct_input' ||
+      normalized === 'manual_input'
+    ) {
+      return 'manual';
+    }
+
+    if (
+      normalized === 'course' ||
+      normalized === 'nlp' ||
+      normalized === 'lesson' ||
+      normalized === 'course_phrase' ||
+      normalized === 'lexicon' ||
+      normalized === 'import'
+    ) {
+      return 'course';
+    }
+
+    return 'manual';
+  }
+
   // ---------------- SSE ----------------
 
   registerSseClient(clientId: string, res: any) {
@@ -87,10 +118,7 @@ export class PhrasebookService {
     const autoTranslation =
       typeof body?.autoTranslate === 'boolean' ? body.autoTranslate : undefined;
 
-    const source =
-      typeof body?.source === 'string' && body.source.trim().length > 0
-        ? body.source.trim()
-        : 'own';
+    const source = this.normalizeSource(body?.source);
 
     const res = await fetch(
       `${this.phrasebookUrl}/phrases?clientId=${encodeURIComponent(clientId)}`,
