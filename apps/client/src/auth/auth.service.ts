@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -50,6 +51,7 @@ const translations = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private resend;
   private readonly accessTokenTtlSec = 15 * 60;
   private readonly refreshTokenTtlSec = 30 * 24 * 60 * 60;
@@ -103,6 +105,7 @@ export class AuthService {
   private verifyJwt(token: string): Record<string, unknown> {
     const [headerEncoded, payloadEncoded, signature] = token.split('.');
     if (!headerEncoded || !payloadEncoded || !signature) {
+      this.logger.warn('jwt_verify_failed cause=malformed');
       throw new UnauthorizedException('Invalid token');
     }
 
@@ -116,6 +119,7 @@ export class AuthService {
       .replace(/=+$/g, '');
 
     if (expectedSig !== signature) {
+      this.logger.warn('jwt_verify_failed cause=signature_mismatch');
       throw new UnauthorizedException('Invalid token');
     }
 
@@ -123,6 +127,7 @@ export class AuthService {
     const payload = JSON.parse(payloadRaw) as Record<string, unknown>;
     const exp = Number(payload.exp || 0);
     if (!Number.isFinite(exp) || exp <= Math.floor(Date.now() / 1000)) {
+      this.logger.warn('jwt_verify_failed cause=expired');
       throw new UnauthorizedException('Token expired');
     }
     return payload;
@@ -173,11 +178,13 @@ export class AuthService {
 
     const payload = this.verifyJwt(refreshToken);
     if (payload.tokenType !== 'refresh') {
+      this.logger.warn('refresh_rejected cause=wrong_token_type');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
     const userId = Number(payload.sub || 0);
     if (!Number.isFinite(userId) || userId <= 0) {
+      this.logger.warn('refresh_rejected cause=invalid_subject');
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -186,6 +193,7 @@ export class AuthService {
       relations: ['languageSettings'],
     });
     if (!user) {
+      this.logger.warn(`refresh_rejected cause=user_not_found userId=${userId}`);
       throw new UnauthorizedException('User not found');
     }
 
@@ -194,16 +202,19 @@ export class AuthService {
 
   async getUserFromAccessToken(token: string): Promise<User> {
     if (!token) {
+      this.logger.warn('access_rejected cause=missing_token');
       throw new UnauthorizedException('Missing access token');
     }
 
     const payload = this.verifyJwt(token);
     if (payload.tokenType !== 'access') {
+      this.logger.warn('access_rejected cause=wrong_token_type');
       throw new UnauthorizedException('Invalid access token');
     }
 
     const userId = Number(payload.sub || 0);
     if (!Number.isFinite(userId) || userId <= 0) {
+      this.logger.warn('access_rejected cause=invalid_subject');
       throw new UnauthorizedException('Invalid access token');
     }
 
@@ -212,6 +223,7 @@ export class AuthService {
       relations: ['languageSettings'],
     });
     if (!user) {
+      this.logger.warn(`access_rejected cause=user_not_found userId=${userId}`);
       throw new UnauthorizedException('User not found');
     }
     return user;
@@ -487,6 +499,7 @@ export class AuthService {
 
     const sessionUser = req.session?.user;
     if (!sessionUser?.id) {
+      this.logger.warn('session_resolve_failed cause=missing_session_user');
       throw new UnauthorizedException('User not authenticated');
     }
 
@@ -496,6 +509,7 @@ export class AuthService {
     });
 
     if (!fromSession) {
+      this.logger.warn(`session_resolve_failed cause=session_user_not_found userId=${sessionUser.id}`);
       throw new UnauthorizedException('User not found');
     }
 

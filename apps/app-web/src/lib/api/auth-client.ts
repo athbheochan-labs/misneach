@@ -8,6 +8,13 @@ export type AuthMeUser = {
   signupComplete: boolean;
 };
 
+export type AuthMeResult = {
+  loggedIn: boolean;
+  user: AuthMeUser | null;
+  cause?: 'unauthenticated' | 'unavailable';
+  status?: number;
+};
+
 export async function requestMagicLink(email: string): Promise<Response> {
   return apiFetch('/api/proxy/auth/login', {
     method: 'POST',
@@ -27,17 +34,28 @@ export async function exchangeMagicLink(email: string, token: string): Promise<R
   });
 }
 
-export async function getAuthMe(): Promise<{
-  loggedIn: boolean;
-  user: AuthMeUser | null;
-}> {
+export async function getAuthMe(): Promise<AuthMeResult> {
   const res = await apiFetch('/api/proxy/auth/me', { cache: 'no-store' });
-  if (!res.ok) return { loggedIn: false, user: null };
+  if (!res.ok) {
+    return {
+      loggedIn: false,
+      user: null,
+      cause: res.status === 401 ? 'unauthenticated' : 'unavailable',
+      status: res.status,
+    };
+  }
   const payload = await res.json().catch(() => ({} as any));
 
   const loggedIn = Boolean(payload?.loggedIn);
   const rawUser = payload?.user;
-  if (!loggedIn || !rawUser) return { loggedIn: false, user: null };
+  if (!loggedIn || !rawUser) {
+    return {
+      loggedIn: false,
+      user: null,
+      cause: 'unauthenticated',
+      status: 200,
+    };
+  }
 
   return {
     loggedIn: true,
@@ -48,6 +66,8 @@ export async function getAuthMe(): Promise<{
       role: rawUser.role === 'admin' ? 'admin' : 'learner',
       signupComplete: Boolean(rawUser.signupComplete),
     },
+    cause: undefined,
+    status: 200,
   };
 }
 

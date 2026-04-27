@@ -55,11 +55,16 @@
 
   onMount(async () => {
     initIcons();
-    const auth = await getAuthMe().catch(() => ({ loggedIn: false, user: null }));
-    if (!auth.loggedIn) {
+    const auth = await getAuthMe().catch(() => ({
+      loggedIn: false,
+      user: null,
+      cause: 'unavailable' as const,
+    }));
+    if (!auth.loggedIn && auth.cause === 'unauthenticated') {
       await goto('/auth/login');
       return;
     }
+    if (!auth.loggedIn) return;
     if (auth.user?.role !== 'admin' && auth.user?.signupComplete === false) {
       await goto('/auth/signup');
     }

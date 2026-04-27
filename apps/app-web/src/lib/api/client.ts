@@ -1,5 +1,11 @@
 import { env } from '$env/dynamic/public';
-import { loadAuthSession } from '$lib/mobile/session-storage';
+import { recordSessionEvent } from '$lib/auth/session-events';
+import {
+  clearAuthSession,
+  loadAuthSession,
+  saveAuthSession,
+  type AuthSessionRecord,
+} from '$lib/mobile/session-storage';
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
@@ -101,6 +107,109 @@ function toResponse(
   });
 }
 
+async function performRequest(url: string, init: RequestInit, headers: Headers): Promise<Response> {
+  const capacitorHttp = getCapacitorHttpPlugin();
+  const shouldUseNativeHttp =
+    isNativeCapacitorRuntime() && Boolean(capacitorHttp?.request) && /^http:\/\//i.test(url);
+
+  if (shouldUseNativeHttp && capacitorHttp?.request) {
+    const nativeResponse = await capacitorHttp.request({
+      url,
+      method: (init.method || 'GET').toUpperCase(),
+      headers: toCapacitorHeaders(headers),
+      data: toCapacitorData(init, headers),
+    });
+    return toResponse(nativeResponse);
+  }
+
+  return fetch(url, init);
+}
+
+function isAuthRefreshPath(url: string): boolean {
+  return /\/auth\/refresh(?:\?|$)/.test(url);
+}
+
+function isRetryableAuthPath(url: string): boolean {
+  return !/\/auth\/(?:login|logout|refresh|verify-request|verify-token)(?:\?|$)/.test(url);
+}
+
+let refreshInFlight: Promise<AuthSessionRecord | null | 'unavailable'> | null = null;
+
+async function refreshAccessToken(
+  currentSession: AuthSessionRecord,
+): Promise<AuthSessionRecord | null | 'unavailable'> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    recordSessionEvent('refresh_started');
+    const refreshUrl = resolveUrl('/api/proxy/auth/refresh');
+    const headers = new Headers({
+      'content-type': 'application/json',
+      accept: 'application/json',
+    });
+
+    try {
+      const response = await performRequest(
+        refreshUrl,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
+        },
+        headers,
+      );
+
+      if (response.ok) {
+        const data = await response.json().catch(() => ({} as Record<string, unknown>));
+        if (!data?.accessToken || !data?.refreshToken) {
+          recordSessionEvent('refresh_failed', {
+            cause: 'missing_token_bundle',
+            status: response.status,
+          });
+          return 'unavailable';
+        }
+
+        const nextSession: AuthSessionRecord = {
+          accessToken: String(data.accessToken),
+          refreshToken: String(data.refreshToken),
+          expiresInSec: Number(data.expiresInSec || 0) || undefined,
+          issuedAtEpochSec: Math.floor(Date.now() / 1000),
+        };
+        await saveAuthSession(nextSession);
+        recordSessionEvent('refresh_succeeded', {
+          expiresInSec: nextSession.expiresInSec ?? null,
+        });
+        return nextSession;
+      }
+
+      if (response.status === 400 || response.status === 401) {
+        await clearAuthSession().catch(() => undefined);
+        recordSessionEvent('session_invalidated', {
+          cause: 'refresh_rejected',
+          status: response.status,
+        });
+        return null;
+      }
+
+      recordSessionEvent('refresh_failed', {
+        cause: 'upstream_error',
+        status: response.status,
+      });
+      return 'unavailable';
+    } catch (error) {
+      recordSessionEvent('refresh_failed', {
+        cause: 'network_error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 'unavailable';
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const url = resolveUrl(input);
   const headers = new Headers(init.headers || {});
@@ -119,19 +228,47 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
     headers,
   };
 
-  const capacitorHttp = getCapacitorHttpPlugin();
-  const shouldUseNativeHttp =
-    isNativeCapacitorRuntime() && Boolean(capacitorHttp?.request) && /^http:\/\//i.test(url);
-
-  if (shouldUseNativeHttp && capacitorHttp?.request) {
-    const nativeResponse = await capacitorHttp.request({
-      url,
-      method: (finalInit.method || 'GET').toUpperCase(),
-      headers: toCapacitorHeaders(headers),
-      data: toCapacitorData(finalInit, headers),
-    });
-    return toResponse(nativeResponse);
+  const response = await performRequest(url, finalInit, headers);
+  if (
+    response.status !== 401 ||
+    !session?.refreshToken ||
+    isAuthRefreshPath(url) ||
+    !isRetryableAuthPath(url)
+  ) {
+    return response;
   }
 
-  return fetch(url, finalInit);
+  const refreshed = await refreshAccessToken(session);
+  if (refreshed === 'unavailable') {
+    recordSessionEvent('session_unavailable', {
+      cause: 'refresh_unavailable_after_401',
+      path: input,
+    });
+    return new Response(
+      JSON.stringify({ error: 'Session refresh unavailable' }),
+      {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
+  }
+
+  if (!refreshed?.accessToken) {
+    return response;
+  }
+
+  const retryHeaders = new Headers(init.headers || {});
+  retryHeaders.set('authorization', `Bearer ${refreshed.accessToken}`);
+  if (!retryHeaders.has('accept')) {
+    retryHeaders.set('accept', 'application/json');
+  }
+
+  return performRequest(
+    url,
+    {
+      ...init,
+      headers: retryHeaders,
+    },
+    retryHeaders,
+  );
 }

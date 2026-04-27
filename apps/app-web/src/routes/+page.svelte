@@ -10,6 +10,9 @@
         await goto('/dashboard');
         return;
       }
+      if (auth.cause === 'unavailable') {
+        return;
+      }
     } catch {
       // fall through to login
     }
