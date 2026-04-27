@@ -3,10 +3,22 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { PhrasebookController } from './phrasebook.controller';
 import { PhrasebookService } from './phrasebook.service';
-import { Phrase, PhraseToken } from './phrasebook.entity';
+import {
+  Phrase,
+  PhraseCategory,
+  PhraseGroup,
+  PhraseToken,
+} from './phrasebook.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Phrase, PhraseToken])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Phrase,
+      PhraseToken,
+      PhraseCategory,
+      PhraseGroup,
+    ]),
+  ],
   controllers: [PhrasebookController],
   providers: [PhrasebookService],
   exports: [],

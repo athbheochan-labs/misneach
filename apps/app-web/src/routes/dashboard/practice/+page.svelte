@@ -3,7 +3,6 @@
   import { getAuthMe } from '$lib/api/auth-client';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { MisButton, MisModeCard, MisTextarea } from '@decyphr/misneach-ui';
   import AppModal from '$lib/components/ui/AppModal.svelte';
   import {
     incrementPracticeProgress,
@@ -17,6 +16,11 @@
   import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
 
   type ExerciseType = 'typed_translation' | 'sentence_builder' | 'cloze';
+  type FlashDueCard = {
+    id: number;
+    front: string;
+    back: string;
+  };
   const SESSION_SIZE = 15;
 
   type Exercise = {
@@ -33,7 +37,7 @@
 
   let loading = false;
   let submitting = false;
-  let sessionMode: 'idle' | 'lesson' | 'fix_mistakes' | 'complete' = 'idle';
+  let sessionMode: 'idle' | 'lesson' | 'fix_mistakes' | 'flash' | 'complete' = 'idle';
 
   let queue: Exercise[] = [];
   let index = 0;
@@ -42,7 +46,7 @@
   let masteredKeys = new Set<string>();
   let sessionCorrectCount = 0;
   let sessionWrongCount = 0;
-  let lastSessionMode: 'lesson' | 'fix_mistakes' = 'lesson';
+  let lastSessionMode: 'lesson' | 'fix_mistakes' | 'flash' = 'lesson';
 
   let freeTextAnswer = '';
   let sentenceChoices: Array<{ id: string; value: string; selectedAt: number | null }> = [];
@@ -73,6 +77,13 @@
   let showNoDueChoiceModal = false;
   let warmupDueToday = 0;
   let warmupMistakesToFix = 0;
+  let flashcards: FlashDueCard[] = [];
+  let flashIndex = 0;
+  let flashFlipped = false;
+  let showPauseOverlay = false;
+  let pauseCorrect = 0;
+  let pauseWrong = 0;
+  let pauseLeft = 0;
 
   const successMessages = [
     'Great job. That was spot on.',
@@ -214,7 +225,14 @@
     .filter((token) => token.selectedAt != null)
     .sort((a, b) => Number(a.selectedAt) - Number(b.selectedAt))
     .map((token) => token.value);
-  $: progress = totalPlanned > 0 ? Math.min(100, Math.round((completedCount / totalPlanned) * 100)) : 0;
+  $: progress =
+    sessionMode === 'flash'
+      ? flashcards.length > 0
+        ? Math.min(100, Math.round((flashIndex / flashcards.length) * 100))
+        : 0
+      : totalPlanned > 0
+        ? Math.min(100, Math.round((completedCount / totalPlanned) * 100))
+        : 0;
   $: studyMode = Boolean(studySessionId);
   $: remainingCount = countRemaining();
   $: canSubmit = current
@@ -222,9 +240,10 @@
       ? selectedSentenceTokens.length > 0
       : freeTextAnswer.trim().length > 0
     : false;
-  $: masteredLabel = `${completedCount}`;
-  $: leftLabel = `${remainingCount} left`;
+  $: masteredLabel = `${sessionMode === 'flash' ? sessionCorrectCount : completedCount}`;
+  $: leftLabel = `${sessionMode === 'flash' ? Math.max(0, flashcards.length - flashIndex) : remainingCount} left`;
   $: sessionTotalCount = sessionCorrectCount + sessionWrongCount;
+  $: currentFlash = flashcards[flashIndex] || null;
 
   function parseSessionLimit(raw: string | null) {
     const parsed = Number(raw || SESSION_SIZE);
@@ -467,12 +486,81 @@
     goto('/dashboard/courses?view=all');
   }
 
-  function startFlashcardReview() {
+  async function startFlashcardReview() {
     if (studySession) {
-      goto(studyFlashcardsHref(studySession, studyReturnTo || studyCoordinatorHref(studySession.id)));
+      await goto(studyFlashcardsHref(studySession, studyReturnTo || studyCoordinatorHref(studySession.id)));
       return;
     }
-    goto('/dashboard/flashcards/study');
+    if (loading) return;
+    if (!ensureOnline('start flashcard review')) return;
+    loading = true;
+    try {
+      const res = await apiFetch(`/api/proxy/flashcards/study/due?limit=${sessionLimit}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(await readError(res, 'Failed to load flashcards'));
+      const payload = await res.json();
+      const cards = Array.isArray(payload)
+        ? payload
+            .map((item: any) => ({
+              id: Number(item?.id),
+              front: String(item?.front || ''),
+              back: String(item?.back || ''),
+            }))
+            .filter((item: FlashDueCard) => Number.isFinite(item.id) && item.front && item.back)
+        : [];
+
+      flashcards = cards.slice(0, sessionLimit);
+      flashIndex = 0;
+      flashFlipped = false;
+      queue = [];
+      index = 0;
+      completedCount = 0;
+      totalPlanned = flashcards.length;
+      sessionCorrectCount = 0;
+      sessionWrongCount = 0;
+      lastSessionMode = 'flash';
+      sessionMode = flashcards.length > 0 ? 'flash' : 'idle';
+      if (flashcards.length === 0) {
+        openInfoModal('No due flashcards', 'No cards are due right now. Check back later.');
+      }
+    } catch (error) {
+      console.error(error);
+      openInfoModal(
+        'Unable to start flashcards',
+        isLikelyNetworkError(error)
+          ? 'Network request failed. Check your connection and retry.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to load flashcards',
+      );
+    } finally {
+      loading = false;
+    }
+  }
+
+  function revealFlash() {
+    flashFlipped = true;
+  }
+
+  async function rateFlash(knew: boolean) {
+    const card = currentFlash;
+    if (!card) return;
+    try {
+      await apiFetch(`/api/proxy/flashcards/cards/${card.id}/attempt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grade: knew ? 'good' : 'again' }),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+    incrementJourneyGoalCounter('flashcardsReviewed', 1);
+    if (knew) sessionCorrectCount += 1;
+    else sessionWrongCount += 1;
+    flashIndex += 1;
+    flashFlipped = false;
+    if (flashIndex >= flashcards.length) {
+      sessionMode = 'complete';
+    }
   }
 
   function toggleSentenceToken(tokenIndex: number) {
@@ -612,6 +700,26 @@
     nextQuestion();
   }
 
+  function openPause() {
+    pauseCorrect = sessionCorrectCount;
+    pauseWrong = sessionWrongCount;
+    pauseLeft = remainingCount;
+    showPauseOverlay = true;
+  }
+
+  function closePause() {
+    showPauseOverlay = false;
+  }
+
+  function closePauseOutside(event: MouseEvent) {
+    if (event.target === event.currentTarget) closePause();
+  }
+
+  function exitSession() {
+    closePause();
+    restart();
+  }
+
   function restart() {
     sessionMode = 'idle';
     queue = [];
@@ -635,6 +743,10 @@
   function repeatLastSession() {
     if (lastSessionMode === 'fix_mistakes') {
       startFixMistakes().catch(() => undefined);
+      return;
+    }
+    if (lastSessionMode === 'flash') {
+      startFlashcardReview().catch(() => undefined);
       return;
     }
     startLesson(true).catch(() => undefined);
@@ -672,25 +784,11 @@
     <div class="offline-banner" role="status">You are offline. Some actions are temporarily unavailable.</div>
   {/if}
 
-  {#if sessionMode === 'lesson' || sessionMode === 'fix_mistakes'}
-    <section class="session-bar" aria-label="Session progress">
-      <div class="session-progress-track">
-        <div class="session-progress-fill" style={`width:${progress}%`}></div>
-      </div>
-      <div class="session-score">
-        <span class="score-mastered">{masteredLabel}</span>
-        <span class="score-left">{leftLabel}</span>
-      </div>
-    </section>
-  {/if}
-
   {#if studyMode}
     <section class="study-banner">
       <p class="study-title">Study session mode</p>
       {#if studySession}
-        <p class="study-meta">
-          Practice target: {studySession.progress.practiceCompleted} / {studySession.targets.practice}
-        </p>
+        <p class="study-meta">Practice target: {studySession.progress.practiceCompleted} / {studySession.targets.practice}</p>
       {/if}
       {#if studyReturnTo}
         <p class="study-meta">You will return to your guided session after completion.</p>
@@ -699,236 +797,223 @@
   {/if}
 
   {#if sessionMode === 'idle'}
-    <section class="warmup-wrap">
-      <p class="warmup-eyebrow">Practice session</p>
-      <h1 class="warmup-headline">Ready to <em>cleachtadh?</em></h1>
-      <p class="warmup-sub">Pick a mode and start your review session.</p>
+    <div class="screen active" id="screen-warmup">
+      <div class="warmup-wrap">
+        <div class="warmup-eyebrow">Practice session</div>
+        <h1 class="warmup-headline">Ready to <em>cleachtadh?</em></h1>
+        <p class="warmup-sub">{warmupDueToday} phrases are due for review today. Pick a mode or jump straight in.</p>
 
-      <div class="due-strip" aria-label="Practice warm-up summary">
-        <div class="due-pill primary">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          {warmupDueToday} due today
+        <div class="due-strip">
+          <div class="due-pill primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            {warmupDueToday} due today
+          </div>
+          <div class="due-pill secondary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            {warmupMistakesToFix} mistakes to fix
+          </div>
+          <div class="due-pill dim">{sessionLimit} phrase session</div>
         </div>
-        <div class="due-pill secondary">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-          {warmupMistakesToFix} mistakes to fix
+
+        <div class="mode-list">
+          <button class="mode-card primary-mode" type="button" onclick={startLesson} disabled={loading}>
+            <div class="mc-icon-wrap dark">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7ec99a" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <div class="mc-text">
+              <div class="mc-eyebrow">Anytime session</div>
+              <div class="mc-title">Start <em>practice</em></div>
+              <div class="mc-sub">Due phrases first, then saved phrases</div>
+            </div>
+            <div class="mc-badge">{loading ? 'Loading' : `${warmupDueToday} due`}</div>
+            <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+          </button>
+
+          <button class="mode-card" type="button" onclick={startFixMistakes} disabled={loading}>
+            <div class="mc-icon-wrap light">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--moss)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            </div>
+            <div class="mc-text">
+              <div class="mc-eyebrow">Targeted review</div>
+              <div class="mc-title">Fix <em>mistakes</em></div>
+              <div class="mc-sub">Retry phrases you got wrong recently</div>
+            </div>
+            <div class="mc-badge amber">{warmupMistakesToFix} to fix</div>
+            <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+          </button>
+
+          <button class="mode-card" type="button" onclick={startFlashcardReview}>
+            <div class="mc-icon-wrap dim">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div class="mc-text">
+              <div class="mc-eyebrow">Spaced repetition</div>
+              <div class="mc-title">Flashcard <em>review</em></div>
+              <div class="mc-sub">Open your due flashcards</div>
+            </div>
+            <div class="mc-badge none">{warmupDueToday} due</div>
+            <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+          </button>
         </div>
-        <div class="due-pill dim">{sessionLimit} phrase session</div>
       </div>
-    </section>
-
-    <div class="mode-grid">
-      <MisModeCard
-        onclick={startLesson}
-        disabled={loading}
-        tone="practice"
-        eyebrow="Anytime session"
-        title="Start"
-        emphasis="practice"
-        description="Due phrases first, then saved phrases so you can keep going any time."
-      />
-
-      <MisModeCard
-        onclick={startFixMistakes}
-        disabled={loading}
-        id="mistakes-hub"
-        tone="mistakes"
-        eyebrow="Targeted review"
-        title="Fix"
-        emphasis="mistakes"
-        description="Retry phrases you got wrong recently. Short and focused."
-      />
-
-      <MisModeCard
-        onclick={startFlashcardReview}
-        tone="flash"
-        eyebrow="Spaced repetition"
-        title="Flashcard"
-        emphasis="review"
-        description="Open your due flashcards for a different kind of recall."
-      />
     </div>
   {:else if sessionMode === 'complete'}
-    <div class="complete-card">
-      <div class="complete-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
+    <div class="screen active" id="screen-complete">
+      <div class="complete-wrap">
+        <div class="complete-mark">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--moss)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h2 class="complete-title">Maith <em>thu!</em></h2>
+        <p class="complete-sub">Session complete. You're building something real.</p>
+        <div class="complete-stats">
+          <div class="cs-stat"><div class="cs-num">{sessionCorrectCount}</div><div class="cs-lbl">Correct</div></div>
+          <div class="cs-stat"><div class="cs-num">{sessionWrongCount}</div><div class="cs-lbl">Wrong</div></div>
+          <div class="cs-stat"><div class="cs-num">{sessionTotalCount}</div><div class="cs-lbl">Total</div></div>
+        </div>
+        <button class="btn-done" type="button" onclick={restart}>Back to practice</button>
+        <button class="btn-again" type="button" onclick={repeatLastSession}>Go again</button>
+        {#if showContinueStudy && studyReturnTo}
+          <button class="btn-again" type="button" onclick={() => goto(studyReturnTo)}>Continue Study Session</button>
+        {/if}
       </div>
-      <h2 class="complete-title">Maith <em>thu.</em></h2>
-      <p class="complete-sub">Session complete. You're building something real.</p>
-
-      <div class="complete-stats">
-        <div class="cs-stat">
-          <div class="cs-num">{sessionCorrectCount}</div>
-          <div class="cs-lbl">Correct</div>
-        </div>
-        <div class="cs-stat">
-          <div class="cs-num">{sessionWrongCount}</div>
-          <div class="cs-lbl">Wrong</div>
-        </div>
-        <div class="cs-stat">
-          <div class="cs-num">{sessionTotalCount}</div>
-          <div class="cs-lbl">Total</div>
-        </div>
-      </div>
-
-      <MisButton variant="unstyled" size="none" onclick={restart} className="btn-done">Back to practice</MisButton>
-      <MisButton variant="unstyled" size="none" onclick={repeatLastSession} className="btn-again">Go again</MisButton>
-      {#if showContinueStudy && studyReturnTo}
-        <MisButton variant="unstyled" size="none" onclick={() => goto(studyReturnTo)} className="btn-secondary">
-          Continue Study Session
-        </MisButton>
-      {/if}
     </div>
   {:else}
-    <article class={`exercise-card ${sessionMode === 'fix_mistakes' ? 'fix-mode' : ''}`}>
-      <header class="ex-header">
-        {#if current?.source === 'retry'}
-          <div class="retry-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="1 4 1 10 7 10"></polyline>
-              <path d="M3.51 15a9 9 0 102.13-9.36L1 10"></path>
-            </svg>
-            Retry
-          </div>
-        {:else}
-          <p class="ex-label">{sessionMode === 'fix_mistakes' ? 'Fix Mistakes' : 'Practice'}</p>
-        {/if}
-        {#if sessionMode === 'fix_mistakes'}
-          <div class="fix-focus-chip">Focused retry</div>
-        {/if}
+    <div class="screen active" id={sessionMode === 'fix_mistakes' ? 'screen-fix' : 'screen-practice'}>
+      <div class="session-bar">
+        <button class="session-exit" type="button" onclick={openPause} title="Pause session">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+        <div class="session-progress-track"><div class="session-progress-fill" style={`width:${progress}%`}></div></div>
+        <div class="session-score">
+          <span class="score-mastered">{masteredLabel}</span>
+          <span class="score-left">{leftLabel}</span>
+        </div>
+      </div>
 
-        {#if current}
-          <h2 class="ex-prompt">{current.prompt}</h2>
-          <p class="ex-instruction">
-            {current.exerciseType === 'sentence_builder'
-              ? 'Build the Irish sentence in order'
-              : current.exerciseType === 'typed_translation'
-                ? typedInstruction(current)
-                : 'Fill in the missing Irish word'}
-          </p>
-        {/if}
-      </header>
-
-      {#if current}
-        <div class="ex-body">
-          {#if current.exerciseType === 'sentence_builder'}
-            <div class="tray-actions">
-              <MisButton variant="unstyled" size="none" onclick={clearSentenceSelection} className="btn-clear" disabled={selectedSentenceTokens.length === 0}>
-                Clear
-              </MisButton>
-            </div>
-
-            <div class={`answer-tray ${selectedSentenceTokens.length ? 'has-words' : ''}`}>
-              {#if selectedSentenceTokens.length === 0}
-                <span class="answer-tray-placeholder">Tap words below to build your answer…</span>
-              {:else}
-                {#each selectedSentenceTokens as token, tokenIndex (`${token}-${tokenIndex}`)}
-                  <MisButton
-                    variant="unstyled"
-                    size="none"
-                    onclick={() => removeSelectedToken(tokenIndex)}
-                    className="word-token placed"
-                  >
-                    {token}
-                  </MisButton>
-                {/each}
+      {#if sessionMode === 'flash' && currentFlash}
+        <div class="flashcard-wrap">
+          <button class={`flashcard ${flashFlipped ? 'flipped' : ''}`} id="fc-card" type="button" onclick={revealFlash} disabled={flashFlipped}>
+            <div class="fc-front">
+              <div class="fc-irish">{currentFlash.front}</div>
+              {#if !flashFlipped}
+                <div class="fc-tap-hint">Tap to reveal</div>
               {/if}
             </div>
-
-            <div class="word-bank">
-              <div class="word-bank-label">Word bank</div>
-              {#each sentenceChoices as token, tokenIndex (token.id)}
-                <MisButton
-                  variant="unstyled"
-                  size="none"
-                  onclick={() => toggleSentenceToken(tokenIndex)}
-                  className={`word-token bank ${token.selectedAt != null ? 'selected' : ''}`}
-                >
-                  {token.value}
-                </MisButton>
-              {/each}
+            {#if flashFlipped}
+              <div class="fc-back">
+                <div class="fc-english">{currentFlash.back}</div>
+                <div class="fc-flip-hint">How well did you know this?</div>
+              </div>
+            {/if}
+          </button>
+          <div class={`flash-rating ${flashFlipped ? '' : 'hidden'}`} id="fc-rating">
+            <button class="btn-rating btn-nope" type="button" onclick={() => rateFlash(false)}>Nior thuig me</button>
+            <button class="btn-rating btn-yep" type="button" onclick={() => rateFlash(true)}>Thuig me</button>
+          </div>
+        </div>
+      {:else if current}
+        <div class="exercise-wrap">
+          <div class="ex-header">
+            <div class="ex-mode-label"><div class="ex-mode-dot"></div>{sessionMode === 'fix_mistakes' ? 'Fix mistakes' : 'Practice'}</div>
+            <div class="ex-phrase">{current.prompt}</div>
+            <div class="ex-instruction">
+              {current.exerciseType === 'sentence_builder'
+                ? 'Build the Irish sentence in order'
+                : current.exerciseType === 'typed_translation'
+                  ? typedInstruction(current)
+                  : 'Fill in the missing Irish word'}
             </div>
-          {:else}
-            <div class="fill-input-wrap">
-              {#if sessionMode === 'fix_mistakes'}
+          </div>
+
+          <div class="ex-body">
+            {#if current.exerciseType === 'sentence_builder'}
+              <div class="tray-actions">
+                <button class="btn-clear" type="button" onclick={clearSentenceSelection} disabled={selectedSentenceTokens.length === 0}>Clear</button>
+              </div>
+
+              <div class={`answer-tray ${selectedSentenceTokens.length ? 'has-words' : ''}`}>
+                {#if selectedSentenceTokens.length === 0}
+                  <span class="answer-tray-placeholder">Tap words below to build your answer...</span>
+                {:else}
+                  {#each selectedSentenceTokens as token, tokenIndex (`${token}-${tokenIndex}`)}
+                    <button class="word-token placed" type="button" onclick={() => removeSelectedToken(tokenIndex)}>{token}</button>
+                  {/each}
+                {/if}
+              </div>
+
+              <div class="word-bank">
+                <div class="word-bank-label">Word bank</div>
+                {#each sentenceChoices as token, tokenIndex (token.id)}
+                  <button
+                    class={`word-token bank ${token.selectedAt != null ? 'selected' : ''}`}
+                    type="button"
+                    onclick={() => toggleSentenceToken(tokenIndex)}
+                  >
+                    {token.value}
+                  </button>
+                {/each}
+              </div>
+            {:else}
+              <div class="fill-input-wrap">
                 <input
                   id="practice-answer"
                   bind:value={freeTextAnswer}
-                  class={`fill-input-single fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
+                  class={`fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
                   type="text"
-                  placeholder="Type the missing word..."
+                  placeholder={sessionMode === 'fix_mistakes' ? 'Type your answer...' : 'Type your answer...'}
                   autocomplete="off"
-                  autocapitalize="none"
+                  autocorrect="off"
+                  autocapitalize="off"
                   spellcheck="false"
-                  on:keydown={handleAnswerKeydown}
+                  onkeydown={handleAnswerKeydown}
                 />
-              {:else}
-                <MisTextarea
-                  id="practice-answer"
-                  bind:value={freeTextAnswer}
-                  rows={2}
-                  className={`answer-textarea fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
-                  placeholder="Type your answer…"
-                  on:keydown={handleAnswerKeydown}
-                ></MisTextarea>
-              {/if}
-              <div class="input-hint">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                {feedback ? 'Press Enter or tap Continue' : 'Press Enter or tap Check to submit'}
-              </div>
-            </div>
-          {/if}
-
-          {#if showAnswer && !feedback}
-            <div class="reveal-box">
-              <p class="reveal-label">Expected answer</p>
-              <p>{current.expectedAnswer}</p>
-            </div>
-          {/if}
-
-          {#if feedback}
-            <div class={`feedback-box show ${feedback.isCorrect ? 'correct' : 'wrong'}`}>
-              <p class="feedback-message">{feedbackMessage}</p>
-              {#if !feedback.isCorrect}
-                <div class="feedback-diff">
-                  <p>Your answer: {@html feedback.userAnswerHtml || '<em>(blank)</em>'}</p>
-                  <p>Expected: {@html feedback.expectedAnswerHtml}</p>
+                <div class="input-hint">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {feedback ? 'Press Enter or tap Continue' : 'Press Enter or tap Check to submit'}
                 </div>
-                <p class="feedback-retry-note">This one will come back around.</p>
-              {/if}
-            </div>
-          {/if}
+              </div>
+            {/if}
 
-          <div class="action-row">
+            {#if showAnswer && !feedback}
+              <div class="feedback-strip show correct">
+                <div class="fb-body">
+                  <div class="fb-title">Answer shown</div>
+                  <div class="fb-answer"><strong>{current.expectedAnswer}</strong></div>
+                </div>
+              </div>
+            {/if}
+
+            {#if feedback}
+              <div class={`feedback-strip show ${feedback.isCorrect ? 'correct' : 'wrong'}`}>
+                <div class="fb-body">
+                  <div class="fb-title">{feedback.isCorrect ? 'Correct!' : 'Not quite'}</div>
+                  <div class="fb-answer">
+                    {#if feedback.isCorrect}
+                      <strong>{feedback.expectedAnswer}</strong>
+                    {:else}
+                      The answer is <strong>{feedback.expectedAnswer}</strong>
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/if}
+          </div>
+
+          <div class="action-bar">
             {#if !feedback}
-              <MisButton
-                variant="unstyled"
-                size="none"
-                onclick={submitAttempt}
-                disabled={submitting || !canSubmit}
-                className="btn-check"
-              >
-                {submitting ? 'Checking…' : 'Check'}
-              </MisButton>
-              <MisButton
-                variant="unstyled"
-                size="none"
-                onclick={() => (showAnswer = !showAnswer)}
-                className="btn-show"
-              >
+              <button class="btn-show" type="button" onclick={() => (showAnswer = !showAnswer)}>
                 {showAnswer ? 'Hide answer' : 'Show answer'}
-              </MisButton>
+              </button>
+              <button class="btn-check" type="button" onclick={submitAttempt} disabled={submitting || !canSubmit}>
+                {submitting ? 'Checking...' : 'Check'}
+              </button>
             {:else}
-              <MisButton variant="unstyled" size="none" onclick={continueAfterFeedback} className="btn-continue">
-                Continue →
-              </MisButton>
+              <button class="btn-check" type="button" onclick={continueAfterFeedback}>Next</button>
             {/if}
           </div>
         </div>
       {/if}
-    </article>
+    </div>
   {/if}
 </section>
 
@@ -936,18 +1021,12 @@
   open={showNoDueChoiceModal}
   title="Daily due complete"
   description="You've finished today's due phrases. Keep practicing saved phrases, or continue your course to unlock new ones."
-  on:close={() => (showNoDueChoiceModal = false)}
+  onclose={() => (showNoDueChoiceModal = false)}
 >
   <div slot="actions" class="modal-actions">
-    <MisButton variant="unstyled" size="none" type="button" className="btn-modal-ghost" onclick={() => (showNoDueChoiceModal = false)}>
-      Cancel
-    </MisButton>
-    <MisButton variant="unstyled" size="none" type="button" className="btn-modal-soft" onclick={continueWithSavedPhrases}>
-      Practice saved phrases
-    </MisButton>
-    <MisButton variant="unstyled" size="none" type="button" className="btn-modal-primary" onclick={continueWithCourse}>
-      Continue course
-    </MisButton>
+    <button type="button" class="btn-modal-ghost" onclick={() => (showNoDueChoiceModal = false)}>Cancel</button>
+    <button type="button" class="btn-modal-soft" onclick={continueWithSavedPhrases}>Practice saved phrases</button>
+    <button type="button" class="btn-modal-primary" onclick={continueWithCourse}>Continue course</button>
   </div>
 </AppModal>
 
@@ -955,98 +1034,61 @@
   open={showInfoModal}
   title={infoModalTitle}
   description={infoModalMessage}
-  on:close={closeInfoModal}
+  onclose={closeInfoModal}
 >
   <div slot="actions" class="modal-actions">
-    <MisButton variant="unstyled" size="none" type="button" className="btn-modal-primary" onclick={closeInfoModal}>
-      OK
-    </MisButton>
+    <button type="button" class="btn-modal-primary" onclick={closeInfoModal}>OK</button>
   </div>
 </AppModal>
 
+<div class={`pause-overlay ${showPauseOverlay ? 'show' : ''}`} onclick={closePauseOutside} onkeydown={(event) => event.key === 'Escape' && closePause()} role="dialog" tabindex="0" aria-modal="true">
+  <div class="pause-sheet" id="pause-sheet">
+    <div class="pause-handle"></div>
+    <div class="pause-title">Session paused</div>
+    <div class="pause-sub">Your progress is saved. Pick up where you left off any time.</div>
+    <div class="pause-progress">
+      <div class="pp-stat"><div class="pp-num">{pauseCorrect}</div><div class="pp-lbl">Correct</div></div>
+      <div class="pp-stat"><div class="pp-num">{pauseWrong}</div><div class="pp-lbl">Wrong</div></div>
+      <div class="pp-stat"><div class="pp-num">{pauseLeft}</div><div class="pp-lbl">Left</div></div>
+    </div>
+    <button class="btn-resume" type="button" onclick={closePause}>Resume session</button>
+    <button class="btn-exit-session" type="button" onclick={exitSession}>Exit to practice menu</button>
+  </div>
+</div>
+
 <style>
   :global(body) {
-    background: var(--parchment, #f5f0e8);
+    background: #f5f0e8;
   }
 
   .practice-wrap {
     --forest: #1c2b22;
-    --forest-mid: #2e4436;
-    --green: #2d7a50;
-    --sage: #7ec99a;
-    --sage-l: #a8dbb8;
     --parchment: #f5f0e8;
-    --parch-dark: #e8e0d0;
+    --parchment-dark: #e8e0d0;
+    --moss: #2d7a50;
+    --sage: #7ec99a;
     --muted: #5a7a64;
-    --ink: #1a1a18;
-
-    max-width: 560px;
+    --error: #c0392b;
+    --error-bg: #fdf0ee;
+    --error-border: #e8a89e;
+    --correct: #2d7a50;
+    --correct-bg: #edf7f0;
+    --correct-border: #7ec99a;
+    max-width: 760px;
     margin: 0 auto;
-    padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
-    color: var(--ink);
-  }
-
-  .session-bar {
-    margin-top: 12px;
-    margin-bottom: 14px;
-  }
-
-  .session-progress-track {
-    height: 4px;
-    border-radius: 999px;
-    background: var(--parch-dark);
-    overflow: hidden;
-  }
-
-  .session-progress-fill {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--green);
-    transition: width 0.35s ease;
-  }
-
-  .session-score {
-    margin-top: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .score-mastered {
-    color: var(--green);
-  }
-
-  .score-left {
-    color: var(--muted);
+    padding: 0 0 calc(44px + env(safe-area-inset-bottom, 0px));
   }
 
   .study-banner {
-    margin-top: 8px;
-    margin-bottom: 12px;
+    margin: 12px 16px 0;
     border-radius: 12px;
     border: 1px solid rgba(45, 122, 80, 0.2);
     background: rgba(45, 122, 80, 0.08);
     padding: 12px 14px;
   }
 
-  .offline-banner {
-    margin-top: 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(180, 83, 9, 0.28);
-    background: rgba(180, 83, 9, 0.11);
-    padding: 10px 12px;
-    font-size: 13px;
-    color: #9a3412;
-    line-height: 1.5;
-  }
-
   .study-title {
-    color: var(--green);
+    color: var(--moss);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -1060,630 +1102,701 @@
     line-height: 1.6;
   }
 
-  .mode-grid {
-    display: flex;
+  .offline-banner {
+    margin: 12px 16px 0;
+    border-radius: 12px;
+    border: 1px solid rgba(180, 83, 9, 0.28);
+    background: rgba(180, 83, 9, 0.11);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #9a3412;
+    line-height: 1.5;
+  }
+
+  .screen {
+    display: none;
+    min-height: calc(100vh - 58px);
     flex-direction: column;
-    gap: 11px;
-    padding-top: 20px;
+  }
+
+  .screen.active {
+    display: flex;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen.active {
+    animation: fadeIn .25s cubic-bezier(.4,0,.2,1) both;
   }
 
   .warmup-wrap {
-    padding-top: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 48px 24px 80px;
   }
 
   .warmup-eyebrow {
-    margin: 0;
-    color: var(--muted);
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.2em;
+    letter-spacing: .2em;
     text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
   }
 
   .warmup-headline {
-    margin: 10px 0 6px;
-    color: var(--forest);
     font-family: 'Fraunces', serif;
-    font-size: clamp(28px, 7vw, 40px);
     font-weight: 900;
-    letter-spacing: -0.03em;
+    font-size: clamp(28px,4vw,40px);
+    letter-spacing: -.03em;
     line-height: 1.05;
+    margin-bottom: 8px;
   }
 
   .warmup-headline em {
     font-style: italic;
     font-weight: 300;
-    color: var(--green);
+    color: var(--moss);
   }
 
   .warmup-sub {
-    margin: 0;
-    color: #777;
     font-size: 14px;
+    color: #777;
+    margin-bottom: 36px;
     line-height: 1.6;
   }
 
   .due-strip {
-    margin-top: 18px;
     display: flex;
-    flex-wrap: wrap;
     gap: 10px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
   }
 
   .due-pill {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 7px;
     padding: 8px 14px;
-    border-radius: 999px;
+    border-radius: 20px;
     font-size: 13px;
     font-weight: 600;
   }
 
-  .due-pill.primary {
-    background: var(--forest);
-    color: var(--parchment);
+  .due-pill.primary { background: var(--forest); color: var(--parchment); }
+  .due-pill.secondary { background: white; color: var(--forest); border: 1px solid var(--parchment-dark); }
+  .due-pill.dim { background: var(--parchment-dark); color: var(--muted); }
+
+  .mode-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
+
+  .mode-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    background: white;
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s, transform .1s, background .15s;
+    text-align: left;
+    width: 100%;
+    font-family: 'Instrument Sans', sans-serif;
   }
 
-  .due-pill.secondary {
-    border: 1px solid var(--parch-dark);
-    background: #fff;
+  .mode-card:hover {
+    border-color: var(--moss);
+    box-shadow: 0 4px 16px rgba(45,122,80,.1);
+    transform: translateY(-1px);
+  }
+
+  .mode-card:active { transform: translateY(0); box-shadow: none; }
+  .mode-card.primary-mode { background: var(--forest); border-color: var(--forest); }
+  .mode-card.primary-mode:hover { background: #243529; border-color: #243529; box-shadow: 0 4px 20px rgba(28,43,34,.25); }
+
+  .mc-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .mc-icon-wrap.dark { background: rgba(126,201,154,.15); }
+  .mc-icon-wrap.light { background: rgba(45,122,80,.08); }
+  .mc-icon-wrap.dim { background: var(--parchment-dark); }
+  .mode-card.primary-mode .mc-icon-wrap { background: rgba(126,201,154,.15); }
+
+  .mc-text { flex: 1; }
+  .mc-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+  .mode-card.primary-mode .mc-eyebrow { color: rgba(245,240,232,.4); }
+
+  .mc-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 17px;
     color: var(--forest);
+    letter-spacing: -.01em;
   }
 
-  .due-pill.dim {
-    background: var(--parch-dark);
-    color: var(--muted);
+  .mode-card.primary-mode .mc-title { color: var(--parchment); }
+  .mc-title em { font-style: italic; font-weight: 300; color: var(--moss); }
+  .mode-card.primary-mode .mc-title em { color: var(--sage); }
+
+  .mc-sub { font-size: 12px; color: #888; margin-top: 2px; line-height: 1.4; }
+  .mode-card.primary-mode .mc-sub { color: rgba(245,240,232,.45); }
+
+  .mc-badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 10px; flex-shrink: 0; }
+  .mc-badge.amber { background: rgba(200,120,40,.1); color: #c07828; }
+  .mc-badge.none { background: var(--parchment-dark); color: #bbb; }
+  .mode-card.primary-mode .mc-badge { background: rgba(126,201,154,.2); color: var(--sage); }
+  .mc-arrow { color: #ccc; flex-shrink: 0; }
+  .mode-card:hover .mc-arrow { color: var(--muted); }
+  .mode-card.primary-mode .mc-arrow { color: rgba(245,240,232,.3); }
+
+  .session-bar {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px;
+    background: var(--parchment);
+    border-bottom: 1px solid var(--parchment-dark);
+    position: sticky;
+    top: 58px;
+    z-index: 25;
   }
 
+  .session-exit {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(28,43,34,.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
 
-  .exercise-card {
-    margin-top: 22px;
-    border-radius: 20px;
-    background: var(--forest);
+  .session-progress-track {
+    flex: 1;
+    height: 4px;
+    background: var(--parchment-dark);
+    border-radius: 2px;
     overflow: hidden;
   }
 
-  .exercise-card.fix-mode {
-    background: linear-gradient(180deg, #24372c 0%, #1c2b22 100%);
+  .session-progress-fill {
+    height: 100%;
+    background: var(--moss);
+    border-radius: 2px;
+    transition: width .4s cubic-bezier(.4,0,.2,1);
+  }
+
+  .session-score {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .score-mastered { color: var(--moss); }
+  .score-left { color: var(--muted); }
+
+  .exercise-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 680px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 0 40px;
   }
 
   .ex-header {
-    padding: 28px 26px 22px;
+    background: var(--forest);
+    padding: 28px 28px 24px;
+    margin: 20px 20px 0;
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
   }
 
-  .ex-label {
-    margin-bottom: 10px;
-    color: var(--muted);
-    font-size: 10px;
+  .ex-header::after {
+    content: '';
+    position: absolute;
+    bottom: -40px;
+    right: -40px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: rgba(45,122,80,.15);
+  }
+
+  .ex-mode-label {
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.2em;
+    letter-spacing: .2em;
     text-transform: uppercase;
-  }
-
-  .retry-badge {
+    color: rgba(245,240,232,.35);
     margin-bottom: 10px;
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 5px;
-    border-radius: 999px;
-    border: 1px solid rgba(180, 83, 9, 0.25);
-    background: rgba(180, 83, 9, 0.15);
-    padding: 3px 10px;
-    color: #d97706;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    gap: 8px;
+    position: relative;
+    z-index: 1;
   }
 
-  .fix-focus-chip {
-    margin-bottom: 10px;
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    border: 1px solid rgba(126, 201, 154, 0.25);
-    background: rgba(126, 201, 154, 0.15);
-    padding: 3px 10px;
-    color: var(--sage);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+  .ex-mode-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--sage);
+    flex-shrink: 0;
   }
 
-  .retry-badge svg {
-    width: 9px;
-    height: 9px;
-  }
-
-  .ex-prompt {
-    color: var(--parchment);
+  .ex-phrase {
     font-family: 'Fraunces', serif;
-    font-weight: 700;
-    font-size: clamp(24px, 6vw, 34px);
-    letter-spacing: -0.03em;
-    line-height: 1.15;
+    font-weight: 900;
+    font-size: clamp(22px,3.5vw,30px);
+    color: var(--parchment);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+    margin-bottom: 6px;
+    position: relative;
+    z-index: 1;
   }
 
   .ex-instruction {
-    margin-top: 10px;
-    color: var(--muted);
-    font-size: 13px;
-    line-height: 1.5;
-  }
-
-  .ex-body {
-    background: var(--parchment);
-    padding: 20px 22px 24px;
-  }
-
-  :global(.answer-textarea) {
-    width: 100%;
-    min-height: 72px;
-    border-radius: 12px;
-    border: 1.5px solid var(--parch-dark);
-    background: #fff;
-    padding: 14px 16px;
-    font-family: 'Instrument Sans', sans-serif;
-    font-size: 16px;
-    color: var(--ink);
-    line-height: 1.5;
-    resize: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-
-  .fill-input-single {
-    width: 100%;
-    border: 1.5px solid var(--parch-dark);
-    border-radius: 12px;
-    background: #fff;
-    padding: 14px 16px;
-    font-family: 'Instrument Sans', sans-serif;
-    font-size: 16px;
-    color: var(--ink);
-    line-height: 1.25;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-
-  .fill-input-single:focus {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(45, 122, 80, 0.12);
-  }
-
-  .fill-input-wrap {
-    margin-bottom: 8px;
-  }
-
-  :global(.fill-input) {
-    font-size: 16px;
-  }
-
-  :global(.fill-input.correct-input) {
-    border-color: rgba(45, 122, 80, 0.45);
-    background: rgba(45, 122, 80, 0.08);
-    color: var(--green);
-  }
-
-  :global(.fill-input.error-input) {
-    border-color: rgba(180, 60, 40, 0.35);
-    background: rgba(180, 60, 40, 0.08);
-    color: #7a1f10;
-    animation: shake 0.28s cubic-bezier(.36,.07,.19,.97);
-  }
-
-  .input-hint {
-    margin-top: 6px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
     font-size: 12px;
+    color: rgba(245,240,232,.4);
+    position: relative;
+    z-index: 1;
   }
 
-  :global(.answer-textarea:focus) {
-    border-color: var(--green);
-    box-shadow: 0 0 0 3px rgba(45, 122, 80, 0.12);
+  .ex-body { padding: 20px 20px 0; }
+  .tray-actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+
+  .btn-clear {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: 'Instrument Sans', sans-serif;
   }
 
-  .tray-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 8px;
-  }
+  .btn-clear:hover { background: var(--parchment-dark); color: var(--forest); }
+  .btn-clear:disabled { opacity: .3; pointer-events: none; }
 
   .answer-tray {
     min-height: 52px;
+    background: white;
+    border: 1.5px solid var(--parchment-dark);
     border-radius: 12px;
-    border: 1.5px solid var(--parch-dark);
-    background: #fff;
     padding: 10px 12px;
     display: flex;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
-    margin-bottom: 14px;
-    transition: border-color 0.15s;
-  }
-
-  .answer-tray.has-words {
-    border-color: var(--parch-dark);
+    margin-bottom: 16px;
   }
 
   .answer-tray-placeholder {
-    color: #c7c2b5;
     font-size: 13px;
+    color: #ccc;
     font-style: italic;
+    pointer-events: none;
   }
 
+  .word-token {
+    display: inline-flex;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .word-token.bank { background: white; border-color: var(--parchment-dark); color: var(--forest); }
+  .word-token.bank:hover { border-color: var(--moss); background: rgba(45,122,80,.04); }
+  .word-token.bank.selected { border-color: var(--moss); background: rgba(45,122,80,.08); color: var(--moss); }
+  .word-token.placed { background: var(--forest); border-color: var(--forest); color: var(--parchment); }
+
   .word-bank {
-    border-radius: 12px;
-    background: var(--parch-dark);
-    padding: 14px;
-    margin-bottom: 14px;
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    min-height: 56px;
+    padding: 16px;
+    background: var(--parchment-dark);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    min-height: 52px;
   }
 
   .word-bank-label {
     width: 100%;
     font-size: 10px;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: .14em;
     text-transform: uppercase;
     color: var(--muted);
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
 
-  :global(.word-token) {
-    display: inline-flex;
-    align-items: center;
-    border-radius: 8px;
-    padding: 7px 12px;
-    font-size: 14px;
-    font-weight: 600;
-    border: 1.5px solid transparent;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.12s;
-    white-space: nowrap;
-  }
+  .fill-input-wrap { margin-bottom: 16px; position: relative; }
 
-  :global(.word-token.bank) {
-    background: #fff;
-    border-color: var(--parch-dark);
-    color: var(--ink);
-  }
-
-  :global(.word-token.bank:hover) {
-    border-color: var(--green);
-    color: var(--green);
-  }
-
-  :global(.word-token.bank.selected) {
-    border-color: var(--green);
-    background: rgba(45, 122, 80, 0.08);
-    color: var(--green);
-  }
-
-  :global(.word-token.placed) {
-    background: var(--forest);
-    border-color: var(--forest);
-    color: var(--parchment);
-    cursor: pointer;
-  }
-
-  :global(.word-token.placed:hover) {
-    background: var(--forest-mid);
-    border-color: var(--forest-mid);
-  }
-
-  :global(.btn-clear) {
-    border: none;
-    background: transparent;
-    padding: 4px 8px;
-    border-radius: 6px;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    text-decoration: none;
-  }
-
-  :global(.btn-clear:hover) {
-    color: var(--forest);
-    background: var(--parch-dark);
-  }
-
-  :global(.btn-clear:disabled) {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-
-  .reveal-box {
-    margin-top: 14px;
-    border-radius: 10px;
-    border: 1px solid rgba(45, 122, 80, 0.2);
-    background: rgba(45, 122, 80, 0.07);
-    padding: 12px 16px;
-    color: var(--forest);
-    font-size: 14px;
-    animation: fadeUp 0.15s ease;
-  }
-
-  .reveal-label {
-    margin-bottom: 4px;
-    color: var(--muted);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-  }
-
-  .feedback-box {
-    margin-top: 14px;
-    display: none;
+  .fill-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--parchment-dark);
     border-radius: 12px;
-    padding: 16px 18px;
-    font-size: 14px;
-    line-height: 1.6;
-    animation: feedIn 0.2s ease;
-  }
-
-  .feedback-box.show {
-    display: block;
-  }
-
-  .feedback-box.correct {
-    border: 1.5px solid rgba(45, 122, 80, 0.25);
-    background: rgba(45, 122, 80, 0.1);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 16px;
     color: var(--forest);
+    background: white;
+    outline: none;
   }
 
-  .feedback-box.wrong {
-    border: 1.5px solid rgba(180, 60, 40, 0.2);
-    background: rgba(180, 60, 40, 0.07);
-    color: #7a1f10;
-  }
+  .fill-input::placeholder { color: #ccc; }
+  .fill-input:focus { border-color: var(--moss); box-shadow: 0 0 0 3px rgba(45,122,80,.08); }
+  .fill-input.correct-input { border-color: var(--correct-border); background: var(--correct-bg); color: var(--correct); }
+  .fill-input.error-input { border-color: var(--error-border); background: var(--error-bg); color: var(--error); }
 
-  .feedback-message {
-    margin-bottom: 8px;
-    font-family: 'Fraunces', serif;
-    font-size: 17px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .feedback-diff {
-    font-size: 13px;
-    line-height: 1.8;
-  }
-
-  .feedback-diff :global(strong) {
-    font-weight: 700;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .feedback-retry-note {
-    margin-top: 8px;
-    opacity: 0.65;
+  .input-hint {
     font-size: 12px;
-    font-style: italic;
-  }
-
-  .action-row {
-    margin-top: 16px;
+    color: var(--muted);
+    margin-top: 6px;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .feedback-strip {
+    padding: 14px 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    display: none;
+    align-items: flex-start;
     gap: 10px;
   }
 
-  :global(.btn-check),
-  :global(.btn-continue),
-  :global(.btn-done),
-  :global(.btn-again),
-  :global(.btn-secondary),
-  :global(.btn-modal-primary),
-  :global(.btn-modal-soft),
-  :global(.btn-modal-ghost),
-  :global(.btn-show) {
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
+  .feedback-strip.show { display: flex; }
+  .feedback-strip.correct { background: var(--correct-bg); border: 1px solid var(--correct-border); }
+  .feedback-strip.wrong { background: var(--error-bg); border: 1px solid var(--error-border); }
+  .fb-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  .feedback-strip.correct .fb-title { color: var(--correct); }
+  .feedback-strip.wrong .fb-title { color: var(--error); }
+  .fb-answer { font-size: 13px; line-height: 1.5; color: #666; }
+  .fb-answer strong { font-family: 'Fraunces', serif; font-style: italic; font-weight: 300; font-size: 15px; color: var(--forest); }
+
+  .action-bar {
+    padding: 0 20px;
+    margin-top: auto;
+    padding-top: 20px;
+    display: flex;
+    gap: 10px;
   }
 
-  :global(.btn-check) {
-    border: none;
+  .btn-check {
+    flex: 1;
+    padding: 15px;
     background: var(--forest);
-    padding: 12px 26px;
     color: var(--parchment);
-    font-family: 'Fraunces', serif;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
     font-size: 15px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    cursor: pointer;
   }
 
-  :global(.btn-check:hover) {
-    background: var(--forest-mid);
-    transform: translateY(-1px);
-  }
+  .btn-check:disabled { opacity: .35; cursor: not-allowed; }
 
-  :global(.btn-check:disabled) {
-    opacity: 0.45;
-    transform: none;
-    cursor: not-allowed;
-  }
-
-  :global(.btn-show) {
-    border: 1.5px solid var(--parch-dark);
-    background: #fff;
-    padding: 11px 18px;
+  .btn-show {
+    padding: 15px 18px;
+    background: white;
     color: var(--muted);
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
     font-size: 14px;
     font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
   }
 
-  :global(.btn-show:hover) {
-    border-color: var(--forest);
-    color: var(--forest);
-  }
-
-  :global(.btn-continue) {
-    border: none;
-    background: var(--sage);
-    padding: 12px 26px;
-    color: var(--forest);
-    font-family: 'Fraunces', serif;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-  }
-
-  :global(.btn-continue:hover) {
-    background: var(--sage-l);
-    transform: translateY(-1px);
-  }
-
-  .complete-card {
-    margin-top: 32px;
-    border-radius: 20px;
-    background: var(--forest);
-    padding: 44px 24px;
-    text-align: center;
+  .flashcard-wrap {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .flashcard {
+    width: 100%;
+    max-width: 500px;
+    background: white;
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 24px;
+    padding: 40px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s, border-color .2s;
+    position: relative;
+    overflow: hidden;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .flashcard::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: rgba(45,122,80,.04);
+  }
+
+  .flashcard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(28,43,34,.1);
+    border-color: var(--parchment-dark);
+  }
+
+  .flashcard.flipped {
+    background: var(--forest);
+    border-color: var(--forest);
+    cursor: default;
+  }
+
+  .fc-irish {
+    font-family: 'Fraunces', serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: clamp(24px,4vw,32px);
+    color: var(--forest);
+    letter-spacing: -.02em;
+    line-height: 1.25;
+  }
+
+  .flashcard.flipped .fc-irish {
+    color: var(--parchment);
+  }
+
+  .fc-tap-hint {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #ccc;
+  }
+
+  .fc-english {
+    font-size: 16px;
+    color: rgba(245,240,232,.6);
+    margin-top: 4px;
+  }
+
+  .fc-flip-hint {
+    font-size: 11px;
+    color: rgba(245,240,232,.25);
+    margin-top: 8px;
+  }
+
+  .flash-rating {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .flash-rating.hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .btn-rating {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .btn-nope {
+    background: rgba(192,57,43,.1);
+    color: var(--error);
+    border: 1.5px solid var(--error-border);
+  }
+
+  .btn-yep {
+    background: rgba(45,122,80,.1);
+    color: var(--correct);
+    border: 1.5px solid var(--correct-border);
+  }
+
+  .complete-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    text-align: center;
+    max-width: 480px;
+    margin: 0 auto;
   }
 
   .complete-mark {
     width: 72px;
     height: 72px;
-    border-radius: 20px;
-    border: 1px solid rgba(126, 201, 154, 0.3);
-    background: rgba(126, 201, 154, 0.15);
+    border-radius: 50%;
+    background: rgba(45,122,80,.1);
+    border: 2px solid var(--correct-border);
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  }
-
-  .complete-mark svg {
-    width: 32px;
-    height: 32px;
-    color: var(--sage);
+    margin: 0 auto 24px;
   }
 
   .complete-title {
-    color: var(--parchment);
     font-family: 'Fraunces', serif;
-    font-size: clamp(32px, 8vw, 42px);
     font-weight: 900;
-    letter-spacing: -0.04em;
-    line-height: 1;
+    font-size: 32px;
+    letter-spacing: -.03em;
+    line-height: 1.1;
+    color: var(--forest);
+    margin-bottom: 8px;
   }
 
-  .complete-title em {
-    color: var(--sage);
-    font-style: italic;
-    font-weight: 300;
-  }
-
-  .complete-sub {
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 320px;
-  }
+  .complete-title em { font-style: italic; font-weight: 300; color: var(--moss); }
+  .complete-sub { font-size: 14px; color: #888; margin-bottom: 32px; line-height: 1.6; }
 
   .complete-stats {
-    width: 100%;
     display: flex;
     gap: 1px;
+    width: 100%;
+    margin-bottom: 32px;
     border-radius: 14px;
     overflow: hidden;
-    border: 1px solid rgba(126, 201, 154, 0.2);
-    margin-top: 2px;
+    border: 1px solid var(--parchment-dark);
   }
 
-  .cs-stat {
-    flex: 1;
-    background: rgba(245, 240, 232, 0.05);
-    padding: 14px 10px;
-    text-align: center;
-  }
+  .cs-stat { flex: 1; background: white; padding: 16px 12px; text-align: center; }
+  .cs-num { font-family: 'Fraunces', serif; font-weight: 900; font-size: 28px; color: var(--forest); letter-spacing: -.02em; }
+  .cs-lbl { font-size: 10px; color: #aaa; font-weight: 600; margin-top: 2px; letter-spacing: .05em; text-transform: uppercase; }
 
-  .cs-num {
-    color: var(--parchment);
-    font-family: 'Fraunces', serif;
-    font-size: 26px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1;
-  }
-
-  .cs-lbl {
-    margin-top: 4px;
-    color: rgba(245, 240, 232, 0.5);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  :global(.btn-done) {
+  .btn-done {
     width: 100%;
-    margin-top: 8px;
+    padding: 15px;
+    background: var(--forest);
+    color: var(--parchment);
     border: none;
-    background: var(--sage);
-    padding: 14px 18px;
-    color: var(--forest);
-    font-family: 'Fraunces', serif;
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
     font-size: 15px;
     font-weight: 700;
-    letter-spacing: -0.01em;
+    cursor: pointer;
+    margin-bottom: 10px;
   }
 
-  :global(.btn-done:hover) {
-    background: var(--sage-l);
-    transform: translateY(-1px);
-  }
-
-  :global(.btn-again) {
+  .btn-again {
     width: 100%;
-    border: 1.5px solid rgba(126, 201, 154, 0.35);
-    background: rgba(126, 201, 154, 0.12);
-    padding: 12px 18px;
-    color: var(--sage);
-    font-size: 13px;
+    padding: 13px;
+    background: none;
+    color: var(--muted);
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .pause-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.42);
+    display: none;
+    align-items: flex-end;
+    z-index: 80;
+  }
+
+  .pause-overlay.show { display: flex; }
+
+  .pause-sheet {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    background: var(--parchment);
+    border-radius: 20px 20px 12px 12px;
+    padding: 20px 16px 28px;
+    border: 1px solid var(--parchment-dark);
+  }
+
+  .pause-handle { width: 40px; height: 4px; border-radius: 4px; background: #ccc; margin: 0 auto 14px; }
+  .pause-title { font-size: 18px; font-weight: 700; color: var(--forest); margin-bottom: 4px; text-align: center; }
+  .pause-sub { font-size: 12px; color: #888; margin-bottom: 16px; text-align: center; }
+  .pause-progress { display: flex; gap: 1px; border: 1px solid var(--parchment-dark); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+  .pp-stat { flex: 1; background: white; text-align: center; padding: 12px; }
+  .pp-num { font-size: 20px; font-weight: 800; color: var(--forest); font-family: 'Fraunces', serif; }
+  .pp-lbl { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: .06em; }
+
+  .btn-resume {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    background: var(--forest);
+    color: var(--parchment);
     font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
+    cursor: pointer;
+    margin-bottom: 8px;
   }
 
-  :global(.btn-again:hover) {
-    background: rgba(126, 201, 154, 0.22);
-    transform: translateY(-1px);
-  }
-
-  :global(.btn-secondary) {
-    border: 1px solid rgba(126, 201, 154, 0.35);
-    background: rgba(126, 201, 154, 0.15);
-    padding: 11px 18px;
-    color: var(--sage);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-  }
-
-  :global(.btn-secondary:hover) {
-    background: rgba(126, 201, 154, 0.25);
+  .btn-exit-session {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 12px;
+    background: white;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
   }
 
   .modal-actions {
@@ -1693,108 +1806,58 @@
     justify-content: flex-end;
   }
 
-  :global(.btn-modal-ghost) {
-    border: 1.5px solid var(--parch-dark);
-    background: transparent;
+  .btn-modal-ghost,
+  .btn-modal-soft,
+  .btn-modal-primary {
+    border-radius: 10px;
+    cursor: pointer;
     padding: 9px 16px;
-    color: var(--muted);
     font-size: 13px;
-    font-weight: 600;
   }
 
-  :global(.btn-modal-ghost:hover) {
-    border-color: var(--forest);
-    color: var(--forest);
-  }
+  .btn-modal-ghost { border: 1.5px solid var(--parchment-dark); background: transparent; color: var(--muted); font-weight: 600; }
+  .btn-modal-soft { border: 1px solid rgba(45, 122, 80, 0.2); background: rgba(45, 122, 80, 0.1); color: var(--moss); font-weight: 700; }
+  .btn-modal-primary { border: none; background: var(--forest); color: var(--parchment); font-weight: 700; }
 
-  :global(.btn-modal-soft) {
-    border: 1px solid rgba(45, 122, 80, 0.2);
-    background: rgba(45, 122, 80, 0.1);
-    padding: 9px 16px;
-    color: var(--green);
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  :global(.btn-modal-soft:hover) {
-    background: rgba(45, 122, 80, 0.18);
-  }
-
-  :global(.btn-modal-primary) {
-    border: none;
-    background: var(--forest);
-    padding: 9px 16px;
-    color: var(--parchment);
-    font-size: 13px;
-    font-weight: 700;
-  }
-
-  :global(.btn-modal-primary:hover) {
-    background: var(--forest-mid);
-  }
-
-  @media (max-width: 480px) {
-    .practice-wrap {
-      padding-left: 16px;
-      padding-right: 16px;
-    }
-
-    .ex-header,
-    .ex-body {
-      padding-left: 18px;
-      padding-right: 18px;
-    }
-
-    .action-row {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
-    :global(.btn-check),
-    :global(.btn-show),
-    :global(.btn-continue) {
-      width: 100%;
-      justify-content: center;
-    }
-  }
-
-  @keyframes fadeUp {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  @keyframes feedIn {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-
-  @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    50% { transform: translateX(4px); }
-    75% { transform: translateX(-2px); }
-  }
-
-  @keyframes popIn {
-    from {
-      opacity: 0;
-      transform: scale(0.5);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
+  @media (max-width: 600px) {
+    .warmup-wrap { padding: 28px 16px 80px; }
+    .warmup-headline { font-size: 28px; }
+    .warmup-sub { font-size: 13px; margin-bottom: 28px; }
+    .due-strip { gap: 8px; margin-bottom: 28px; }
+    .due-pill { font-size: 12px; padding: 7px 12px; }
+    .mode-list { gap: 8px; }
+    .mode-card { padding: 14px 16px; gap: 12px; border-radius: 14px; }
+    .mc-icon-wrap { width: 38px; height: 38px; border-radius: 10px; }
+    .mc-title { font-size: 15px; }
+    .mc-sub { font-size: 11px; }
+    .session-bar { padding: 0 12px; gap: 10px; }
+    .session-score { gap: 10px; font-size: 11px; }
+    .exercise-wrap { padding: 0 0 24px; }
+    .ex-header { margin: 12px 12px 0; padding: 20px 20px 18px; border-radius: 16px; }
+    .ex-phrase { font-size: 20px; }
+    .ex-body { padding: 14px 12px 0; }
+    .answer-tray { padding: 8px 10px; min-height: 48px; }
+    .word-token { padding: 8px 12px; font-size: 13px; border-radius: 8px; }
+    .word-bank { padding: 12px; gap: 7px; border-radius: 10px; margin-bottom: 16px; }
+    .feedback-strip { padding: 12px 14px; border-radius: 10px; }
+    .fb-title { font-size: 12px; }
+    .fb-answer { font-size: 12px; }
+    .fill-input { font-size: 15px; padding: 13px 14px; }
+    .action-bar { padding: 0 12px; padding-top: 16px; gap: 8px; }
+    .btn-check { padding: 14px; font-size: 14px; border-radius: 12px; }
+    .btn-show { padding: 14px 14px; font-size: 13px; border-radius: 12px; }
+    .complete-wrap { padding: 32px 16px; }
+    .complete-title { font-size: 26px; }
+    .complete-sub { font-size: 13px; margin-bottom: 24px; }
+    .complete-stats { margin-bottom: 24px; }
+    .cs-num { font-size: 24px; }
+    .btn-done { padding: 14px; font-size: 14px; }
+    .btn-again { padding: 12px; font-size: 13px; }
+    .flashcard-wrap { padding: 16px; gap: 16px; }
+    .flashcard { padding: 32px 24px; border-radius: 20px; min-height: 180px; }
+    .fc-irish { font-size: 24px; }
+    .fc-english { font-size: 15px; }
+    .flash-rating { gap: 8px; }
+    .btn-rating { padding: 13px; font-size: 13px; border-radius: 12px; }
   }
 </style>

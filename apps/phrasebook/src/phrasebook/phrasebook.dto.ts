@@ -5,6 +5,7 @@ import {
   ValidateNested,
   IsNumber,
   IsBoolean,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -34,6 +35,10 @@ export class UpdatePhraseDto {
   source?: string;
 
   @IsOptional()
+  @IsString()
+  language?: string;
+
+  @IsOptional()
   @IsBoolean()
   autoTranslation?: boolean;
 
@@ -52,6 +57,22 @@ export class UpdatePhraseDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  groupName?: string;
+
+  @IsOptional()
+  @IsInt()
+  categoryId?: number;
+
+  @IsOptional()
+  @IsInt()
+  groupId?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -78,7 +99,25 @@ export class PhrasebookStatementDto {
   pronunciation?: string | null;
   example?: string | null;
   notes?: string | null;
+  categoryId?: number | null;
+  category?: string | null;
+  groupId?: number | null;
+  groupName?: string | null;
   inPractice: boolean;
   inFlashcards: boolean;
   tokens?: PhraseTokenDto[];
+}
+
+export class PhraseCategoryDto {
+  id: number;
+  name: string;
+  archived: boolean;
+  groupCount: number;
+}
+
+export class PhraseGroupDto {
+  id: number;
+  categoryId: number;
+  name: string;
+  archived: boolean;
 }

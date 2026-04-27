@@ -1,7 +1,12 @@
 import { config } from 'dotenv';
 import { DataSource } from 'typeorm';
 
-import { Phrase, PhraseToken } from './phrasebook/phrasebook.entity';
+import {
+  Phrase,
+  PhraseCategory,
+  PhraseGroup,
+  PhraseToken,
+} from './phrasebook/phrasebook.entity';
 config();
 
 export const AppDataSource = new DataSource({
@@ -13,6 +18,6 @@ export const AppDataSource = new DataSource({
   database: process.env.MARIA_DB_DATABASE,
   synchronize: false,
   logging: false,
-  entities: [Phrase, PhraseToken],
+  entities: [Phrase, PhraseToken, PhraseCategory, PhraseGroup],
   migrations: [__dirname + '/migrations/*{.js,.ts}'],
 });

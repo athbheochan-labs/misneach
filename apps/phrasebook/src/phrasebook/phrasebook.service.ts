@@ -8,9 +8,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { createHash, randomUUID } from 'crypto';
 
-import { UpdatePhraseDto, PhrasebookStatementDto } from './phrasebook.dto';
-import { Phrase } from './phrasebook.entity';
-import { PhraseToken } from './phrasebook.entity';
+import {
+  PhraseCategoryDto,
+  PhraseGroupDto,
+  PhrasebookStatementDto,
+  UpdatePhraseDto,
+} from './phrasebook.dto';
+import { Phrase, PhraseCategory, PhraseGroup, PhraseToken } from './phrasebook.entity';
 
 @Injectable()
 export class PhrasebookService {
@@ -19,6 +23,10 @@ export class PhrasebookService {
     private readonly phraseRepo: Repository<Phrase>,
     @InjectRepository(PhraseToken)
     private readonly tokenRepo: Repository<PhraseToken>,
+    @InjectRepository(PhraseCategory)
+    private readonly categoryRepo: Repository<PhraseCategory>,
+    @InjectRepository(PhraseGroup)
+    private readonly groupRepo: Repository<PhraseGroup>,
   ) {}
 
   private readonly logger = new Logger(PhrasebookService.name);
@@ -29,6 +37,19 @@ export class PhrasebookService {
     return String(text || '')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  private normalizeOptionalText(
+    value: string | undefined | null,
+    maxLength?: number,
+  ): string | null {
+    const normalized = String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normalized) return null;
+    return typeof maxLength === 'number'
+      ? normalized.slice(0, maxLength)
+      : normalized;
   }
 
   private normalizeSource(
@@ -147,12 +168,133 @@ export class PhrasebookService {
     return response.json();
   }
 
-  async getPhrasebook(clientId: string): Promise<PhrasebookStatementDto[]> {
-    const phrases = await this.phraseRepo.find({
-      where: { clientId },
-      relations: ['tokens'],
-      order: { tokens: { position: 'ASC' } },
+  private async ensureCategory(
+    clientId: string,
+    name: string | undefined | null,
+  ): Promise<PhraseCategory | null> {
+    const normalized = this.normalizeOptionalText(name, 100);
+    if (!normalized) return null;
+    let category = await this.categoryRepo.findOne({
+      where: { clientId, name: normalized },
     });
+    if (category) {
+      if (category.archivedAt) {
+        category.archivedAt = null;
+        category = await this.categoryRepo.save(category);
+      }
+      return category;
+    }
+    return this.categoryRepo.save(
+      this.categoryRepo.create({
+        clientId,
+        name: normalized,
+        createdAt: new Date(),
+        archivedAt: null,
+      }),
+    );
+  }
+
+  private async ensureGroup(
+    clientId: string,
+    category: PhraseCategory | null,
+    name: string | undefined | null,
+  ): Promise<PhraseGroup | null> {
+    const normalized = this.normalizeOptionalText(name, 150);
+    if (!normalized || !category) return null;
+    let group = await this.groupRepo.findOne({
+      where: { clientId, categoryId: category.id, name: normalized },
+      relations: ['category'],
+    });
+    if (group) {
+      if (group.archivedAt) {
+        group.archivedAt = null;
+        group = await this.groupRepo.save(group);
+      }
+      return group;
+    }
+    return this.groupRepo.save(
+      this.groupRepo.create({
+        clientId,
+        categoryId: category.id,
+        name: normalized,
+        createdAt: new Date(),
+        archivedAt: null,
+      }),
+    );
+  }
+
+  private async resolveOrganization(
+    clientId: string,
+    dto: UpdatePhraseDto,
+  ): Promise<{ category: PhraseCategory | null; group: PhraseGroup | null }> {
+    let category: PhraseCategory | null = null;
+    let group: PhraseGroup | null = null;
+
+    if (typeof dto.categoryId === 'number') {
+      category =
+        (await this.categoryRepo.findOne({
+          where: { id: dto.categoryId, clientId },
+        })) ?? null;
+    }
+
+    if (!category && dto.category !== undefined) {
+      category = await this.ensureCategory(clientId, dto.category);
+    }
+
+    if (typeof dto.groupId === 'number') {
+      group =
+        (await this.groupRepo.findOne({
+          where: { id: dto.groupId, clientId },
+          relations: ['category'],
+        })) ?? null;
+      if (group?.category) category = group.category;
+    }
+
+    if (!group && dto.groupName !== undefined) {
+      group = await this.ensureGroup(clientId, category, dto.groupName);
+    }
+
+    return { category, group };
+  }
+
+  private async persistOrganizationLinks(
+    phraseId: number,
+    organization: { category: PhraseCategory | null; group: PhraseGroup | null },
+  ): Promise<void> {
+    await this.phraseRepo
+      .createQueryBuilder()
+      .update(Phrase)
+      .set({
+        categoryId: organization.category?.id ?? null,
+        groupId: organization.group?.id ?? null,
+      })
+      .where('id = :id', { id: phraseId })
+      .execute();
+  }
+
+  async getPhrasebook(
+    clientId: string,
+    filters?: { categoryId?: number; groupId?: number },
+  ): Promise<PhrasebookStatementDto[]> {
+    const qb = this.phraseRepo
+      .createQueryBuilder('phrase')
+      .leftJoinAndSelect('phrase.tokens', 'token')
+      .leftJoinAndSelect('phrase.category', 'category')
+      .leftJoinAndSelect('phrase.group', 'group')
+      .where('phrase.clientId = :clientId', { clientId })
+      .orderBy('phrase.id', 'DESC')
+      .addOrderBy('token.position', 'ASC');
+
+    if (filters?.categoryId) {
+      qb.andWhere('phrase.categoryId = :categoryId', {
+        categoryId: filters.categoryId,
+      });
+    }
+    if (filters?.groupId) {
+      qb.andWhere('phrase.groupId = :groupId', { groupId: filters.groupId });
+    }
+
+    const phrases = await qb.getMany();
 
     return phrases.map((p) => this.toDto(p));
   }
@@ -160,7 +302,7 @@ export class PhrasebookService {
   async getPhrase(id: number): Promise<PhrasebookStatementDto> {
     const phrase = await this.phraseRepo.findOne({
       where: { id },
-      relations: ['tokens'],
+      relations: ['tokens', 'category', 'group'],
       order: { tokens: { position: 'ASC' } },
     });
 
@@ -184,25 +326,42 @@ export class PhrasebookService {
       normalizedText,
     );
     if (existing) {
+      if (
+        dto.category !== undefined ||
+        dto.groupName !== undefined ||
+        dto.categoryId !== undefined ||
+        dto.groupId !== undefined
+      ) {
+        const organization = await this.resolveOrganization(clientId, dto);
+        await this.persistOrganizationLinks(existing.id, organization);
+      }
       return this.getPhrase(existing.id);
     }
 
     const fingerprint = this.phraseFingerprint(clientId, normalizedText);
 
+    const organization = await this.resolveOrganization(clientId, dto);
     const phraseEntity = this.phraseRepo.create({
       clientId,
       fingerprint,
       createdAt: new Date(),
-      ...dto,
       text: normalizedText,
+      language: dto.language || 'ga',
+      translation: this.normalizeOptionalText(dto.translation, 2000) ?? undefined,
+      pronunciation: this.normalizeOptionalText(dto.pronunciation, 500) ?? undefined,
+      example: this.normalizeOptionalText(dto.example, 2000) ?? undefined,
+      notes: this.normalizeOptionalText(dto.notes, 4000) ?? undefined,
       source: this.normalizeSource(dto.source, 'manual'),
       inPractice: Boolean(dto.inPractice),
       inFlashcards: Boolean(dto.inFlashcards),
+      categoryId: organization.category?.id ?? null,
+      groupId: organization.group?.id ?? null,
     });
 
     let saved: Phrase;
     try {
       saved = await this.phraseRepo.save(phraseEntity);
+      await this.persistOrganizationLinks(saved.id, organization);
     } catch (error) {
       if (!this.isDuplicateEntryError(error)) {
         throw error;
@@ -273,15 +432,55 @@ export class PhrasebookService {
   ): Promise<PhrasebookStatementDto> {
     const phrase = await this.phraseRepo.findOne({
       where: { id },
-      relations: ['tokens'],
+      relations: ['tokens', 'category', 'group'],
     });
     if (!phrase) throw new NotFoundException(`Phrase ${id} not found`);
 
-    Object.assign(phrase, dto);
+    let organizationToPersist:
+      | { category: PhraseCategory | null; group: PhraseGroup | null }
+      | null = null;
+
+    if (dto.text !== undefined) {
+      phrase.text = this.normalizePhraseText(dto.text);
+    }
+    if (dto.translation !== undefined) {
+      phrase.translation = this.normalizeOptionalText(dto.translation, 2000) ?? undefined;
+    }
+    if (dto.pronunciation !== undefined) {
+      phrase.pronunciation = this.normalizeOptionalText(dto.pronunciation, 500) ?? undefined;
+    }
+    if (dto.example !== undefined) {
+      phrase.example = this.normalizeOptionalText(dto.example, 2000) ?? undefined;
+    }
+    if (dto.notes !== undefined) {
+      phrase.notes = this.normalizeOptionalText(dto.notes, 4000) ?? undefined;
+    }
+    if (typeof dto.inPractice === 'boolean') {
+      phrase.inPractice = dto.inPractice;
+    }
+    if (typeof dto.inFlashcards === 'boolean') {
+      phrase.inFlashcards = dto.inFlashcards;
+    }
     if (typeof dto.source === 'string') {
       phrase.source = this.normalizeSource(dto.source, 'manual');
     }
+    if (
+      dto.category !== undefined ||
+      dto.groupName !== undefined ||
+      dto.categoryId !== undefined ||
+      dto.groupId !== undefined
+    ) {
+      organizationToPersist = await this.resolveOrganization(phrase.clientId, dto);
+      phrase.categoryId = organizationToPersist.category?.id ?? null;
+      phrase.category = organizationToPersist.category ?? null;
+      phrase.groupId = organizationToPersist.group?.id ?? null;
+      phrase.group = organizationToPersist.group ?? null;
+    }
     await this.phraseRepo.save(phrase);
+
+    if (organizationToPersist) {
+      await this.persistOrganizationLinks(phrase.id, organizationToPersist);
+    }
 
     await this.emitStatementEvent('statement_updated', phrase, dto);
 
@@ -413,6 +612,10 @@ export class PhrasebookService {
       pronunciation: p.pronunciation,
       example: p.example,
       notes: p.notes,
+      categoryId: p.categoryId ?? p.category?.id ?? null,
+      category: p.category?.name ?? null,
+      groupId: p.groupId ?? p.group?.id ?? null,
+      groupName: p.group?.name ?? null,
       inPractice: Boolean(p.inPractice),
       inFlashcards: Boolean(p.inFlashcards),
       tokens: p.tokens?.map((t) => ({
@@ -422,5 +625,135 @@ export class PhrasebookService {
         pos: t.pos,
       })),
     };
+  }
+
+  async listCategories(clientId: string): Promise<PhraseCategoryDto[]> {
+    const categories = await this.categoryRepo.find({
+      where: { clientId },
+      relations: ['groups'],
+      order: { name: 'ASC' },
+    });
+    return categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      archived: Boolean(category.archivedAt),
+      groupCount: Array.isArray(category.groups) ? category.groups.length : 0,
+    }));
+  }
+
+  async createCategory(clientId: string, name: string): Promise<PhraseCategoryDto> {
+    const category = await this.ensureCategory(clientId, name);
+    if (!category) throw new BadRequestException('Category name is required');
+    return {
+      id: category.id,
+      name: category.name,
+      archived: Boolean(category.archivedAt),
+      groupCount: 0,
+    };
+  }
+
+  async updateCategory(
+    clientId: string,
+    id: number,
+    body: { name?: string; archived?: boolean },
+  ): Promise<PhraseCategoryDto> {
+    const category = await this.categoryRepo.findOne({ where: { id, clientId } });
+    if (!category) throw new NotFoundException(`Category ${id} not found`);
+    if (body.name !== undefined) {
+      const normalized = this.normalizeOptionalText(body.name, 100);
+      if (!normalized) throw new BadRequestException('Category name is required');
+      category.name = normalized;
+    }
+    if (typeof body.archived === 'boolean') {
+      category.archivedAt = body.archived ? new Date() : null;
+    }
+    const saved = await this.categoryRepo.save(category);
+    return {
+      id: saved.id,
+      name: saved.name,
+      archived: Boolean(saved.archivedAt),
+      groupCount: await this.groupRepo.count({ where: { categoryId: saved.id, clientId } }),
+    };
+  }
+
+  async deleteCategory(clientId: string, id: number): Promise<{ success: boolean }> {
+    await this.phraseRepo
+      .createQueryBuilder()
+      .update(Phrase)
+      .set({ categoryId: null, groupId: null })
+      .where('clientId = :clientId AND categoryId = :id', { clientId, id })
+      .execute();
+    await this.groupRepo.delete({ clientId, categoryId: id });
+    const res = await this.categoryRepo.delete({ clientId, id });
+    return { success: Boolean(res.affected) };
+  }
+
+  async listGroups(clientId: string, categoryId?: number): Promise<PhraseGroupDto[]> {
+    const where = categoryId ? { clientId, categoryId } : { clientId };
+    const groups = await this.groupRepo.find({ where, order: { name: 'ASC' } });
+    return groups.map((group) => ({
+      id: group.id,
+      categoryId: group.categoryId,
+      name: group.name,
+      archived: Boolean(group.archivedAt),
+    }));
+  }
+
+  async createGroup(
+    clientId: string,
+    categoryId: number | undefined,
+    name: string,
+  ): Promise<PhraseGroupDto> {
+    if (!categoryId) throw new BadRequestException('Category is required');
+    const category = await this.categoryRepo.findOne({ where: { id: categoryId, clientId } });
+    if (!category) throw new NotFoundException(`Category ${categoryId} not found`);
+    const group = await this.ensureGroup(clientId, category, name);
+    if (!group) throw new BadRequestException('Group name is required');
+    return {
+      id: group.id,
+      categoryId: group.categoryId,
+      name: group.name,
+      archived: Boolean(group.archivedAt),
+    };
+  }
+
+  async updateGroup(
+    clientId: string,
+    id: number,
+    body: { categoryId?: number; name?: string; archived?: boolean },
+  ): Promise<PhraseGroupDto> {
+    const group = await this.groupRepo.findOne({ where: { id, clientId } });
+    if (!group) throw new NotFoundException(`Group ${id} not found`);
+    if (typeof body.categoryId === 'number') {
+      const category = await this.categoryRepo.findOne({ where: { id: body.categoryId, clientId } });
+      if (!category) throw new NotFoundException(`Category ${body.categoryId} not found`);
+      group.categoryId = body.categoryId;
+    }
+    if (body.name !== undefined) {
+      const normalized = this.normalizeOptionalText(body.name, 150);
+      if (!normalized) throw new BadRequestException('Group name is required');
+      group.name = normalized;
+    }
+    if (typeof body.archived === 'boolean') {
+      group.archivedAt = body.archived ? new Date() : null;
+    }
+    const saved = await this.groupRepo.save(group);
+    return {
+      id: saved.id,
+      categoryId: saved.categoryId,
+      name: saved.name,
+      archived: Boolean(saved.archivedAt),
+    };
+  }
+
+  async deleteGroup(clientId: string, id: number): Promise<{ success: boolean }> {
+    await this.phraseRepo
+      .createQueryBuilder()
+      .update(Phrase)
+      .set({ groupId: null })
+      .where('clientId = :clientId AND groupId = :id', { clientId, id })
+      .execute();
+    const res = await this.groupRepo.delete({ clientId, id });
+    return { success: Boolean(res.affected) };
   }
 }

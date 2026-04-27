@@ -3,8 +3,63 @@ import {
   Entity,
   ManyToOne,
   OneToMany,
+  JoinColumn,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+
+@Entity('phrase_categories')
+export class PhraseCategory {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ nullable: false })
+  clientId: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: false })
+  name: string;
+
+  @Column({ type: 'timestamp', nullable: false })
+  createdAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt?: Date | null;
+
+  @OneToMany(() => PhraseGroup, (group) => group.category)
+  groups: PhraseGroup[];
+
+  @OneToMany(() => Phrase, (phrase) => phrase.category)
+  phrases: Phrase[];
+}
+
+@Entity('phrase_groups')
+export class PhraseGroup {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column({ nullable: false })
+  clientId: string;
+
+  @Column({ type: 'int', nullable: false })
+  categoryId: number;
+
+  @ManyToOne(() => PhraseCategory, (category) => category.groups, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'categoryId' })
+  category: PhraseCategory;
+
+  @Column({ type: 'varchar', length: 150, nullable: false })
+  name: string;
+
+  @Column({ type: 'timestamp', nullable: false })
+  createdAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt?: Date | null;
+
+  @OneToMany(() => Phrase, (phrase) => phrase.group)
+  phrases: Phrase[];
+}
 
 /**
  * Represents a stored linguistic phrase (sentence or phrase)
@@ -63,6 +118,26 @@ export class Phrase {
 
   @Column({ type: 'varchar', length: 4000, nullable: true })
   notes?: string;
+
+  @Column({ type: 'int', nullable: true })
+  categoryId?: number | null;
+
+  @ManyToOne(() => PhraseCategory, (category) => category.phrases, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'categoryId' })
+  category?: PhraseCategory | null;
+
+  @Column({ type: 'int', nullable: true })
+  groupId?: number | null;
+
+  @ManyToOne(() => PhraseGroup, (group) => group.phrases, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'groupId' })
+  group?: PhraseGroup | null;
 
   @Column({ type: 'boolean', default: false })
   inPractice: boolean;
