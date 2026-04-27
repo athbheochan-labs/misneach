@@ -13,6 +13,7 @@ import { PhrasebookService } from './phrasebook.service';
 import {
   PhraseCategoryDto,
   PhraseGroupDto,
+  PhrasebookPageDto,
   UpdatePhraseDto,
 } from './phrasebook.dto';
 
@@ -25,12 +26,22 @@ export class PhrasebookController {
   @Get('phrases')
   getPhrasebook(
     @Query('clientId') clientId: string,
+    @Query('search') search?: string,
+    @Query('filter') filter?: string,
     @Query('categoryId') categoryId?: string,
     @Query('groupId') groupId?: string,
-  ) {
+    @Query('sort') sort?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ): Promise<PhrasebookPageDto> {
     return this.service.getPhrasebook(clientId, {
+      search,
+      filter,
       categoryId: categoryId ? Number(categoryId) : undefined,
       groupId: groupId ? Number(groupId) : undefined,
+      sort,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
     });
   }
 

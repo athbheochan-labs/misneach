@@ -27,6 +27,22 @@ export interface PhrasebookStatement {
   }>;
 }
 
+export interface PhrasebookSummary {
+  total: number;
+  inPractice: number;
+  inFlashcards: number;
+  own: number;
+}
+
+export interface PhrasebookPage {
+  items: PhrasebookStatement[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  summary: PhrasebookSummary;
+}
+
 @Injectable()
 export class PhrasebookService {
   private phrasebookUrl = process.env.PHRASEBOOK_URL || 'http://phrasebook:3011';
@@ -104,11 +120,24 @@ export class PhrasebookService {
 
   async getPhrasebook(
     clientId: string,
-    filters?: { categoryId?: string; groupId?: string },
-  ) {
+    filters?: {
+      search?: string;
+      filter?: string;
+      categoryId?: string;
+      groupId?: string;
+      sort?: string;
+      page?: string;
+      pageSize?: string;
+    },
+  ): Promise<PhrasebookPage> {
     const params = new URLSearchParams({ clientId });
+    if (filters?.search) params.set('search', filters.search);
+    if (filters?.filter) params.set('filter', filters.filter);
     if (filters?.categoryId) params.set('categoryId', filters.categoryId);
     if (filters?.groupId) params.set('groupId', filters.groupId);
+    if (filters?.sort) params.set('sort', filters.sort);
+    if (filters?.page) params.set('page', filters.page);
+    if (filters?.pageSize) params.set('pageSize', filters.pageSize);
     const res = await fetch(`${this.phrasebookUrl}/phrases?${params.toString()}`);
     return res.json();
   }
