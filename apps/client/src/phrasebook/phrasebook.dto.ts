@@ -9,6 +9,10 @@ export interface PhrasebookChanges {
   pronunciation?: string;
   example?: string;
   notes?: string;
+  category?: string;
+  groupName?: string;
+  categoryId?: number;
+  groupId?: number;
   source?: string;
   inPractice?: boolean;
   inFlashcards?: boolean;
@@ -20,6 +24,10 @@ export class UpdatePhraseDto {
   pronunciation?: string;
   example?: string;
   notes?: string;
+  category?: string;
+  groupName?: string;
+  categoryId?: number;
+  groupId?: number;
   autoTranslate?: boolean;
   source?: string;
   inPractice?: boolean;

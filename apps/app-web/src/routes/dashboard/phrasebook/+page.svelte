@@ -9,6 +9,10 @@
     translation?: string | null;
     pronunciation?: string | null;
     notes?: string | null;
+    categoryId?: number | string | null;
+    category?: string | null;
+    groupId?: number | string | null;
+    groupName?: string | null;
     source?: string | null;
     inPractice?: boolean;
     inFlashcards?: boolean;
@@ -21,6 +25,8 @@
     translation: string;
     pronunciation: string;
     notes: string;
+    category: string;
+    groupName: string;
   };
 
   type FlashcardDeck = {
@@ -29,10 +35,29 @@
     cardCount?: number;
   };
 
+  type PhraseCategory = {
+    id: number | string;
+    name: string;
+    archived?: boolean;
+  };
+
+  type PhraseGroup = {
+    id: number | string;
+    categoryId: number | string;
+    name: string;
+    archived?: boolean;
+  };
+
   let loading = false;
   let phrases: Phrase[] = [];
   let searchTerm = '';
   let activeFilter: 'all' | 'course' | 'own' | 'unannotated' = 'all';
+  let selectedCategoryId = '';
+  let selectedGroupId = '';
+  let categories: PhraseCategory[] = [];
+  let groups: PhraseGroup[] = [];
+  let categoryOptions: string[] = [];
+  let groupOptions: string[] = [];
 
   let phraseModalOpen = false;
   let editingPhraseId: number | string | null = null;
@@ -41,7 +66,9 @@
     text: '',
     translation: '',
     pronunciation: '',
-    notes: ''
+    notes: '',
+    category: '',
+    groupName: ''
   };
 
   let routePractice = true;
@@ -79,6 +106,10 @@
       translation: raw.translation ? String(raw.translation) : null,
       pronunciation: raw.pronunciation ? String(raw.pronunciation) : null,
       notes: raw.notes ? String(raw.notes) : null,
+      categoryId: raw.categoryId != null ? String(raw.categoryId) : null,
+      category: raw.category ? String(raw.category) : null,
+      groupId: raw.groupId != null ? String(raw.groupId) : null,
+      groupName: raw.groupName ? String(raw.groupName) : null,
       source: raw.source ? String(raw.source) : null,
       inPractice: Boolean(raw.inPractice),
       inFlashcards: Boolean(raw.inFlashcards),
@@ -172,6 +203,40 @@
     }
   }
 
+  async function loadOrganization() {
+    try {
+      const [categoryRes, groupRes] = await Promise.all([
+        apiFetch('/api/proxy/phrasebook/categories', { cache: 'no-store' }),
+        apiFetch('/api/proxy/phrasebook/groups', { cache: 'no-store' })
+      ]);
+
+      if (categoryRes.ok) {
+        const payload = await categoryRes.json();
+        categories = Array.isArray(payload)
+          ? payload.map((item) => ({
+              id: String(item.id),
+              name: String(item.name || ''),
+              archived: Boolean(item.archived)
+            })).filter((item) => item.name)
+          : [];
+      }
+
+      if (groupRes.ok) {
+        const payload = await groupRes.json();
+        groups = Array.isArray(payload)
+          ? payload.map((item) => ({
+              id: String(item.id),
+              categoryId: String(item.categoryId),
+              name: String(item.name || ''),
+              archived: Boolean(item.archived)
+            })).filter((item) => item.name)
+          : [];
+      }
+    } catch (err) {
+      console.warn('Failed to load phrase organization', err);
+    }
+  }
+
   function connectStream(accessToken?: string | null) {
     const streamUrl = accessToken
       ? `/api/phrasebook/stream?accessToken=${encodeURIComponent(accessToken)}`
@@ -247,7 +312,7 @@
   }
 
   onMount(async () => {
-    await loadPhrases();
+    await Promise.all([loadPhrases(), loadOrganization()]);
     const session = await loadAuthSession().catch(() => null);
     connectStream(session?.accessToken || null);
   });
@@ -262,6 +327,9 @@
 
   $: normalizedSearch = searchTerm.toLowerCase().trim();
   $: filteredPhrases = phrases.filter((item) => {
+    if (selectedCategoryId && String(item.categoryId || '') !== selectedCategoryId) return false;
+    if (selectedGroupId && String(item.groupId || '') !== selectedGroupId) return false;
+
     if (normalizedSearch) {
       const matches =
         (item.text || '').toLowerCase().includes(normalizedSearch) ||
@@ -288,6 +356,28 @@
   $: inPracticeCount = phrases.filter((item) => item.inPractice).length;
   $: inFlashcardsCount = phrases.filter((item) => item.inFlashcards).length;
   $: ownCount = phrases.filter((item) => isOwnSource(item.source)).length;
+  $: categoryOptions = [
+    ...new Set([
+      ...categories.filter((item) => !item.archived).map((item) => item.name),
+      ...phrases.map((item) => String(item.category || '').trim()).filter(Boolean)
+    ])
+  ].sort((a, b) => a.localeCompare(b));
+  $: groupOptions = [
+    ...new Set([
+      ...groups
+        .filter((item) => !item.archived)
+        .filter((item) => !selectedCategoryId || String(item.categoryId) === selectedCategoryId)
+        .map((item) => item.name),
+      ...phrases
+        .filter((item) => !selectedCategoryId || String(item.categoryId || '') === selectedCategoryId)
+        .map((item) => String(item.groupName || '').trim())
+        .filter(Boolean)
+    ])
+  ].sort((a, b) => a.localeCompare(b));
+  $: visibleGroups = groups.filter((item) => !item.archived && (!selectedCategoryId || String(item.categoryId) === selectedCategoryId));
+  $: if (selectedGroupId && !visibleGroups.some((item) => String(item.id) === selectedGroupId)) {
+    selectedGroupId = '';
+  }
 
   $: pronPreviewText = form.pronunciation.trim() && form.text.trim() ? `${form.text.trim()} -> ${form.pronunciation.trim()}` : '';
 
@@ -298,7 +388,9 @@
       text: '',
       translation: '',
       pronunciation: '',
-      notes: ''
+      notes: '',
+      category: '',
+      groupName: ''
     };
     routePractice = true;
     routeFlashcard = false;
@@ -315,7 +407,9 @@
       text: item.text || '',
       translation: item.translation || '',
       pronunciation: item.pronunciation || '',
-      notes: item.notes || ''
+      notes: item.notes || '',
+      category: item.category || '',
+      groupName: item.groupName || ''
     };
     phraseModalOpen = true;
   }
@@ -361,6 +455,8 @@
     const translation = form.translation.trim();
     const pronunciation = form.pronunciation.trim();
     const notes = form.notes.trim();
+    const category = form.category.trim();
+    const groupName = form.groupName.trim();
 
     if (!text || !translation) {
       alert('Irish phrase and English translation are required');
@@ -379,6 +475,8 @@
             translation,
             pronunciation: pronunciation || null,
             notes: notes || null,
+            category: category || null,
+            groupName: groupName || null,
             source: editingSource || 'own'
           })
         });
@@ -395,6 +493,8 @@
             translation,
             pronunciation: pronunciation || null,
             notes: notes || null,
+            category: category || null,
+            groupName: groupName || null,
             source: editingSource || phrases[idx].source,
             loading: true,
             pendingRequestId: data.requestId || null
@@ -443,6 +543,8 @@
             translation,
             pronunciation: pronunciation || null,
             notes: notes || null,
+            category: category || null,
+            groupName: groupName || null,
             source: 'own',
             inPractice: routePractice,
             inFlashcards: routeFlashcard
@@ -474,6 +576,8 @@
             translation,
             pronunciation: pronunciation || null,
             notes: notes || null,
+            category: category || null,
+            groupName: groupName || null,
             source: 'own',
             inPractice: routePractice,
             inFlashcards: routeFlashcard,
@@ -493,6 +597,7 @@
         showToast(routeLabels.length ? `Phrase saved -> added to ${routeLabels.join(' & ')}` : 'Phrase saved to phrasebook');
       }
 
+      await Promise.all([loadOrganization(), loadPhrases()]);
       closePhraseModal();
     } catch (err) {
       console.error(err);
@@ -645,6 +750,26 @@
         <button class={`filter-chip ${activeFilter === 'own' ? 'active' : ''}`} onclick={() => (activeFilter = 'own')}>Added by me</button>
         <button class={`filter-chip ${activeFilter === 'unannotated' ? 'active' : ''}`} onclick={() => (activeFilter = 'unannotated')}>Not yet annotated</button>
       </div>
+      <div class="org-filters">
+        <label class="org-filter">
+          <span>Category</span>
+          <select bind:value={selectedCategoryId}>
+            <option value="">All categories</option>
+            {#each categories.filter((item) => !item.archived) as category (category.id)}
+              <option value={String(category.id)}>{category.name}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="org-filter">
+          <span>Group</span>
+          <select bind:value={selectedGroupId} disabled={!visibleGroups.length}>
+            <option value="">All groups</option>
+            {#each visibleGroups as group (group.id)}
+              <option value={String(group.id)}>{group.name}</option>
+            {/each}
+          </select>
+        </label>
+      </div>
       <div class="toolbar-right">
         <button class="btn-add" onclick={openAdd}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -709,6 +834,12 @@
                   {#if item.notes}
                     <div class="phrase-notes">{item.notes}</div>
                   {/if}
+                  {#if item.category || item.groupName}
+                    <div class="phrase-meta">
+                      {#if item.category}<span>{item.category}</span>{/if}
+                      {#if item.groupName}<span>{item.groupName}</span>{/if}
+                    </div>
+                  {/if}
                 </div>
 
                 <div class="phrase-progress">
@@ -768,6 +899,12 @@
                   {#if item.notes}
                     <div class="phrase-notes">{item.notes}</div>
                   {/if}
+                  {#if item.category || item.groupName}
+                    <div class="phrase-meta">
+                      {#if item.category}<span>{item.category}</span>{/if}
+                      {#if item.groupName}<span>{item.groupName}</span>{/if}
+                    </div>
+                  {/if}
                 </div>
 
                 <div class="phrase-progress">
@@ -818,6 +955,12 @@
               <div class="phrase-english">{item.translation || '-'}</div>
               {#if item.notes}
                 <div class="phrase-notes">{item.notes}</div>
+              {/if}
+              {#if item.category || item.groupName}
+                <div class="phrase-meta">
+                  {#if item.category}<span>{item.category}</span>{/if}
+                  {#if item.groupName}<span>{item.groupName}</span>{/if}
+                </div>
               {/if}
             </div>
 
@@ -873,6 +1016,38 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
           Write it how it sounds to you. There is no wrong answer.
         </div>
+      </div>
+
+      <div class="field">
+        <label for="phrase-category">Category <span class="field-opt">(optional)</span></label>
+        <input
+          id="phrase-category"
+          type="text"
+          bind:value={form.category}
+          list="phrase-category-options"
+          placeholder="e.g. Reading, Conversation, Grammar"
+        />
+        <datalist id="phrase-category-options">
+          {#each categoryOptions as option}
+            <option value={option}></option>
+          {/each}
+        </datalist>
+      </div>
+
+      <div class="field">
+        <label for="phrase-group">Group <span class="field-opt">(optional)</span></label>
+        <input
+          id="phrase-group"
+          type="text"
+          bind:value={form.groupName}
+          list="phrase-group-options"
+          placeholder="e.g. Book X, Chapter 4, Cafe Dialogues"
+        />
+        <datalist id="phrase-group-options">
+          {#each groupOptions as option}
+            <option value={option}></option>
+          {/each}
+        </datalist>
       </div>
 
       <div class="field">
@@ -1164,6 +1339,45 @@
     color: var(--parchment);
   }
 
+  .org-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .org-filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1.5px solid var(--parch-dark);
+    border-radius: 10px;
+    padding: 5px 8px;
+  }
+
+  .org-filter span {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .org-filter select {
+    border: none;
+    background: transparent;
+    color: var(--forest);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+    min-width: 130px;
+  }
+
+  .org-filter select:disabled {
+    color: #aaa;
+  }
+
   .toolbar-right {
     margin-left: auto;
   }
@@ -1364,6 +1578,25 @@
     padding-top: 10px;
     margin-top: 2px;
     font-style: italic;
+  }
+
+  .phrase-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .phrase-meta span {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid var(--parch-dark);
+    background: var(--parchment);
+    padding: 3px 8px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
   }
 
   .phrase-progress {

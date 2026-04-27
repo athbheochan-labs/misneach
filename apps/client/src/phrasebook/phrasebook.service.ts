@@ -13,6 +13,10 @@ export interface PhrasebookStatement {
   pronunciation?: string | null;
   example?: string | null;
   notes?: string | null;
+  category?: string | null;
+  groupName?: string | null;
+  categoryId?: number | null;
+  groupId?: number | null;
   inPractice?: boolean;
   inFlashcards?: boolean;
   tokens?: Array<{
@@ -98,10 +102,14 @@ export class PhrasebookService {
 
   // ---------------- CRUD ----------------
 
-  async getPhrasebook(clientId: string) {
-    const res = await fetch(
-      `${this.phrasebookUrl}/phrases?clientId=${encodeURIComponent(clientId)}`,
-    );
+  async getPhrasebook(
+    clientId: string,
+    filters?: { categoryId?: string; groupId?: string },
+  ) {
+    const params = new URLSearchParams({ clientId });
+    if (filters?.categoryId) params.set('categoryId', filters.categoryId);
+    if (filters?.groupId) params.set('groupId', filters.groupId);
+    const res = await fetch(`${this.phrasebookUrl}/phrases?${params.toString()}`);
     return res.json();
   }
 
@@ -239,5 +247,91 @@ export class PhrasebookService {
     });
 
     return { accepted: true, requestId };
+  }
+
+  async listCategories(clientId: string) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/categories?clientId=${encodeURIComponent(clientId)}`,
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to load categories');
+    return res.json();
+  }
+
+  async createCategory(clientId: string, body: { name?: string }) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/categories?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to create category');
+    return res.json();
+  }
+
+  async updateCategory(clientId: string, id: string, body: { name?: string; archived?: boolean }) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/categories/${Number(id)}?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to update category');
+    return res.json();
+  }
+
+  async deleteCategory(clientId: string, id: string) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/categories/${Number(id)}?clientId=${encodeURIComponent(clientId)}`,
+      { method: 'DELETE' },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to delete category');
+    return res.json();
+  }
+
+  async listGroups(clientId: string, categoryId?: string) {
+    const params = new URLSearchParams({ clientId });
+    if (categoryId) params.set('categoryId', categoryId);
+    const res = await fetch(`${this.phrasebookUrl}/groups?${params.toString()}`);
+    if (!res.ok) throw new Error(await res.text() || 'Failed to load groups');
+    return res.json();
+  }
+
+  async createGroup(clientId: string, body: { categoryId?: number; name?: string }) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/groups?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to create group');
+    return res.json();
+  }
+
+  async updateGroup(clientId: string, id: string, body: { categoryId?: number; name?: string; archived?: boolean }) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/groups/${Number(id)}?clientId=${encodeURIComponent(clientId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to update group');
+    return res.json();
+  }
+
+  async deleteGroup(clientId: string, id: string) {
+    const res = await fetch(
+      `${this.phrasebookUrl}/groups/${Number(id)}?clientId=${encodeURIComponent(clientId)}`,
+      { method: 'DELETE' },
+    );
+    if (!res.ok) throw new Error(await res.text() || 'Failed to delete group');
+    return res.json();
   }
 }
