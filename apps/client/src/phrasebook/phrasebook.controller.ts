@@ -35,11 +35,24 @@ export class PhrasebookController {
   @Get('/list')
   async getPhrasebook(
     @Req() req: AuthenticatedRequest,
+    @Query('search') search?: string,
+    @Query('filter') filter?: string,
     @Query('categoryId') categoryId?: string,
     @Query('groupId') groupId?: string,
+    @Query('sort') sort?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
   ) {
     const clientId = await this.authService.getClientIdFromSession(req);
-    return this.phrasebookService.getPhrasebook(clientId, { categoryId, groupId });
+    return this.phrasebookService.getPhrasebook(clientId, {
+      search,
+      filter,
+      categoryId,
+      groupId,
+      sort,
+      page,
+      pageSize,
+    });
   }
 
   @Get('/categories')

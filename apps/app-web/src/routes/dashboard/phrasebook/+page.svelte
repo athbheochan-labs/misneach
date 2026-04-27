@@ -48,16 +48,35 @@
     archived?: boolean;
   };
 
+  type PhrasebookSummary = {
+    total: number;
+    inPractice: number;
+    inFlashcards: number;
+    own: number;
+  };
+
   let loading = false;
   let phrases: Phrase[] = [];
   let searchTerm = '';
   let activeFilter: 'all' | 'course' | 'own' | 'unannotated' = 'all';
+  let sortBy: 'newest' | 'oldest' | 'alphabetical' = 'newest';
   let selectedCategoryId = '';
   let selectedGroupId = '';
+  let currentPage = 1;
+  let pageSize = 24;
+  let totalCount = 0;
+  let totalPages = 1;
+  let summary: PhrasebookSummary = {
+    total: 0,
+    inPractice: 0,
+    inFlashcards: 0,
+    own: 0
+  };
   let categories: PhraseCategory[] = [];
   let groups: PhraseGroup[] = [];
   let categoryOptions: string[] = [];
   let groupOptions: string[] = [];
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   let phraseModalOpen = false;
   let editingPhraseId: number | string | null = null;
@@ -187,17 +206,48 @@
     pendingTimers.set(timerKey, timer);
   }
 
-  async function loadPhrases() {
+  async function loadPhrases(page = currentPage) {
     loading = true;
     try {
-      const res = await apiFetch('/api/proxy/phrasebook/list', { cache: 'no-store' });
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        filter: activeFilter,
+        sort: sortBy
+      });
+      const normalizedSearch = searchTerm.trim();
+      if (normalizedSearch) params.set('search', normalizedSearch);
+      if (selectedCategoryId) params.set('categoryId', selectedCategoryId);
+      if (selectedGroupId) params.set('groupId', selectedGroupId);
+
+      const res = await apiFetch(`/api/proxy/phrasebook/list?${params.toString()}`, {
+        cache: 'no-store'
+      });
       if (!res.ok) throw new Error(await readErrorMessage(res, 'Failed to load phrasebook'));
       const data = await res.json();
-      phrases = Array.isArray(data) ? data.map((item) => normalizePhrase(item)) : [];
+      phrases = Array.isArray(data?.items) ? data.items.map((item) => normalizePhrase(item)) : [];
+      currentPage = Number(data?.page) > 0 ? Number(data.page) : page;
+      pageSize = Number(data?.pageSize) > 0 ? Number(data.pageSize) : pageSize;
+      totalCount = Number(data?.total) >= 0 ? Number(data.total) : phrases.length;
+      totalPages = Number(data?.totalPages) > 0 ? Number(data.totalPages) : 1;
+      summary = {
+        total: Number(data?.summary?.total ?? totalCount),
+        inPractice: Number(data?.summary?.inPractice ?? 0),
+        inFlashcards: Number(data?.summary?.inFlashcards ?? 0),
+        own: Number(data?.summary?.own ?? 0)
+      };
     } catch (err) {
       console.error(err);
       alert(err instanceof Error ? err.message : 'Failed to load phrasebook');
       phrases = [];
+      totalCount = 0;
+      totalPages = 1;
+      summary = {
+        total: 0,
+        inPractice: 0,
+        inFlashcards: 0,
+        own: 0
+      };
     } finally {
       loading = false;
     }
@@ -323,39 +373,14 @@
     for (const timer of pendingTimers.values()) clearTimeout(timer);
     pendingTimers.clear();
     if (toastTimer) clearTimeout(toastTimer);
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
   });
 
   $: normalizedSearch = searchTerm.toLowerCase().trim();
-  $: filteredPhrases = phrases.filter((item) => {
-    if (selectedCategoryId && String(item.categoryId || '') !== selectedCategoryId) return false;
-    if (selectedGroupId && String(item.groupId || '') !== selectedGroupId) return false;
-
-    if (normalizedSearch) {
-      const matches =
-        (item.text || '').toLowerCase().includes(normalizedSearch) ||
-        (item.translation || '').toLowerCase().includes(normalizedSearch) ||
-        (item.notes || '').toLowerCase().includes(normalizedSearch);
-      if (!matches) return false;
-    }
-
-    if (activeFilter === 'course') return !isOwnSource(item.source);
-    if (activeFilter === 'own') return isOwnSource(item.source);
-    if (activeFilter === 'unannotated') {
-      const pronunciation = (item.pronunciation || '').trim();
-      const notes = (item.notes || '').trim();
-      return !pronunciation && !notes;
-    }
-
-    return true;
-  });
-
-  $: ownPhrases = filteredPhrases.filter((item) => isOwnSource(item.source));
-  $: coursePhrases = filteredPhrases.filter((item) => !isOwnSource(item.source));
-
-  $: totalCount = phrases.length;
-  $: inPracticeCount = phrases.filter((item) => item.inPractice).length;
-  $: inFlashcardsCount = phrases.filter((item) => item.inFlashcards).length;
-  $: ownCount = phrases.filter((item) => isOwnSource(item.source)).length;
+  $: filteredPhrases = phrases;
+  $: inPracticeCount = summary.inPractice;
+  $: inFlashcardsCount = summary.inFlashcards;
+  $: ownCount = summary.own;
   $: categoryOptions = [
     ...new Set([
       ...categories.filter((item) => !item.archived).map((item) => item.name),
@@ -377,9 +402,57 @@
   $: visibleGroups = groups.filter((item) => !item.archived && (!selectedCategoryId || String(item.categoryId) === selectedCategoryId));
   $: if (selectedGroupId && !visibleGroups.some((item) => String(item.id) === selectedGroupId)) {
     selectedGroupId = '';
+    void loadPhrases(1);
   }
 
   $: pronPreviewText = form.pronunciation.trim() && form.text.trim() ? `${form.text.trim()} -> ${form.pronunciation.trim()}` : '';
+
+  function scheduleSearchReload() {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      void loadPhrases(1);
+    }, 250);
+  }
+
+  function updateFilter(next: typeof activeFilter) {
+    if (activeFilter === next) return;
+    activeFilter = next;
+    void loadPhrases(1);
+  }
+
+  function updateSort(next: typeof sortBy) {
+    if (sortBy === next) return;
+    sortBy = next;
+    void loadPhrases(1);
+  }
+
+  function updateCategory(next: string) {
+    if (selectedCategoryId === next) return;
+    selectedCategoryId = next;
+    selectedGroupId = '';
+    void loadPhrases(1);
+  }
+
+  function updateGroup(next: string) {
+    if (selectedGroupId === next) return;
+    selectedGroupId = next;
+    void loadPhrases(1);
+  }
+
+  function updatePageSize(next: string) {
+    const parsed = Number(next);
+    if (!Number.isFinite(parsed) || parsed < 1 || pageSize === parsed) return;
+    pageSize = parsed;
+    void loadPhrases(1);
+  }
+
+  function goToPage(nextPage: number) {
+    if (nextPage < 1 || nextPage > totalPages || nextPage === currentPage || loading) return;
+    void loadPhrases(nextPage);
+  }
+
+  $: pageStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  $: pageEnd = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount);
 
   function openAdd() {
     editingPhraseId = null;
@@ -742,18 +815,24 @@
     <div class="toolbar fade-up">
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input class="search-input" type="text" bind:value={searchTerm} placeholder="Search phrases..." />
+        <input
+          class="search-input"
+          type="text"
+          bind:value={searchTerm}
+          placeholder="Search phrases..."
+          oninput={() => scheduleSearchReload()}
+        />
       </div>
       <div class="filter-chips">
-        <button class={`filter-chip ${activeFilter === 'all' ? 'active' : ''}`} onclick={() => (activeFilter = 'all')}>All</button>
-        <button class={`filter-chip ${activeFilter === 'course' ? 'active' : ''}`} onclick={() => (activeFilter = 'course')}>From course</button>
-        <button class={`filter-chip ${activeFilter === 'own' ? 'active' : ''}`} onclick={() => (activeFilter = 'own')}>Added by me</button>
-        <button class={`filter-chip ${activeFilter === 'unannotated' ? 'active' : ''}`} onclick={() => (activeFilter = 'unannotated')}>Not yet annotated</button>
+        <button class={`filter-chip ${activeFilter === 'all' ? 'active' : ''}`} onclick={() => updateFilter('all')}>All</button>
+        <button class={`filter-chip ${activeFilter === 'course' ? 'active' : ''}`} onclick={() => updateFilter('course')}>From course</button>
+        <button class={`filter-chip ${activeFilter === 'own' ? 'active' : ''}`} onclick={() => updateFilter('own')}>Added by me</button>
+        <button class={`filter-chip ${activeFilter === 'unannotated' ? 'active' : ''}`} onclick={() => updateFilter('unannotated')}>Not yet annotated</button>
       </div>
       <div class="org-filters">
         <label class="org-filter">
           <span>Category</span>
-          <select bind:value={selectedCategoryId}>
+          <select value={selectedCategoryId} onchange={(event) => updateCategory((event.currentTarget as HTMLSelectElement).value)}>
             <option value="">All categories</option>
             {#each categories.filter((item) => !item.archived) as category (category.id)}
               <option value={String(category.id)}>{category.name}</option>
@@ -762,11 +841,28 @@
         </label>
         <label class="org-filter">
           <span>Group</span>
-          <select bind:value={selectedGroupId} disabled={!visibleGroups.length}>
+          <select value={selectedGroupId} disabled={!visibleGroups.length} onchange={(event) => updateGroup((event.currentTarget as HTMLSelectElement).value)}>
             <option value="">All groups</option>
             {#each visibleGroups as group (group.id)}
               <option value={String(group.id)}>{group.name}</option>
             {/each}
+          </select>
+        </label>
+        <label class="org-filter">
+          <span>Sort</span>
+          <select value={sortBy} onchange={(event) => updateSort((event.currentTarget as HTMLSelectElement).value as typeof sortBy)}>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="alphabetical">A-Z</option>
+          </select>
+        </label>
+        <label class="org-filter">
+          <span>Page size</span>
+          <select value={String(pageSize)} onchange={(event) => updatePageSize((event.currentTarget as HTMLSelectElement).value)}>
+            <option value="12">12</option>
+            <option value="24">24</option>
+            <option value="48">48</option>
+            <option value="96">96</option>
           </select>
         </label>
       </div>
@@ -786,11 +882,11 @@
       <div class="phrase-grid">
         <div class="empty-state">
           <span class="empty-icon">📖</span>
-          <div class="empty-title">{normalizedSearch ? 'No phrases found' : 'Your phrasebook is empty'}</div>
-          <div class="empty-body">{normalizedSearch
+          <div class="empty-title">{normalizedSearch || activeFilter !== 'all' || selectedCategoryId || selectedGroupId ? 'No phrases found' : 'Your phrasebook is empty'}</div>
+          <div class="empty-body">{normalizedSearch || activeFilter !== 'all' || selectedCategoryId || selectedGroupId
             ? 'Try a different search term, or clear the filter.'
             : 'Phrases from your lessons will appear here automatically. You can also add your own from a book, conversation, or anything you hear.'}</div>
-          {#if !normalizedSearch}
+          {#if !normalizedSearch && activeFilter === 'all' && !selectedCategoryId && !selectedGroupId}
             <button class="btn-add" style="margin: 0 auto;" onclick={openAdd}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Add your first phrase
@@ -798,136 +894,6 @@
           {/if}
         </div>
       </div>
-    {:else if activeFilter === 'all' && !normalizedSearch}
-      {#if ownPhrases.length}
-        <div class="source-section">
-          <div class="source-section-head">
-            <span class="source-section-label">Added by you</span>
-            <span class="source-section-count">{ownPhrases.length}</span>
-            <span class="source-section-line"></span>
-          </div>
-
-          <div class="phrase-grid">
-            {#each ownPhrases as item (item.id)}
-              <article class="phrase-card">
-                {#if item.loading}
-                  <div class="loading-overlay"><div class="spinner"></div></div>
-                {/if}
-
-                <div class={`phrase-source-strip ${sourceClass(item)}`}>
-                  <span><span class="source-dot"></span>{sourceLabel(item)}</span>
-                </div>
-
-                <button class="card-edit-btn" onclick={() => openEdit(item)} title="Edit phrase">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                </button>
-
-                <div class="phrase-body">
-                  <div class="phrase-irish">{item.text}</div>
-                  {#if item.pronunciation}
-                    <div class="phrase-pron">
-                      <svg class="pron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
-                      {item.pronunciation}
-                    </div>
-                  {/if}
-                  <div class="phrase-english">{item.translation || '-'}</div>
-                  {#if item.notes}
-                    <div class="phrase-notes">{item.notes}</div>
-                  {/if}
-                  {#if item.category || item.groupName}
-                    <div class="phrase-meta">
-                      {#if item.category}<span>{item.category}</span>{/if}
-                      {#if item.groupName}<span>{item.groupName}</span>{/if}
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="phrase-progress">
-                  <span class={`progress-pill pp-practice ${item.inPractice ? 'active' : ''}`}>
-                    {#if item.inPractice}<span class="pp-dot"></span>{/if}
-                    {item.inPractice ? 'In practice' : 'Practice'}
-                  </span>
-                  <span class={`progress-pill pp-flashcard ${item.inFlashcards ? 'active' : ''}`}>
-                    {#if item.inFlashcards}<span class="pp-dot"></span>{/if}
-                    {item.inFlashcards ? 'In flashcards' : 'Flashcards'}
-                  </span>
-                </div>
-
-                <div class="phrase-actions">
-                  <button class="action-btn practice" onclick={() => togglePractice(item.id)}>{item.inPractice ? 'In practice ✓' : 'Add to practice'}</button>
-                  <button class="action-btn" onclick={() => toggleFlashcard(item.id)}>{item.inFlashcards ? 'In flashcards ✓' : 'Add to flashcards'}</button>
-                  <button class="action-btn" onclick={() => openEdit(item)}>Edit</button>
-                </div>
-              </article>
-            {/each}
-          </div>
-        </div>
-      {/if}
-
-      {#if coursePhrases.length}
-        <div class="source-section">
-          <div class="source-section-head">
-            <span class="source-section-label">From your course</span>
-            <span class="source-section-count">{coursePhrases.length}</span>
-            <span class="source-section-line"></span>
-          </div>
-
-          <div class="phrase-grid">
-            {#each coursePhrases as item (item.id)}
-              <article class="phrase-card">
-                {#if item.loading}
-                  <div class="loading-overlay"><div class="spinner"></div></div>
-                {/if}
-
-                <div class={`phrase-source-strip ${sourceClass(item)}`}>
-                  <span><span class="source-dot"></span>{sourceLabel(item)}</span>
-                </div>
-
-                <button class="card-edit-btn" onclick={() => openEdit(item)} title="Edit phrase">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                </button>
-
-                <div class="phrase-body">
-                  <div class="phrase-irish">{item.text}</div>
-                  {#if item.pronunciation}
-                    <div class="phrase-pron">
-                      <svg class="pron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"></path><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
-                      {item.pronunciation}
-                    </div>
-                  {/if}
-                  <div class="phrase-english">{item.translation || '-'}</div>
-                  {#if item.notes}
-                    <div class="phrase-notes">{item.notes}</div>
-                  {/if}
-                  {#if item.category || item.groupName}
-                    <div class="phrase-meta">
-                      {#if item.category}<span>{item.category}</span>{/if}
-                      {#if item.groupName}<span>{item.groupName}</span>{/if}
-                    </div>
-                  {/if}
-                </div>
-
-                <div class="phrase-progress">
-                  <span class={`progress-pill pp-practice ${item.inPractice ? 'active' : ''}`}>
-                    {#if item.inPractice}<span class="pp-dot"></span>{/if}
-                    {item.inPractice ? 'In practice' : 'Practice'}
-                  </span>
-                  <span class={`progress-pill pp-flashcard ${item.inFlashcards ? 'active' : ''}`}>
-                    {#if item.inFlashcards}<span class="pp-dot"></span>{/if}
-                    {item.inFlashcards ? 'In flashcards' : 'Flashcards'}
-                  </span>
-                </div>
-
-                <div class="phrase-actions">
-                  <button class="action-btn practice" onclick={() => togglePractice(item.id)}>{item.inPractice ? 'In practice ✓' : 'Add to practice'}</button>
-                  <button class="action-btn" onclick={() => toggleFlashcard(item.id)}>{item.inFlashcards ? 'In flashcards ✓' : 'Add to flashcards'}</button>
-                  <button class="action-btn" onclick={() => openEdit(item)}>Edit</button>
-                </div>
-              </article>
-            {/each}
-          </div>
-        </div>
-      {/if}
     {:else}
       <div class="phrase-grid">
         {#each filteredPhrases as item (item.id)}
@@ -982,6 +948,20 @@
             </div>
           </article>
         {/each}
+      </div>
+      <div class="pagination-bar fade-up">
+        <div class="pagination-meta">
+          Showing {pageStart}-{pageEnd} of {totalCount}
+        </div>
+        <div class="pagination-controls">
+          <button class="pagination-btn" onclick={() => goToPage(currentPage - 1)} disabled={loading || currentPage <= 1}>
+            Previous
+          </button>
+          <span class="pagination-page">Page {currentPage} of {totalPages}</span>
+          <button class="pagination-btn" onclick={() => goToPage(currentPage + 1)} disabled={loading || currentPage >= totalPages}>
+            Next
+          </button>
+        </div>
       </div>
     {/if}
   </div>
@@ -1412,6 +1392,60 @@
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+  }
+
+  .pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 18px;
+    padding: 14px 16px;
+    border: 1.5px solid var(--parch-dark);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.86);
+  }
+
+  .pagination-meta {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pagination-page {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--forest);
+    min-width: 92px;
+    text-align: center;
+  }
+
+  .pagination-btn {
+    border: 1.5px solid var(--parch-dark);
+    background: #fff;
+    color: var(--forest);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, opacity 0.15s;
+  }
+
+  .pagination-btn:hover:not(:disabled) {
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .source-section {
@@ -2106,6 +2140,20 @@
 
     .phrase-grid {
       grid-template-columns: 1fr;
+    }
+
+    .pagination-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .pagination-controls {
+      justify-content: space-between;
+    }
+
+    .pagination-page {
+      min-width: 0;
+      flex: 1;
     }
 
     .page-header {

@@ -108,6 +108,22 @@ export class PhrasebookStatementDto {
   tokens?: PhraseTokenDto[];
 }
 
+export class PhrasebookSummaryDto {
+  total: number;
+  inPractice: number;
+  inFlashcards: number;
+  own: number;
+}
+
+export class PhrasebookPageDto {
+  items: PhrasebookStatementDto[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  summary: PhrasebookSummaryDto;
+}
+
 export class PhraseCategoryDto {
   id: number;
   name: string;

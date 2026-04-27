@@ -5,12 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import { createHash, randomUUID } from 'crypto';
 
 import {
   PhraseCategoryDto,
   PhraseGroupDto,
+  PhrasebookPageDto,
+  PhrasebookSummaryDto,
   PhrasebookStatementDto,
   UpdatePhraseDto,
 } from './phrasebook.dto';
@@ -18,6 +20,17 @@ import { Phrase, PhraseCategory, PhraseGroup, PhraseToken } from './phrasebook.e
 
 @Injectable()
 export class PhrasebookService {
+  private readonly ownSources = [
+    'manual',
+    'own',
+    'user',
+    'user_added',
+    'custom',
+    'personal',
+    'direct_input',
+    'manual_input',
+  ];
+
   constructor(
     @InjectRepository(Phrase)
     private readonly phraseRepo: Repository<Phrase>,
@@ -274,29 +287,173 @@ export class PhrasebookService {
 
   async getPhrasebook(
     clientId: string,
-    filters?: { categoryId?: number; groupId?: number },
-  ): Promise<PhrasebookStatementDto[]> {
+    filters?: {
+      search?: string;
+      filter?: string;
+      categoryId?: number;
+      groupId?: number;
+      sort?: string;
+      page?: number;
+      pageSize?: number;
+    },
+  ): Promise<PhrasebookPageDto> {
+    const pageSize = Math.min(Math.max(filters?.pageSize ?? 24, 1), 100);
+    const requestedPage = Math.max(filters?.page ?? 1, 1);
+    const sort = this.normalizePhraseSort(filters?.sort);
+    const baseQb = this.buildPhrasebookQuery(clientId, filters);
+    const total = await baseQb.clone().getCount();
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : 1;
+    const page = Math.min(requestedPage, totalPages);
+    const offset = (page - 1) * pageSize;
+
+    const idRows = await this.applyPhraseSort(baseQb.clone(), sort)
+      .select('phrase.id', 'id')
+      .offset(offset)
+      .limit(pageSize)
+      .getRawMany<{ id: number }>();
+
+    const ids = idRows
+      .map((row) => Number(row.id))
+      .filter((value) => Number.isFinite(value));
+
+    let phrases: Phrase[] = [];
+    if (ids.length) {
+      phrases = await this.phraseRepo
+        .createQueryBuilder('phrase')
+        .leftJoinAndSelect('phrase.tokens', 'token')
+        .leftJoinAndSelect('phrase.category', 'category')
+        .leftJoinAndSelect('phrase.group', 'group')
+        .where('phrase.id IN (:...ids)', { ids })
+        .orderBy('token.position', 'ASC')
+        .getMany();
+
+      const order = new Map(ids.map((id, index) => [id, index]));
+      phrases.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+
+    return {
+      items: phrases.map((phrase) => this.toDto(phrase)),
+      page,
+      pageSize,
+      total,
+      totalPages,
+      summary: await this.getPhrasebookSummary(clientId, filters),
+    };
+  }
+
+  private buildPhrasebookQuery(
+    clientId: string,
+    filters?: {
+      search?: string;
+      filter?: string;
+      categoryId?: number;
+      groupId?: number;
+    },
+  ) {
     const qb = this.phraseRepo
       .createQueryBuilder('phrase')
-      .leftJoinAndSelect('phrase.tokens', 'token')
-      .leftJoinAndSelect('phrase.category', 'category')
-      .leftJoinAndSelect('phrase.group', 'group')
-      .where('phrase.clientId = :clientId', { clientId })
-      .orderBy('phrase.id', 'DESC')
-      .addOrderBy('token.position', 'ASC');
+      .where('phrase.clientId = :clientId', { clientId });
 
     if (filters?.categoryId) {
       qb.andWhere('phrase.categoryId = :categoryId', {
         categoryId: filters.categoryId,
       });
     }
+
     if (filters?.groupId) {
       qb.andWhere('phrase.groupId = :groupId', { groupId: filters.groupId });
     }
 
-    const phrases = await qb.getMany();
+    const search = this.normalizeOptionalText(filters?.search, 200);
+    if (search) {
+      qb.andWhere(
+        `(
+          LOWER(phrase.text) LIKE :search
+          OR LOWER(COALESCE(phrase.translation, '')) LIKE :search
+          OR LOWER(COALESCE(phrase.notes, '')) LIKE :search
+        )`,
+        { search: `%${search.toLowerCase()}%` },
+      );
+    }
 
-    return phrases.map((p) => this.toDto(p));
+    const filter = String(filters?.filter || 'all').trim().toLowerCase();
+    if (filter === 'own') {
+      qb.andWhere('LOWER(phrase.source) IN (:...ownSources)', {
+        ownSources: this.ownSources,
+      });
+    } else if (filter === 'course') {
+      qb.andWhere('LOWER(phrase.source) NOT IN (:...ownSources)', {
+        ownSources: this.ownSources,
+      });
+    } else if (filter === 'unannotated') {
+      qb.andWhere(
+        `COALESCE(NULLIF(TRIM(phrase.pronunciation), ''), NULL) IS NULL
+         AND COALESCE(NULLIF(TRIM(phrase.notes), ''), NULL) IS NULL`,
+      );
+    }
+
+    return qb;
+  }
+
+  private normalizePhraseSort(
+    value?: string,
+  ): 'newest' | 'oldest' | 'alphabetical' {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'oldest') return 'oldest';
+    if (normalized === 'alphabetical') return 'alphabetical';
+    return 'newest';
+  }
+
+  private applyPhraseSort(
+    qb: SelectQueryBuilder<Phrase>,
+    sort: 'newest' | 'oldest' | 'alphabetical',
+  ) {
+    if (sort === 'oldest') {
+      return qb.orderBy('phrase.id', 'ASC');
+    }
+    if (sort === 'alphabetical') {
+      return qb.orderBy('phrase.text', 'ASC').addOrderBy('phrase.id', 'DESC');
+    }
+    return qb.orderBy('phrase.id', 'DESC');
+  }
+
+  private async getPhrasebookSummary(
+    clientId: string,
+    filters?: {
+      search?: string;
+      filter?: string;
+      categoryId?: number;
+      groupId?: number;
+    },
+  ): Promise<PhrasebookSummaryDto> {
+    const row = await this.buildPhrasebookQuery(clientId, filters)
+      .select('COUNT(*)', 'total')
+      .addSelect(
+        'SUM(CASE WHEN phrase.inPractice = 1 THEN 1 ELSE 0 END)',
+        'inPractice',
+      )
+      .addSelect(
+        'SUM(CASE WHEN phrase.inFlashcards = 1 THEN 1 ELSE 0 END)',
+        'inFlashcards',
+      )
+      .addSelect(
+        'SUM(CASE WHEN LOWER(phrase.source) IN (:...ownSources) THEN 1 ELSE 0 END)',
+        'own',
+      )
+      .setParameter('ownSources', this.ownSources)
+      .getRawOne<{
+        total: string | number | null;
+        inPractice: string | number | null;
+        inFlashcards: string | number | null;
+        own: string | number | null;
+      }>();
+
+    return {
+      total: Number(row?.total ?? 0),
+      inPractice: Number(row?.inPractice ?? 0),
+      inFlashcards: Number(row?.inFlashcards ?? 0),
+      own: Number(row?.own ?? 0),
+    };
   }
 
   async getPhrase(id: number): Promise<PhrasebookStatementDto> {
