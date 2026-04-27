@@ -177,7 +177,7 @@
   }
 
   async function loadSnapshot(id: string) {
-    const res = await fetch(`/api/proxy/snapshot/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    const res = await apiFetch(`/api/proxy/snapshot/${encodeURIComponent(id)}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(await readError(res, 'Failed to load lexicon snapshot'));
     const data = await res.json();
     snapshot = Array.isArray(data.snapshot) ? data.snapshot : [];
