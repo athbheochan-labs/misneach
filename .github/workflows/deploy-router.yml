@@ -21,29 +21,69 @@ jobs:
     steps:
       - name: Resolve merged PR metadata
         id: plan
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { owner, repo } = context.repo;
             const commitSha = context.sha;
+            const headCommitMessage = String(context.payload.head_commit?.message || "");
 
-            const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner,
-              repo,
-              commit_sha: commitSha,
-            });
+            const parsePrNumber = (value) => {
+              const match =
+                value.match(/Merge pull request #(\d+)/i) ||
+                value.match(/\(#(\d+)\)\s*$/m);
+              if (!match) return null;
+              const parsed = Number(match[1]);
+              return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+            };
 
-            if (!prs.data.length) {
-              core.info("No PR associated with this commit. Skipping deploy routing.");
+            const setSkipOutputs = () => {
+              core.info("No PR metadata resolved for this commit. Skipping deploy routing.");
               core.setOutput("deploy_backend", "false");
               core.setOutput("deploy_frontend", "false");
               core.setOutput("target_env", "staging");
               core.setOutput("merge_sha", commitSha);
               core.setOutput("pr_number", "");
+            };
+
+            let prNumber = parsePrNumber(headCommitMessage);
+            let pr = null;
+
+            if (prNumber) {
+              core.info(`Resolved PR #${prNumber} from head commit message.`);
+              try {
+                const prResponse = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                });
+                pr = prResponse.data;
+              } catch (error) {
+                core.warning(`Failed to load PR #${prNumber} from commit message lookup: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            }
+
+            if (!pr) {
+              try {
+                const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                  owner,
+                  repo,
+                  commit_sha: commitSha,
+                });
+                if (prs.data.length) {
+                  pr = prs.data[0];
+                  prNumber = pr.number;
+                }
+              } catch (error) {
+                core.warning(`Commit-to-PR lookup failed for ${commitSha}: ${error instanceof Error ? error.message : String(error)}`);
+              }
+            }
+
+            if (!pr || !prNumber) {
+              setSkipOutputs();
               return;
             }
 
-            const pr = prs.data[0];
             const labels = (pr.labels || []).map(l => l.name);
 
             const has = (name) => labels.includes(name);
@@ -53,12 +93,12 @@ jobs:
             const deployFrontend = !deployNone && (deployBoth || has("deploy:frontend"));
             const targetEnv = has("env:prod") ? "prod" : "staging";
 
-            core.info(`Routing from PR #${pr.number} labels: ${labels.join(", ")}`);
+            core.info(`Routing from PR #${prNumber} labels: ${labels.join(", ")}`);
             core.setOutput("deploy_backend", String(deployBackend));
             core.setOutput("deploy_frontend", String(deployFrontend));
             core.setOutput("target_env", targetEnv);
             core.setOutput("merge_sha", commitSha);
-            core.setOutput("pr_number", String(pr.number));
+            core.setOutput("pr_number", String(prNumber));
 
   trigger-backend-images:
     needs: resolve-deploy-plan
@@ -66,7 +106,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dispatch backend image publish workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -85,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Emit repository dispatch for frontend pipeline
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const { owner, repo } = context.repo;
