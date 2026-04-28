@@ -14,6 +14,7 @@ import {
   PhraseCategoryDto,
   PhraseGroupDto,
   PhrasebookPageDto,
+  PhrasebookPracticePhraseDto,
   UpdatePhraseDto,
 } from './phrasebook.dto';
 
@@ -43,6 +44,13 @@ export class PhrasebookController {
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });
+  }
+
+  @Get('phrases/practice')
+  getPracticePhrases(
+    @Query('clientId') clientId: string,
+  ): Promise<PhrasebookPracticePhraseDto[]> {
+    return this.service.getPracticePhrases(clientId);
   }
 
   @Get('phrases/:id')

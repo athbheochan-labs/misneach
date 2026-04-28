@@ -97,7 +97,8 @@ export class PracticeService {
   }
 
   private async getPhrases(clientId: string): Promise<PhrasebookPhrase[]> {
-    const url = `${this.phrasebookUrl}/phrases?clientId=${encodeURIComponent(clientId)}`;
+    const params = new URLSearchParams({ clientId });
+    const url = `${this.phrasebookUrl}/phrases/practice?${params.toString()}`;
     let res: Response;
 
     try {
@@ -113,9 +114,9 @@ export class PracticeService {
       );
     }
 
-    const data = (await this.parseResponse(res)) as PhrasebookPhrase[];
+    const phrases = (await this.parseResponse(res)) as PhrasebookPhrase[];
 
-    return data.filter(
+    return phrases.filter(
       (phrase) =>
         typeof phrase?.id === 'number' &&
         typeof phrase?.text === 'string' &&

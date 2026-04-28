@@ -12,6 +12,7 @@ import {
   PhraseCategoryDto,
   PhraseGroupDto,
   PhrasebookPageDto,
+  PhrasebookPracticePhraseDto,
   PhrasebookSummaryDto,
   PhrasebookStatementDto,
   UpdatePhraseDto,
@@ -339,6 +340,31 @@ export class PhrasebookService {
       totalPages,
       summary: await this.getPhrasebookSummary(clientId, filters),
     };
+  }
+
+  async getPracticePhrases(
+    clientId: string,
+  ): Promise<PhrasebookPracticePhraseDto[]> {
+    const phrases = await this.phraseRepo
+      .createQueryBuilder('phrase')
+      .leftJoinAndSelect('phrase.tokens', 'token')
+      .where('phrase.clientId = :clientId', { clientId })
+      .andWhere('phrase.inPractice = 1')
+      .orderBy('phrase.id', 'DESC')
+      .addOrderBy('token.position', 'ASC')
+      .getMany();
+
+    return phrases.map((phrase) => ({
+      id: phrase.id,
+      text: phrase.text,
+      translation: phrase.translation,
+      tokens: phrase.tokens?.map((token) => ({
+        position: token.position,
+        surface: token.surface,
+        lemma: token.lemma,
+        pos: token.pos,
+      })),
+    }));
   }
 
   private buildPhrasebookQuery(
