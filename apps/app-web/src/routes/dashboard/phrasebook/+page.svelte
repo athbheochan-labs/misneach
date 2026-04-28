@@ -1,7 +1,7 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
   import { loadAuthSession } from '$lib/mobile/session-storage';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
 
   type Phrase = {
     id: number | string;
@@ -81,6 +81,7 @@
   let phraseModalOpen = false;
   let editingPhraseId: number | string | null = null;
   let editingSource: string | null = null;
+  let phraseTextInput: HTMLInputElement | null = null;
   let form: PhraseModalForm = {
     text: '',
     translation: '',
@@ -454,6 +455,11 @@
   $: pageStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   $: pageEnd = totalCount === 0 ? 0 : Math.min(currentPage * pageSize, totalCount);
 
+  async function focusPhraseInput() {
+    await tick();
+    phraseTextInput?.focus();
+  }
+
   function openAdd() {
     editingPhraseId = null;
     editingSource = 'own';
@@ -471,6 +477,7 @@
     selectedDeckId = '';
     newDeckName = '';
     phraseModalOpen = true;
+    void focusPhraseInput();
   }
 
   function openEdit(item: Phrase) {
@@ -485,6 +492,7 @@
       groupName: item.groupName || ''
     };
     phraseModalOpen = true;
+    void focusPhraseInput();
   }
 
   function closePhraseModal() {
@@ -980,7 +988,7 @@
 
       <div class="field">
         <label for="phrase-text">Irish phrase</label>
-        <input id="phrase-text" type="text" bind:value={form.text} placeholder="e.g. Ce mhead ata air?" />
+        <input id="phrase-text" type="text" bind:this={phraseTextInput} bind:value={form.text} placeholder="e.g. Ce mhead ata air?" />
       </div>
 
       <div class="field">
