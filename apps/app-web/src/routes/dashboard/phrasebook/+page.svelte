@@ -986,7 +986,10 @@
     tabindex="-1"
     role="button"
   >
-    <div class="modal-sheet">
+    <form class="modal-sheet" onsubmit={(event) => {
+      event.preventDefault();
+      void savePhrase();
+    }}>
       <div class="modal-drag"></div>
       <h2 class="modal-title">{editingPhraseId != null ? 'Edit phrase' : 'Add a phrase'}</h2>
       <p class="modal-sub">{editingPhraseId != null ? 'Update the Irish, translation, pronunciation or notes.' : 'Save a phrase to your phrasebook. You can annotate it and route it to practice or flashcards.'}</p>
@@ -1095,10 +1098,10 @@
 
       <div class="modal-actions">
         {#if editingPhraseId != null}
-          <button class="btn-delete" onclick={deletePhrase}>Delete phrase</button>
+          <button type="button" class="btn-delete" onclick={deletePhrase}>Delete phrase</button>
         {/if}
-        <button class="btn-cancel" onclick={closePhraseModal}>Cancel</button>
-        <button class="btn-confirm" onclick={savePhrase} disabled={savingPhrase}>
+        <button type="button" class="btn-cancel" onclick={closePhraseModal}>Cancel</button>
+        <button type="submit" class="btn-confirm" disabled={savingPhrase}>
           {#if savingPhrase}
             Saving...
           {:else}
@@ -1106,7 +1109,7 @@
           {/if}
         </button>
       </div>
-    </div>
+    </form>
   </div>
 
   <div class={`toast ${toastVisible ? 'show' : ''}`}>
