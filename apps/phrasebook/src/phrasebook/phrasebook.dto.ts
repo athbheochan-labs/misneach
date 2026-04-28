@@ -124,6 +124,13 @@ export class PhrasebookPageDto {
   summary: PhrasebookSummaryDto;
 }
 
+export class PhrasebookPracticePhraseDto {
+  id: number;
+  text: string;
+  translation?: string | null;
+  tokens?: PhraseTokenDto[];
+}
+
 export class PhraseCategoryDto {
   id: number;
   name: string;
