@@ -92,7 +92,7 @@
   };
 
   let routePractice = true;
-  let routeFlashcard = false;
+  let routeFlashcard = true;
   let flashcardDecks: FlashcardDeck[] = [];
   let selectedDeckId = '';
   let newDeckName = '';
@@ -472,12 +472,17 @@
       groupName: ''
     };
     routePractice = true;
-    routeFlashcard = false;
+    routeFlashcard = true;
     flashcardDecks = [];
     selectedDeckId = '';
     newDeckName = '';
     phraseModalOpen = true;
     void focusPhraseInput();
+    void loadFlashcardDeckOptions().catch((err) => {
+      console.error(err);
+      selectedDeckId = '__new__';
+      flashcardDecks = [];
+    });
   }
 
   function openEdit(item: Phrase) {
