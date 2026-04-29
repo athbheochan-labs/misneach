@@ -10,8 +10,6 @@ flowchart LR
   W --> C[Client API Gateway]
   C --> S[Domain Services]
   S --> DB[(MariaDB)]
-  C --> K[(Kafka)]
-  S --> K
   C --> R[(Redis)]
   T[Translator Service] --> N[NLP Service]
   T --> DB
@@ -48,7 +46,6 @@ flowchart TB
   subgraph DataInfra
     mariadb[(mariadb)]
     redis[(redis)]
-    kafka[(kafka)]
   end
 
   web --> apiproxy
@@ -72,16 +69,12 @@ flowchart TB
   translator --> nlp
 
   client --> mariadb
-  client --> kafka
   client --> redis
   lexicon --> mariadb
-  lexicon --> kafka
   phrasebook --> mariadb
   flashcards --> mariadb
-  flashcards --> kafka
   focus --> mariadb
   practice --> mariadb
-  practice --> kafka
   courses --> mariadb
   challenges --> mariadb
   discounts --> mariadb
@@ -96,15 +89,8 @@ flowchart TB
 1. User request hits frontend (`web`, `app-web`, or `admin-web`).
 2. Frontend calls `client` API endpoints.
 3. `client` orchestrates across domain services (`focus`, `practice`, `courses`, `challenges`, `payment`, `business`, `discounts`).
-4. Services persist/query MariaDB, and some services publish/consume Kafka events.
+4. Services persist/query MariaDB and call internal HTTP endpoints where needed.
 5. Response returns through frontend to user.
-
-### Event Flow (Async Path)
-
-1. Producer service emits event to Kafka.
-2. Consumer service group reads and processes event.
-3. Consumer persists resulting state to MariaDB.
-4. Client-facing APIs expose updated state on subsequent reads.
 
 ## Service Catalog
 
@@ -114,14 +100,14 @@ flowchart TB
 | `app-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `admin-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `api-proxy` | `client` | HTTP API ingress | HTTP proxy to `client` | None | TBD |
-| `client` | `mariadb`, `kafka`, domain services | internal HTTP API | HTTP to domain services, Kafka, Redis | MariaDB, Redis | TBD |
-| `translator` | `mariadb`, `kafka`, `nlp` | HTTP API | HTTP to `nlp`, Kafka/DB interactions | MariaDB | TBD |
+| `client` | `mariadb`, domain services | internal HTTP API | HTTP to domain services, Redis | MariaDB, Redis | TBD |
+| `translator` | `mariadb`, `nlp` | HTTP API | HTTP to `nlp` and DB-backed translation persistence | MariaDB | TBD |
 | `nlp` | none | HTTP API | none | None | TBD |
-| `lexicon` | `mariadb`, `kafka` | HTTP/API/consumer | Kafka + DB operations | MariaDB | TBD |
+| `lexicon` | `mariadb` | HTTP API | HTTP to `nlp` + DB operations | MariaDB | TBD |
 | `phrasebook` | `mariadb` | HTTP API | DB operations | MariaDB | TBD |
-| `flashcards` | `mariadb`, `kafka` | HTTP/API/consumer | Kafka + DB operations | MariaDB | TBD |
+| `flashcards` | `mariadb` | HTTP API | HTTP to `lexicon` + DB operations | MariaDB | TBD |
 | `focus` | `mariadb` | HTTP API | DB operations | MariaDB | TBD |
-| `practice` | `mariadb`, `kafka`, `phrasebook` | HTTP API | HTTP to `phrasebook`, Kafka + DB | MariaDB | TBD |
+| `practice` | `mariadb`, `phrasebook` | HTTP API | HTTP to `phrasebook`/`lexicon` + DB | MariaDB | TBD |
 | `courses` | `mariadb` | HTTP API | DB operations | MariaDB | TBD |
 | `challenges` | `mariadb`, `courses` | HTTP API | HTTP to `courses`, DB operations | MariaDB | TBD |
 | `payment` | none | HTTP API | payment integrations | None/External | TBD |
@@ -130,9 +116,6 @@ flowchart TB
 | `waitlist` | `mariadb` | HTTP API | DB operations | MariaDB | TBD |
 | `mariadb` | none | SQL | none | persistent volume | Platform |
 | `redis` | none | Redis protocol | none | persistent volume | Platform |
-| `kafka` | `zookeeper` | Kafka protocol | none | broker log storage | Platform |
-| `kafka-ui` | `kafka` | HTTP UI | Kafka admin client | none | Platform |
-| `zookeeper` | none | coordination | none | local state | Platform |
 
 ## Architecture Contract
 

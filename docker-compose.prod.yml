@@ -41,43 +41,12 @@ services:
       retries: 10
       start_period: 10s
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.9.0
-    restart: unless-stopped
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/zookeeper.env
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: confluentinc/cp-kafka:7.9.0
-    restart: unless-stopped
-    depends_on:
-      - zookeeper
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/kafka.env
-    ports:
-      - "9092:9092"
-      - "9093:9093"
-      - "29092:29092"
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    restart: unless-stopped
-    depends_on:
-      - kafka
-    env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/kafka-ui.env
-    ports:
-      - "9095:8080"
-
   translator:
     <<: *backend-common
     image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-translator:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/apps/translation/translation-connector
     command: ["node", "dist/main"]
     depends_on:
-      - kafka
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/translator.env
@@ -96,7 +65,6 @@ services:
     working_dir: /usr/src/app/apps/lexicon
     command: ["./entrypoint.sh"]
     depends_on:
-      - kafka
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/lexicon.env
@@ -121,7 +89,6 @@ services:
     working_dir: /usr/src/app/apps/flashcards
     command: ["./entrypoint.sh"]
     depends_on:
-      - kafka
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/flashcards.env
@@ -147,7 +114,6 @@ services:
     command: ["./entrypoint.sh"]
     depends_on:
       - mariadb
-      - kafka
       - phrasebook
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/practice.env
@@ -233,7 +199,6 @@ services:
     command: ["node", "dist/main"]
     depends_on:
       - mariadb
-      - kafka
       - flashcards
       - focus
       - practice
