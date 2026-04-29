@@ -32,16 +32,6 @@ class ProcessRequest(BaseModel):
     interaction: InteractionMetadata
 
 
-class ChatDeltaPayload(BaseModel):
-    type: str
-    chatId: int
-    clientId: str
-    botId: int
-    language: str
-    text: str
-    interaction: InteractionMetadata
-
-
 class LexiconImportRequest(BaseModel):
     requestId: str
     clientId: str

@@ -9,20 +9,11 @@ from app.consumers.lexicon import handle_lexicon_import, handle_statement_event
 from app.consumers.translation import handle_translation
 
 from app.database import create_all_tables
-from app.utils.kafka.dispatcher import KafkaConsumerDispatcher
-import app.consumers
 
 
 logger = logging.getLogger("uvicorn")
 
 app = FastAPI(title="NLP Service", version="0.1.0")
-
-dispatcher = KafkaConsumerDispatcher("kafka:9092", "nlp-chat-group")
-ENABLE_KAFKA_CONSUMERS = os.getenv("NLP_ENABLE_KAFKA_CONSUMERS", "false").lower() in (
-    "1",
-    "true",
-    "yes",
-)
 
 
 @app.on_event("startup")
@@ -34,15 +25,6 @@ async def startup_event():
             logger.info("NLP DB tables ensured.")
         except Exception as e:
             logger.exception("Failed to create tables: %s", e)
-
-    if ENABLE_KAFKA_CONSUMERS:
-        await dispatcher.start()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    if ENABLE_KAFKA_CONSUMERS:
-        await dispatcher.stop()
 
 
 @app.get("/health")
