@@ -503,9 +503,11 @@
 :global(html),:global(body){
   font-family:'Instrument Sans',sans-serif;
   background:#111;
-  min-height:100vh;
-  height:100%;
-  overflow:hidden;
+  min-height:100dvh;
+  height:auto;
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
 }
 
 .phone{
