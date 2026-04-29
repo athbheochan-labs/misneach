@@ -3,7 +3,6 @@ import os
 import json
 import urllib.request
 
-from app.utils.kafka.dispatcher import consumes
 from app.schemas import (
     LexiconImportRequest,
     StatementChanges,
@@ -28,7 +27,6 @@ def _post_nlp_complete(payload: dict):
         response.read()
 
 
-@consumes("lexicon.import", validation=LexiconImportRequest)
 async def handle_lexicon_import(req: LexiconImportRequest):
     text = " ".join(req.words)
 
@@ -48,7 +46,6 @@ async def handle_lexicon_import(req: LexiconImportRequest):
     _post_nlp_complete(resp.dict())
 
 
-@consumes("statement.events", validation=StatementEvent)
 async def handle_statement_event(req: StatementEvent):
     # 1️⃣ NLP only cares about text
     resp = process_text(
