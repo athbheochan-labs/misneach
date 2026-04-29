@@ -6,6 +6,7 @@ import {
   Payload,
 } from '@nestjs/microservices';
 import { CefrAssessmentService } from 'src/cefr/cefr.service';
+import { TokeniserService } from 'src/common/tokeniser/tokeniser.service';
 import { LexiconIngestService } from './ingest/lexicon.ingest.service';
 import { NlpCompleteEventDto } from './lexicon.dto';
 import { LexiconQueryService } from './query/lexicon.query.service';
@@ -19,6 +20,7 @@ export class LexiconController {
     private readonly ingestService: LexiconIngestService,
     private readonly queryService: LexiconQueryService,
     private readonly cefrService: CefrAssessmentService,
+    private readonly tokeniserService: TokeniserService,
   ) { }
 
   private normalizeEventPayload(payload: unknown): NlpCompleteEventDto | null {
@@ -186,5 +188,90 @@ export class LexiconController {
 
     await this.ingestService.ingestFromEvent(event);
     return { ok: true };
+  }
+
+  @Post('ingest/statement-event')
+  async ingestStatementEvent(
+    @Body()
+    body: {
+      requestId?: string;
+      statementId?: number | string | null;
+      clientId: string;
+      language?: string;
+      changes?: {
+        text?: string;
+        translation?: string;
+        pronunciation?: string;
+        notes?: string;
+      };
+      interaction?: { type?: string; timestamp?: string | number };
+      type?: 'statement_created' | 'statement_updated';
+      autoTranslate?: boolean;
+      timestamp?: string | number;
+    },
+  ) {
+    const clientId = String(body?.clientId || '').trim();
+    const text = String(body?.changes?.text || '').trim();
+    const language = String(body?.language || 'ga').trim() || 'ga';
+
+    if (!clientId || !text) {
+      throw new BadRequestException('clientId and changes.text are required');
+    }
+
+    const tokenised = await this.tokeniserService.tokenise(text, language);
+    const tokens = tokenised.length
+      ? tokenised.map((token) => ({
+          surface: String(token.token || '').trim(),
+          lemma: String(token.lemma || token.token || '').trim(),
+          pos: String(token.pos || 'unknown').trim() || 'unknown',
+          morph:
+            token.meta && typeof token.meta === 'object'
+              ? token.meta
+              : undefined,
+        }))
+      : text
+          .split(/\s+/)
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .map((surface) => ({
+            surface,
+            lemma: surface,
+            pos: 'unknown',
+          }));
+
+    const rawStatementId =
+      typeof body?.statementId === 'number'
+        ? body.statementId
+        : typeof body?.statementId === 'string' && body.statementId.trim()
+          ? Number(body.statementId)
+          : undefined;
+    const statementId =
+      rawStatementId != null && Number.isFinite(rawStatementId)
+        ? rawStatementId
+        : undefined;
+
+    await this.ingestService.ingestFromEvent({
+      requestId: body?.requestId,
+      statementId,
+      clientId,
+      language,
+      interaction: {
+        type: String(body?.interaction?.type || 'statement_updated'),
+        timestamp: body?.interaction?.timestamp ?? Date.now(),
+      },
+      changes: {
+        translation: body?.changes?.translation,
+        pronunciation: body?.changes?.pronunciation,
+        notes: body?.changes?.notes,
+      },
+      sentences: [
+        {
+          text,
+          tokens,
+        },
+      ],
+    });
+
+    return { ok: true, tokenCount: tokens.length };
   }
 }

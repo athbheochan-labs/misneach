@@ -8,6 +8,8 @@ export const INTERACTION_WEIGHTS: Record<string, number> = {
   course_gloss_lookup: 0.3,
   course_swap_correct: 0.65,
   course_swap_incorrect: -0.2,
+  practice_correct: 0.7,
+  practice_incorrect: -0.25,
   flashcard_guess_correct: 0.8,
   flashcard_guess_incorrect: -0.3,
   default: 0.3,

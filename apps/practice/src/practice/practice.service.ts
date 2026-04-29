@@ -8,7 +8,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { StatementEventProducer } from '@decyphr/messaging';
 import {
   DuePracticeQueryDto,
   PracticeMistakesQueryDto,
@@ -55,13 +54,13 @@ type ResolvedPhrasePair = {
 export class PracticeService {
   private readonly logger = new Logger(PracticeService.name);
   private readonly phrasebookUrl = process.env.PHRASEBOOK_SERVICE_URL || 'http://phrasebook:3011';
+  private readonly lexiconUrl = process.env.LEXICON_SERVICE_URL || 'http://lexicon:3010';
 
   constructor(
     @InjectRepository(PracticeProfile)
     private readonly profileRepo: Repository<PracticeProfile>,
     @InjectRepository(PracticeAttempt)
     private readonly attemptRepo: Repository<PracticeAttempt>,
-    private readonly statementEventProducer: StatementEventProducer,
   ) {}
 
   private nextMidnight(daysFromNow: number): Date {
@@ -98,6 +97,46 @@ export class PracticeService {
     }
 
     throw lastError;
+  }
+
+  private async postLexiconStudyEvent(payload: {
+    clientId: string;
+    language: string;
+    changes: {
+      text: string;
+      translation?: string;
+      notes?: string;
+    };
+    interaction: {
+      type: 'practice_correct' | 'practice_incorrect';
+      timestamp: number;
+    };
+  }) {
+    const response = await this.fetchWithRetry(
+      `${this.lexiconUrl}/ingest/statement-event`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: randomUUID(),
+          clientId: payload.clientId,
+          language: payload.language,
+          changes: payload.changes,
+          interaction: payload.interaction,
+          type: 'statement_updated',
+          autoTranslate: false,
+          timestamp: Date.now(),
+        }),
+      },
+      2,
+    );
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `Lexicon ingest failed (${response.status})${body ? `: ${body}` : ''}`,
+      );
+    }
   }
 
   private async getPhrases(clientId: string): Promise<PhrasebookPhrase[]> {
@@ -949,23 +988,18 @@ export class PracticeService {
     try {
       const lexiconText = resolved?.irish || this.cleanText(phrase.text);
       const lexiconTranslation = resolved?.english || this.cleanText(phrase.translation || '');
-      await this.statementEventProducer.emitStatementEvent({
-        requestId: randomUUID(),
+      await this.postLexiconStudyEvent({
         clientId,
+        language: 'ga',
         changes: {
           text: lexiconText,
           translation: lexiconTranslation || undefined,
+          notes: phrase.notes?.trim() || undefined,
         },
         interaction: {
-          type: gradeResult.isCorrect
-            ? 'flashcard_guess_correct'
-            : 'flashcard_guess_incorrect',
+          type: gradeResult.isCorrect ? 'practice_correct' : 'practice_incorrect',
           timestamp: Date.now(),
         },
-        type: 'statement_updated',
-        autoTranslate: false,
-        timestamp: Date.now(),
-        language: 'ga',
       });
     } catch (error) {
       this.logger.warn(
