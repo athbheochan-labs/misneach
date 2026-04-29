@@ -1,157 +1,176 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import Redis from 'ioredis';
-import { REDIS } from 'src/common/redis.provider';
-import { RedisProfileService } from './profile.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-describe('RedisProfileService', () => {
-  let service: RedisProfileService;
-  let redis: jest.Mocked<Redis>;
+import { User, Word } from 'src/bank/bank.entity';
+import { UserWordStatistics } from 'src/interaction/interaction.entity';
+import { LexiconProfileService } from './profile.service';
+
+function createMockRepo<T>() {
+  return {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+  } as unknown as jest.Mocked<Repository<T>>;
+}
+
+describe('LexiconProfileService', () => {
+  let service: LexiconProfileService;
+  let userRepo: jest.Mocked<Repository<User>>;
+  let wordRepo: jest.Mocked<Repository<Word>>;
+  let statsRepo: jest.Mocked<Repository<UserWordStatistics>>;
 
   beforeEach(async () => {
-    const redisMock: Partial<jest.Mocked<Redis>> = {
-      hset: jest.fn(),
-      zincrby: jest.fn(),
-      zrevrange: jest.fn(),
-      hmget: jest.fn(),
-    };
+    userRepo = createMockRepo<User>();
+    wordRepo = createMockRepo<Word>();
+    statsRepo = createMockRepo<UserWordStatistics>();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        RedisProfileService,
+        LexiconProfileService,
+        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(Word), useValue: wordRepo },
         {
-          provide: REDIS,
-          useValue: redisMock,
+          provide: getRepositoryToken(UserWordStatistics),
+          useValue: statsRepo,
         },
       ],
     }).compile();
 
-    service = module.get(RedisProfileService);
-    redis = module.get(REDIS);
+    service = module.get(LexiconProfileService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  // ---------------- Words ----------------
-
-  describe('setWord', () => {
-    it('stores a word in Redis', async () => {
-      await service.setWord(1, 'hello');
-
-      expect(redis.hset).toHaveBeenCalledWith('lexicon:words', '1', 'hello');
-    });
-
-    it('does not write if wordId is invalid', async () => {
-      await service.setWord(-1, 'hello');
-
-      expect(redis.hset).not.toHaveBeenCalled();
-    });
-
-    it('does not write if word is empty', async () => {
-      await service.setWord(1, '');
-
-      expect(redis.hset).not.toHaveBeenCalled();
-    });
-  });
-
-  // ---------------- Scores ----------------
-
   describe('addOrUpdateUserWordScore', () => {
-    it('increments score for user word', async () => {
-      await service.addOrUpdateUserWordScore('user1', 'en', 42, 1.5);
+    it('increments priority score on an existing stats record', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 1, clientId: 'user1' } as User);
+      wordRepo.findOne.mockResolvedValue({ id: 42, language: 'ga' } as Word);
+      statsRepo.findOne.mockResolvedValue({
+        id: 7,
+        priorityScore: 1.5,
+        user: { id: 1 },
+        word: { id: 42 },
+      } as any);
 
-      expect(redis.zincrby).toHaveBeenCalledWith(
-        'user:user1:priority:en',
-        1.5,
-        '42',
+      await service.addOrUpdateUserWordScore('user1', 'ga', 42, 1.25);
+
+      expect(statsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ priorityScore: 2.75 }),
       );
     });
 
-    it('does not write if inputs are missing', async () => {
-      await service.addOrUpdateUserWordScore('', 'en', 42, 1);
+    it('creates a stats record when one does not exist', async () => {
+      const user = { id: 1, clientId: 'user1' } as User;
+      const word = { id: 42, language: 'ga' } as Word;
+      const created = {
+        user,
+        word,
+        priorityScore: 0,
+        lastSeenAt: null,
+      } as UserWordStatistics;
 
-      expect(redis.zincrby).not.toHaveBeenCalled();
+      userRepo.findOne.mockResolvedValue(user);
+      wordRepo.findOne.mockResolvedValue(word);
+      statsRepo.findOne.mockResolvedValue(null);
+      statsRepo.create.mockReturnValue(created);
+
+      await service.addOrUpdateUserWordScore('user1', 'ga', 42, 0.5);
+
+      expect(statsRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user,
+          word,
+          priorityScore: 0,
+          lastSeenAt: null,
+        }),
+      );
+      expect(statsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ priorityScore: 0.5 }),
+      );
     });
 
     it('does not write if scoreDelta is invalid', async () => {
-      await service.addOrUpdateUserWordScore('user1', 'en', 42, Number.NaN);
-
-      expect(redis.zincrby).not.toHaveBeenCalled();
+      await service.addOrUpdateUserWordScore('user1', 'ga', 42, Number.NaN);
+      expect(statsRepo.save).not.toHaveBeenCalled();
     });
   });
 
   describe('getUserTopWords', () => {
-    it('returns parsed wordId/score pairs', async () => {
-      redis.zrevrange.mockResolvedValue(['10', '2.5', '20', '1.0']);
+    it('returns ranked word snapshots from persistent stats', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 1, clientId: 'user1' } as User);
+      statsRepo.find.mockResolvedValue([
+        { word: { id: 10 }, priorityScore: 2.5 } as any,
+        { word: { id: 20 }, priorityScore: 1.0 } as any,
+      ]);
 
-      const result = await service.getUserTopWords('user1', 'en', 10);
+      const result = await service.getUserTopWords('user1', 'ga', 10);
 
-      expect(redis.zrevrange).toHaveBeenCalledWith(
-        'user:user1:priority:en',
-        0,
-        9,
-        'WITHSCORES',
+      expect(statsRepo.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            user: { id: 1 },
+            word: { language: 'ga' },
+          },
+          order: { priorityScore: 'DESC', id: 'ASC' },
+          take: 10,
+        }),
       );
-
       expect(result).toEqual([
         { wordId: 10, score: 2.5 },
         { wordId: 20, score: 1.0 },
       ]);
     });
-
-    it('returns empty array if no results', async () => {
-      redis.zrevrange.mockResolvedValue([]);
-
-      const result = await service.getUserTopWords('user1', 'en');
-
-      expect(result).toEqual([]);
-    });
   });
 
-  // ---------------- Seen timestamps ----------------
-
   describe('markWordSeen', () => {
-    it('stores seen timestamp', async () => {
-      await service.markWordSeen('user1', 'en', 5);
+    it('stores a last-seen timestamp on the stats record', async () => {
+      const user = { id: 1, clientId: 'user1' } as User;
+      const word = { id: 5, language: 'ga' } as Word;
+      const stats = {
+        id: 2,
+        user,
+        word,
+        priorityScore: 0,
+        lastSeenAt: null,
+      } as UserWordStatistics;
 
-      expect(redis.hset).toHaveBeenCalledWith(
-        'user:user1:seen:en',
-        '5',
-        expect.any(String),
+      userRepo.findOne.mockResolvedValue(user);
+      wordRepo.findOne.mockResolvedValue(word);
+      statsRepo.findOne.mockResolvedValue(stats);
+
+      await service.markWordSeen('user1', 'ga', 5);
+
+      expect(statsRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastSeenAt: expect.any(Date),
+        }),
       );
-    });
-
-    it('does not write on invalid input', async () => {
-      await service.markWordSeen('', 'en', 5);
-
-      expect(redis.hset).not.toHaveBeenCalled();
     });
   });
 
   describe('getUserWordSeen', () => {
-    it('returns a map of seen timestamps', async () => {
-      redis.hmget.mockResolvedValue(['1700000000000', null, '1700000001000']);
+    it('returns a map of persisted timestamps', async () => {
+      userRepo.findOne.mockResolvedValue({ id: 1, clientId: 'user1' } as User);
+      statsRepo.find.mockResolvedValue([
+        {
+          word: { id: 1 },
+          lastSeenAt: new Date('2026-01-01T00:00:00.000Z'),
+        } as any,
+        {
+          word: { id: 3 },
+          lastSeenAt: new Date('2026-01-03T00:00:00.000Z'),
+        } as any,
+      ]);
 
-      const result = await service.getUserWordSeen('user1', 'en', [1, 2, 3]);
+      const result = await service.getUserWordSeen('user1', 'ga', [1, 2, 3]);
 
-      expect(redis.hmget).toHaveBeenCalledWith(
-        'user:user1:seen:en',
-        '1',
-        '2',
-        '3',
-      );
-
-      expect(result.get(1)).toBe(1700000000000);
+      expect(result.get(1)).toBe(new Date('2026-01-01T00:00:00.000Z').getTime());
       expect(result.has(2)).toBe(false);
-      expect(result.get(3)).toBe(1700000001000);
-    });
-
-    it('returns empty map if wordIds is empty', async () => {
-      const result = await service.getUserWordSeen('user1', 'en', []);
-
-      expect(result.size).toBe(0);
-      expect(redis.hmget).not.toHaveBeenCalled();
+      expect(result.get(3)).toBe(new Date('2026-01-03T00:00:00.000Z').getTime());
     });
   });
 });

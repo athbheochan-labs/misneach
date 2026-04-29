@@ -12,7 +12,7 @@ import { Statement, StatementToken } from 'src/statement/statement.entity';
 import { StatementModule } from 'src/statement/statement.module';
 import { LexiconIngestService } from './ingest/lexicon.ingest.service';
 import { LexiconController } from './lexicon.controller';
-import { RedisProfileService } from './profile.service';
+import { LexiconProfileService } from './profile.service';
 import { LexiconQueryService } from './query/lexicon.query.service';
 import { WordScoringService } from './scoring.service';
 
@@ -35,7 +35,7 @@ import { WordScoringService } from './scoring.service';
   providers: [
     LexiconIngestService,
     LexiconQueryService,
-    RedisProfileService,
+    LexiconProfileService,
     InteractionService,
     CefrAssessmentService,
     WordScoringService,
