@@ -26,6 +26,8 @@ type BuiltExercise = {
   exerciseType: ExerciseType;
   prompt: string;
   expectedAnswer: string;
+  hintTranslation?: string;
+  hintContext?: string;
   tokens?: string[];
   maskedIndex?: number;
 };
@@ -35,6 +37,8 @@ type PracticeQueueItem = {
   phraseId: number;
   exerciseType: ExerciseType;
   prompt: string;
+  hintTranslation?: string;
+  hintContext?: string;
   tokens?: string[];
   maskedIndex?: number;
   dueAt: Date;
@@ -367,6 +371,8 @@ export class PracticeService {
       exerciseType,
       prompt: promptTokens.join(' '),
       expectedAnswer: selected.token,
+      hintTranslation: resolved.english,
+      hintContext: this.cleanText(phrase.notes || ''),
       tokens: sorted,
       maskedIndex: selected.index,
     };
@@ -734,6 +740,8 @@ export class PracticeService {
       phraseId: profile.phraseId,
       exerciseType: profile.exerciseType,
       prompt: built.prompt,
+      hintTranslation: built.hintTranslation,
+      hintContext: built.hintContext,
       tokens,
       maskedIndex: built.maskedIndex,
       dueAt: extra?.dueAt ?? profile.dueAt,

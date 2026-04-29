@@ -28,6 +28,8 @@
     phraseId: number;
     exerciseType: ExerciseType;
     prompt: string;
+    hintTranslation?: string;
+    hintContext?: string;
     tokens?: string[];
     maskedIndex?: number;
     dueAt: string;
@@ -52,6 +54,8 @@
   let sentenceChoices: Array<{ id: string; value: string; selectedAt: number | null }> = [];
   let sentenceSelectionCounter = 0;
   let showAnswer = false;
+  let showClozeHint = false;
+  let hintRevealCount = 0;
 
   let feedback: {
     isCorrect: boolean;
@@ -362,6 +366,7 @@
   function resetAnswerState() {
     freeTextAnswer = '';
     showAnswer = false;
+    showClozeHint = false;
     feedback = null;
     feedbackMessage = '';
     sentenceChoices = [];
@@ -618,6 +623,12 @@
     }
   }
 
+  function revealClozeHint() {
+    if (!current || current.exerciseType !== 'cloze' || showClozeHint) return;
+    showClozeHint = true;
+    hintRevealCount += 1;
+  }
+
   async function submitAttempt() {
     if (!current || !canSubmit) return;
     if (!ensureOnline('submit your answer')) return;
@@ -625,6 +636,7 @@
     const body: Record<string, unknown> = {
       exerciseType: current.exerciseType,
       phraseId: current.phraseId,
+      hintsUsed: hintRevealCount,
     };
 
     if (current.exerciseType === 'sentence_builder') {
@@ -970,6 +982,31 @@
                 <div class="input-hint">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                   {feedback ? 'Press Enter or tap Continue' : 'Press Enter or tap Check to submit'}
+                </div>
+              </div>
+            {/if}
+
+            {#if current.exerciseType === 'cloze' && (current.hintTranslation || current.hintContext)}
+              <div class="cloze-hint-wrap">
+                <div class="cloze-hint-card">
+                  {#if current.hintTranslation}
+                    <div class="cloze-hint-row">
+                      <span class="cloze-hint-label">Translation</span>
+                      <span class="cloze-hint-value">{current.hintTranslation}</span>
+                    </div>
+                  {/if}
+                  {#if current.hintContext}
+                    {#if !showClozeHint}
+                      <button class="btn-cloze-hint" type="button" onclick={revealClozeHint}>
+                        Show context
+                      </button>
+                    {:else}
+                      <div class="cloze-hint-row">
+                        <span class="cloze-hint-label">Context</span>
+                        <span class="cloze-hint-value">{current.hintContext}</span>
+                      </div>
+                    {/if}
+                  {/if}
                 </div>
               </div>
             {/if}
@@ -1491,6 +1528,50 @@
     display: flex;
     align-items: center;
     gap: 5px;
+  }
+
+  .cloze-hint-wrap {
+    margin: -2px 0 16px;
+  }
+
+  .btn-cloze-hint {
+    border: 1px solid var(--parchment-dark);
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--forest);
+    border-radius: 999px;
+    padding: 9px 12px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .cloze-hint-card {
+    border: 1px solid var(--parchment-dark);
+    background: rgba(255, 253, 248, 0.96);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .cloze-hint-row {
+    display: grid;
+    gap: 3px;
+  }
+
+  .cloze-hint-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .cloze-hint-value {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #4c5b51;
   }
 
   .feedback-strip {

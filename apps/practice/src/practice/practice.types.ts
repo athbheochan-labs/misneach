@@ -12,5 +12,6 @@ export type PhrasebookPhrase = {
   id: number;
   text: string;
   translation?: string | null;
+  notes?: string | null;
   tokens?: PhraseToken[];
 };
