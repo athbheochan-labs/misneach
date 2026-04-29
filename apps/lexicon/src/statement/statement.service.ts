@@ -1,14 +1,9 @@
 import {
-  Inject,
   Injectable,
   Logger,
-  OnModuleInit,
-  Optional,
 } from '@nestjs/common';
-import { ClientKafka } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
-import { lastValueFrom } from 'rxjs';
 import { Repository } from 'typeorm';
 
 import { Word } from 'src/bank/bank.entity';
@@ -20,7 +15,7 @@ import { Statement, StatementToken } from './statement.entity';
 import { CreateStatementInput } from './statement.types';
 
 @Injectable()
-export class StatementService implements OnModuleInit {
+export class StatementService {
   private readonly logger = new Logger(StatementService.name);
 
   constructor(
@@ -28,20 +23,7 @@ export class StatementService implements OnModuleInit {
     private readonly statementRepository: Repository<Statement>,
     @InjectRepository(StatementToken)
     private readonly tokenRepository: Repository<StatementToken>,
-    @Optional()
-    @Inject('STATEMENT_PRODUCER')
-    private readonly kafkaProducer?: ClientKafka,
   ) { }
-
-  async onModuleInit() {
-    if (!this.kafkaProducer) {
-      this.logger.warn(
-        'STATEMENT_PRODUCER is not configured; statement.updated events will not be emitted.',
-      );
-      return;
-    }
-    await this.kafkaProducer.connect();
-  }
 
   /**
    * Creates or retrieves a statement derived from an ingestion event.
@@ -254,35 +236,5 @@ export class StatementService implements OnModuleInit {
     }
     statement.meaning = translated;
     await this.statementRepository.save(statement);
-
-    this.logger.debug(
-      'TOKENS BEFORE EMIT',
-      JSON.stringify(statement.tokens, null, 2),
-    );
-
-    if (!this.kafkaProducer) {
-      this.logger.warn(
-        `Skipping statement.updated emit for statementId=${statement.id} because STATEMENT_PRODUCER is not configured.`,
-      );
-      return;
-    }
-
-    await lastValueFrom(
-      this.kafkaProducer.emit('statement.updated', {
-        value: JSON.stringify({
-          id: statement.id,
-          requestId: statement.requestId,
-          text: statement.text,
-          meaning: statement.meaning,
-          tokens: statement.tokens.map((token) => ({
-            id: token.id,
-            position: token.position,
-            surface: token.surface,
-            lemma: token.lemma,
-            pos: token.pos,
-          })),
-        }),
-      }),
-    );
   }
 }

@@ -4,8 +4,3 @@ export * from './dto/statement-changes.dto';
 export * from './dto/statement-event.dto';
 export * from './dto/phrasebook-token.dto';
 export * from './dto/phrasebook-tokens.dto';
-export * from './kafka/kafka.module';
-export * from './kafka/kafka.producer';
-export * from './kafka/topics';
-export * from './kafka/translation-producer';
-export * from './kafka/statement-event.producer';
