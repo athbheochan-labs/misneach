@@ -6,7 +6,7 @@ import { User, Word, WordForm } from 'src/bank/bank.entity';
 import { InteractionService } from 'src/interaction/interaction.service';
 import { Statement } from 'src/statement/statement.entity';
 import { StatementService } from 'src/statement/statement.service';
-import { RedisProfileService } from '../profile.service';
+import { LexiconProfileService } from '../profile.service';
 import {
   INTERACTION_WEIGHTS,
   POS_MULTIPLIERS,
@@ -37,7 +37,7 @@ export class LexiconIngestService {
     @InjectRepository(Word) private readonly wordRepository: Repository<Word>,
     @InjectRepository(WordForm)
     private readonly wordFormRepository: Repository<WordForm>,
-    private readonly profile: RedisProfileService,
+    private readonly profile: LexiconProfileService,
     private readonly interactionService: InteractionService,
     private readonly statementService: StatementService,
   ) { }
@@ -319,7 +319,6 @@ export class LexiconIngestService {
    * Applies all non-persistence side effects for ingested words.
    *
    * Side effects include:
-   * - updating Redis lexicon data
    * - updating per-user word scores
    * - marking words as seen
    * - recording interaction events
@@ -347,8 +346,6 @@ export class LexiconIngestService {
     await Promise.all(
       wordForms.map(async (wf) => {
         const word = wf.word;
-
-        await this.profile.setWord(word.id, word.lemma);
 
         const weight = this.computeWeight(word.pos, interaction?.type);
 

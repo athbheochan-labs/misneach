@@ -1,216 +1,193 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import Redis from 'ioredis';
-import { REDIS } from 'src/common/redis.provider';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User, Word } from 'src/bank/bank.entity';
+import { UserWordStatistics } from 'src/interaction/interaction.entity';
+import { In, Repository } from 'typeorm';
 
-/**
- * Service for managing user and word-related data in Redis.
- *
- * This includes storing words, tracking user scores for words,
- * and recording when a user has seen a word. Uses Redis hashes
- * and sorted sets for efficient lookups and scoring.
- */
 @Injectable()
-export class RedisProfileService {
-  private readonly logger = new Logger(RedisProfileService.name);
+export class LexiconProfileService {
+  private readonly logger = new Logger(LexiconProfileService.name);
 
-  private static readonly SLOW_REDIS_MS = 50;
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Word)
+    private readonly wordRepository: Repository<Word>,
+    @InjectRepository(UserWordStatistics)
+    private readonly statsRepository: Repository<UserWordStatistics>,
+  ) { }
 
-  constructor(@Inject(REDIS) private readonly redis: Redis) { }
-
-  /**
-   * Store a word in Redis.
-   *
-   * @param wordId - The ID of the word.
-   * @param word - The word string.
-   */
-  async setWord(wordId: number, word: string) {
-    if (!Number.isInteger(wordId) || wordId <= 0) {
-      this.logger.warn('Invalid wordId passed to setWord', { wordId });
-      return;
-    }
-
-    if (!word) {
-      this.logger.warn('Empty word passed to setWord', { wordId });
-      return;
-    }
-
-    const start = Date.now();
-    await this.redis.hset('lexicon:words', wordId.toString(), word);
-
-    this.logSlow('hset lexicon:words', start, { wordId });
-  }
-
-  /**
-   * Increment or update the score of a word for a specific user in a given language.
-   *
-   * @param userId - The ID of the user.
-   * @param language - The language code (e.g., 'en', 'fr').
-   * @param wordId - The ID of the word.
-   * @param scoreDelta - The amount to increment (or decrement) the score.
-   */
   async addOrUpdateUserWordScore(
-    userId: string,
+    clientId: string,
     language: string,
     wordId: number,
     scoreDelta: number,
   ) {
-    if (!userId || !language) {
+    if (!clientId || !language) {
       this.logger.warn(
-        'Missing userId or language in addOrUpdateUserWordScore',
-        {
-          userId,
-          language,
-          wordId,
-          scoreDelta,
-        },
+        'Missing clientId or language in addOrUpdateUserWordScore',
+        { clientId, language, wordId, scoreDelta },
       );
       return;
     }
 
     if (!Number.isFinite(scoreDelta)) {
       this.logger.warn('Invalid scoreDelta', {
-        userId,
+        clientId,
         language,
         wordId,
         scoreDelta,
       });
       return;
     }
-    const key = `user:${userId}:priority:${language}`;
 
-    const start = Date.now();
-    await this.redis.zincrby(key, scoreDelta, wordId.toString());
+    const stats = await this.getOrCreateStats(clientId, wordId, language);
+    if (!stats) {
+      return;
+    }
 
-    this.logSlow('zincrby priority', start, {
-      key,
-      wordId,
-      scoreDelta,
-    });
+    stats.priorityScore = Number((stats.priorityScore + scoreDelta).toFixed(4));
+    await this.statsRepository.save(stats);
   }
 
-  /**
-   * Retrieve a user's top words for a given language, sorted by score descending.
-   *
-   * @param userId - The ID of the user.
-   * @param language - The language code.
-   * @param limit - Maximum number of words to retrieve (default 1000).
-   * @returns Array of objects containing wordId and score.
-   */
   async getUserTopWords(
-    userId: string,
+    clientId: string,
     language: string,
     limit = 1000,
   ): Promise<{ wordId: number; score: number }[]> {
-    const key = `user:${userId}:priority:${language}`;
-
-    const start = Date.now();
-    const zrange = await this.redis.zrevrange(key, 0, limit - 1, 'WITHSCORES');
-    this.logSlow('zrevrange priority', start, { key, limit });
-
-    if (zrange.length === 0) {
-      this.logger.debug('No priority words found', {
-        userId,
-        language,
-      });
+    const user = await this.userRepository.findOne({ where: { clientId } });
+    if (!user) {
       return [];
     }
 
-    const result: { wordId: number; score: number }[] = [];
+    const stats = await this.statsRepository.find({
+      where: {
+        user: { id: user.id },
+        word: { language },
+      },
+      relations: ['word'],
+      order: { priorityScore: 'DESC', id: 'ASC' },
+      take: limit,
+    });
 
-    for (let i = 0; i < zrange.length; i += 2) {
-      result.push({
-        wordId: Number(zrange[i]),
-        score: Number(zrange[i + 1]),
-      });
-    }
-
-    return result;
+    return stats
+      .filter((stat) => stat.word?.id != null)
+      .map((stat) => ({
+        wordId: stat.word.id,
+        score: stat.priorityScore ?? 0,
+      }));
   }
 
-  /**
-   * Record that a user has seen a word at the current timestamp.
-   *
-   * @param userId - The ID of the user.
-   * @param language - The language code.
-   * @param wordId - The ID of the word.
-   */
-  async markWordSeen(userId: string, language: string, wordId: number) {
-    if (!userId || !language || !Number.isInteger(wordId)) {
+  async markWordSeen(clientId: string, language: string, wordId: number) {
+    if (!clientId || !language || !Number.isInteger(wordId) || wordId <= 0) {
       this.logger.warn('Invalid input to markWordSeen', {
-        userId,
+        clientId,
         language,
         wordId,
       });
       return;
     }
-    const key = `user:${userId}:seen:${language}`;
 
-    const start = Date.now();
-    await this.redis.hset(key, wordId.toString(), Date.now().toString());
-    this.logSlow('hset seen', start, { key, wordId });
+    const stats = await this.getOrCreateStats(clientId, wordId, language);
+    if (!stats) {
+      return;
+    }
+
+    stats.lastSeenAt = new Date();
+    await this.statsRepository.save(stats);
   }
 
-  /**
-   * Retrieve the timestamps when a user last saw a set of words.
-   *
-   * @param userId - The ID of the user.
-   * @param language - The language code.
-   * @param wordIds - Array of word IDs to check.
-   * @returns Map of wordId -> timestamp (in milliseconds).
-   */
   async getUserWordSeen(
-    userId: string,
+    clientId: string,
     language: string,
     wordIds: number[],
   ): Promise<Map<number, number>> {
-    const key = `user:${userId}:seen:${language}`;
-
     if (!wordIds.length) {
       return new Map();
     }
 
-    const start = Date.now();
-    const values = await this.redis.hmget(
-      key,
-      ...wordIds.map((id) => id.toString()),
-    );
-
-    this.logSlow('hmget seen', start, {
-      key,
-      count: wordIds.length,
-    });
-
-    const map = new Map<number, number>();
-
-    wordIds.forEach((id, idx) => {
-      const v = values[idx];
-      if (v) map.set(id, Number(v));
-    });
-
-    if (map.size === 0) {
-      this.logger.debug('No seen timestamps found', {
-        userId,
-        language,
-        requested: wordIds.length,
-      });
+    const user = await this.userRepository.findOne({ where: { clientId } });
+    if (!user) {
+      return new Map();
     }
 
-    return map;
+    const stats = await this.statsRepository.find({
+      where: {
+        user: { id: user.id },
+        word: {
+          id: In(wordIds),
+          language,
+        },
+      },
+      relations: ['word'],
+    });
+
+    const seenMap = new Map<number, number>();
+
+    for (const stat of stats) {
+      if (stat.word?.id != null && stat.lastSeenAt) {
+        seenMap.set(stat.word.id, stat.lastSeenAt.getTime());
+      }
+    }
+
+    return seenMap;
   }
 
-  private logSlow(
-    operation: string,
-    start: number,
-    context: Record<string, unknown>,
-  ): void {
-    const duration = Date.now() - start;
+  private async getOrCreateStats(
+    clientId: string,
+    wordId: number,
+    language: string,
+  ): Promise<UserWordStatistics | null> {
+    if (!Number.isInteger(wordId) || wordId <= 0) {
+      this.logger.warn('Invalid wordId passed to profile service', {
+        clientId,
+        language,
+        wordId,
+      });
+      return null;
+    }
 
-    if (duration > RedisProfileService.SLOW_REDIS_MS) {
-      this.logger.warn('Slow Redis operation', {
-        operation,
-        duration,
-        ...context,
+    const user = await this.getOrCreateUser(clientId);
+    const word = await this.wordRepository.findOne({
+      where: { id: wordId, language },
+    });
+
+    if (!word) {
+      this.logger.warn('Word not found for profile update', {
+        clientId,
+        language,
+        wordId,
+      });
+      return null;
+    }
+
+    let stats = await this.statsRepository.findOne({
+      where: {
+        user: { id: user.id },
+        word: { id: wordId },
+      },
+      relations: ['word'],
+    });
+
+    if (!stats) {
+      stats = this.statsRepository.create({
+        user,
+        word,
+        lastSeenAt: null,
+        priorityScore: 0,
       });
     }
+
+    return stats;
+  }
+
+  private async getOrCreateUser(clientId: string): Promise<User> {
+    let user = await this.userRepository.findOne({ where: { clientId } });
+    if (user) {
+      return user;
+    }
+
+    user = this.userRepository.create({ clientId });
+    return this.userRepository.save(user);
   }
 }

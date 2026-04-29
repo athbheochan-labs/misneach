@@ -4,7 +4,6 @@ import { In, Repository } from 'typeorm';
 
 import { User, Word } from 'src/bank/bank.entity';
 import { UserWordStatistics } from 'src/interaction/interaction.entity';
-import { RedisProfileService } from '../profile.service';
 import { WordScoringService } from '../scoring.service';
 import { WordSnapshot } from './lexicon.query.types';
 
@@ -13,7 +12,6 @@ export class LexiconQueryService {
   private readonly logger = new Logger(LexiconQueryService.name);
 
   constructor(
-    private readonly profile: RedisProfileService,
     private readonly scoringService: WordScoringService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -71,16 +69,7 @@ export class LexiconQueryService {
     const wordMap = new Map(wordEntities.map((w) => [w.id, w]));
 
     // ---------------------------------------------------------------------
-    // 4. Seen timestamps (Redis)
-    // ---------------------------------------------------------------------
-    const seenMap = await this.profile.getUserWordSeen(
-      user.clientId,
-      language,
-      wordIds,
-    );
-
-    // ---------------------------------------------------------------------
-    // 5. Compute decayed scores
+    // 4. Compute decayed scores
     // ---------------------------------------------------------------------
     const snapshots: WordSnapshot[] = [];
     const statsToUpdate: UserWordStatistics[] = [];
@@ -89,7 +78,7 @@ export class LexiconQueryService {
       const word = wordMap.get(wordId);
       if (!word) continue;
 
-      const seenAt = seenMap.get(wordId);
+      const seenAt = stat.lastSeenAt?.getTime();
       const daysSinceSeen = seenAt
         ? (Date.now() - seenAt) / (1000 * 60 * 60 * 24)
         : 365;
@@ -120,19 +109,19 @@ export class LexiconQueryService {
     }
 
     // ---------------------------------------------------------------------
-    // 6. Persist decay updates (optional but explicit)
+    // 5. Persist decay updates (optional but explicit)
     // ---------------------------------------------------------------------
     if (statsToUpdate.length) {
       await this.userWordRepository.save(statsToUpdate);
     }
 
     // ---------------------------------------------------------------------
-    // 7. Sort (stable for pagination)
+    // 6. Sort (stable for pagination)
     // ---------------------------------------------------------------------
     snapshots.sort((a, b) => b.stats.score - a.stats.score);
 
     // ---------------------------------------------------------------------
-    // 8. Safety check (can remove later)
+    // 7. Safety check (can remove later)
     // ---------------------------------------------------------------------
     const ids = snapshots.map((s) => s.id);
     if (new Set(ids).size !== ids.length) {

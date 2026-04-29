@@ -94,6 +94,12 @@ export class UserWordStatistics {
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   lastUpdated: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  lastSeenAt?: Date | null;
+
+  @Column({ type: 'float', default: 0 })
+  priorityScore: number;
+
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 0.0 })
   score: number;
 }
