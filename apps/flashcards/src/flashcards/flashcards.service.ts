@@ -6,7 +6,6 @@ import { randomUUID } from 'crypto';
 import {
   KafkaProducer,
   KafkaTopics,
-  StatementEventProducer,
 } from '@decyphr/messaging';
 
 import {
@@ -28,6 +27,7 @@ type FlashcardGrade = 'again' | 'hard' | 'good' | 'easy';
 @Injectable()
 export class FlashcardsService {
   private readonly logger = new Logger(FlashcardsService.name);
+  private readonly lexiconUrl = process.env.LEXICON_SERVICE_URL || 'http://lexicon:3010';
 
   constructor(
     @InjectRepository(FlashcardPack)
@@ -37,7 +37,6 @@ export class FlashcardsService {
     @InjectRepository(FlashcardAttempt)
     private readonly attemptRepo: Repository<FlashcardAttempt>,
     private readonly kafkaProducer: KafkaProducer,
-    private readonly statementEventProducer: StatementEventProducer,
   ) {}
 
   private clamp(value: number, min: number, max: number) {
@@ -137,24 +136,35 @@ export class FlashcardsService {
       ? 'flashcard_guess_correct'
       : 'flashcard_guess_incorrect';
 
-    await this.statementEventProducer.emitStatementEvent({
-      requestId: randomUUID(),
-      clientId,
-      changes: {
-        text: card.front,
-        translation: card.back,
-        pronunciation: card.pronunciation ?? undefined,
-        notes: card.notes ?? undefined,
-      },
-      interaction: {
-        type: interactionType,
+    const response = await fetch(`${this.lexiconUrl}/ingest/statement-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestId: randomUUID(),
+        clientId,
+        changes: {
+          text: card.front,
+          translation: card.back,
+          pronunciation: card.pronunciation ?? undefined,
+          notes: card.notes ?? undefined,
+        },
+        interaction: {
+          type: interactionType,
+          timestamp: Date.now(),
+        },
+        type: 'statement_updated',
+        autoTranslate: false,
         timestamp: Date.now(),
-      },
-      type: 'statement_updated',
-      autoTranslate: false,
-      timestamp: Date.now(),
-      language: card.pack?.language ?? 'ga',
+        language: card.pack?.language ?? 'ga',
+      }),
     });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(
+        `Lexicon ingest failed (${response.status})${body ? `: ${body}` : ''}`,
+      );
+    }
   }
 
   async createPack(clientId: string, dto: CreateFlashcardPackDto) {

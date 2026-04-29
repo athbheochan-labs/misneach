@@ -108,6 +108,7 @@ export class LexiconQueryService {
           score: Number(decayedScore.toFixed(2)),
           rawScore: stat.score,
           lastSeenAt: seenAt ? new Date(seenAt).toISOString() : null,
+          updatedAt: stat.lastUpdated?.toISOString(),
         },
       });
 

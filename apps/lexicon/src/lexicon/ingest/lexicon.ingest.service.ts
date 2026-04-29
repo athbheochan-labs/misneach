@@ -100,7 +100,7 @@ export class LexiconIngestService {
             language: event.language,
             clientId: event.clientId,
             source: event.interaction?.type ?? 'nlp',
-            meaning: event.meaning ?? null,
+            meaning: event.changes?.translation ?? event.meaning ?? null,
             pronunciation: event.changes?.pronunciation ?? null,
             notes: event.changes?.notes ?? null,
             timestamp: new Date(),
@@ -110,6 +110,8 @@ export class LexiconIngestService {
           // update fields like translation, pronunciation, notes
           statement.text = sentence.text;
           statement.meaning = event.changes?.translation ?? statement.meaning;
+          statement.translation =
+            event.changes?.translation ?? statement.translation;
           statement.pronunciation =
             event.changes?.pronunciation ?? statement.pronunciation;
           statement.notes = event.changes?.notes ?? statement.notes;
@@ -123,10 +125,17 @@ export class LexiconIngestService {
           language: event.language,
           clientId: event.clientId,
           source: event.interaction?.type ?? 'nlp',
-          meaning: event.meaning ?? null,
+          meaning: event.changes?.translation ?? event.meaning ?? null,
+          pronunciation: event.changes?.pronunciation ?? null,
+          notes: event.changes?.notes ?? null,
           timestamp: new Date(),
           requestId: event.requestId,
         });
+      }
+
+      if (event.changes?.translation) {
+        statement.translation = event.changes.translation;
+        await this.statementService.save(statement);
       }
 
       statementMap.set(sentence.text, statement);
@@ -412,10 +421,18 @@ export class LexiconIngestService {
   }
 
   private interactionCorrectness(type: string): number | undefined {
-    if (type === 'flashcard_guess_correct' || type === 'course_swap_correct') {
+    if (
+      type === 'flashcard_guess_correct' ||
+      type === 'course_swap_correct' ||
+      type === 'practice_correct'
+    ) {
       return 1;
     }
-    if (type === 'flashcard_guess_incorrect' || type === 'course_swap_incorrect') {
+    if (
+      type === 'flashcard_guess_incorrect' ||
+      type === 'course_swap_incorrect' ||
+      type === 'practice_incorrect'
+    ) {
       return 0;
     }
     return undefined;
