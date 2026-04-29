@@ -358,6 +358,7 @@ export class PhrasebookService {
       id: phrase.id,
       text: phrase.text,
       translation: phrase.translation,
+      notes: phrase.notes,
       tokens: phrase.tokens?.map((token) => ({
         position: token.position,
         surface: token.surface,
