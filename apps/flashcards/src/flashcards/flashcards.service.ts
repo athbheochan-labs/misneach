@@ -4,11 +4,6 @@ import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 
 import {
-  KafkaProducer,
-  KafkaTopics,
-} from '@decyphr/messaging';
-
-import {
   CreateFlashcardDto,
   CreateFlashcardPackDto,
   CreateFlashcardPackWithCardsDto,
@@ -36,7 +31,6 @@ export class FlashcardsService {
     private readonly cardRepo: Repository<Flashcard>,
     @InjectRepository(FlashcardAttempt)
     private readonly attemptRepo: Repository<FlashcardAttempt>,
-    private readonly kafkaProducer: KafkaProducer,
   ) {}
 
   private clamp(value: number, min: number, max: number) {
@@ -110,22 +104,6 @@ export class FlashcardsService {
     };
   }
 
-  private async emitFlashcardsEvent(payload: {
-    type: string;
-    clientId: string;
-    packId?: number;
-    cardId?: number;
-    attemptId?: number;
-    grade?: FlashcardGrade;
-    dueAt?: string;
-    totalDue?: number;
-  }) {
-    await this.kafkaProducer.request(KafkaTopics.FLASHCARDS_EVENTS, {
-      ...payload,
-      timestamp: Date.now(),
-    });
-  }
-
   private async emitLexiconInteractionFromAttempt(
     card: Flashcard,
     clientId: string,
@@ -177,12 +155,6 @@ export class FlashcardsService {
       }),
     );
 
-    await this.emitFlashcardsEvent({
-      type: 'flashcards.pack.created',
-      clientId,
-      packId: pack.id,
-    });
-
     return pack;
   }
 
@@ -203,11 +175,6 @@ export class FlashcardsService {
 
       await this.cardRepo.save(createdCards);
 
-      await this.emitFlashcardsEvent({
-        type: 'flashcards.cards.bulk_created',
-        clientId,
-        packId: pack.id,
-      });
     }
 
     return this.getPack(clientId, pack.id);
@@ -272,13 +239,6 @@ export class FlashcardsService {
         dueAt: this.nextMidnight(dto.dueInDays ?? 0),
       }),
     );
-
-    await this.emitFlashcardsEvent({
-      type: 'flashcards.card.created',
-      clientId,
-      packId,
-      cardId: card.id,
-    });
 
     return card;
   }
@@ -452,17 +412,6 @@ export class FlashcardsService {
 
     await this.emitLexiconInteractionFromAttempt(card, clientId, dto.grade);
 
-    await this.emitFlashcardsEvent({
-      type: 'flashcards.card.attempted',
-      clientId,
-      packId: card.packId,
-      cardId: card.id,
-      attemptId: attempt.id,
-      grade: dto.grade,
-      dueAt: card.dueAt.toISOString(),
-      totalDue,
-    });
-
     return {
       cardId: card.id,
       grade: dto.grade,
@@ -474,19 +423,5 @@ export class FlashcardsService {
       attemptId: attempt.id,
       totalDue,
     };
-  }
-
-  async handleCommand(command: any) {
-    switch (command?.action) {
-      case 'create_pack':
-        return this.createPackWithCards(command.clientId, command.data);
-      case 'create_card':
-        return this.createCard(command.clientId, command.packId, command.data);
-      case 'record_attempt':
-        return this.recordAttempt(command.clientId, command.cardId, command.data);
-      default:
-        this.logger.warn(`Unsupported flashcards command: ${JSON.stringify(command)}`);
-        return;
-    }
   }
 }

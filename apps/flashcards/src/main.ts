@@ -1,7 +1,6 @@
 import { Logger, LogLevel } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 import { AppModule } from './app.module';
 
@@ -16,22 +15,8 @@ async function bootstrap() {
 
   app.useLogger(logLevels);
 
-  const kafkaBroker = configService.get<string>('KAFKA_BROKERS', 'kafka:9092');
-  const kafkaGroupId = configService.get<string>('KAFKA_GROUP_ID', 'flashcards-consumer');
   const port = configService.get<number>('PORT', 3012);
   const host = configService.get<string>('HOST', '0.0.0.0');
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.KAFKA,
-    options: {
-      client: {
-        brokers: [kafkaBroker],
-      },
-      consumer: {
-        groupId: kafkaGroupId,
-      },
-    },
-  });
 
   app.enableCors({
     origin: configService.get<string>('CORS_ORIGIN', '*'),
@@ -43,7 +28,6 @@ async function bootstrap() {
     credentials: configService.get<boolean>('CORS_CREDENTIALS', true),
   });
 
-  await app.startAllMicroservices();
   await app.listen(port, host);
   Logger.log('Flashcards service started', 'Bootstrap');
 }
