@@ -11,10 +11,29 @@ import { afterNavigate, goto } from '$app/navigation';
     if (!browser) return;
     enableAutoPageviews();
 
+    const restoreDocumentScroll = () => {
+      const root = document.documentElement;
+      const body = document.body;
+
+      root.style.overflow = '';
+      root.style.height = '';
+      body.style.overflow = '';
+      body.style.height = '';
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+
+      root.classList.remove('scroll-locked', 'overflow-hidden', 'modal-open');
+      body.classList.remove('scroll-locked', 'overflow-hidden', 'modal-open');
+    };
+
     let removeListener: (() => void) | undefined;
     let removeBackListener: (() => void) | undefined;
     let removeViewportListeners: (() => void) | undefined;
     let removeTelemetry: (() => void) | undefined;
+    let removeScrollRecoveryListeners: (() => void) | undefined;
     let trackTelemetryEvent: (event: string, meta?: Record<string, unknown>) => void = () => undefined;
     let trackTelemetryRoute: (route: string) => void = () => undefined;
     let trackTelemetryError: (event: string, error: unknown, meta?: Record<string, unknown>) => void = () =>
@@ -55,6 +74,23 @@ import { afterNavigate, goto } from '$app/navigation';
     };
 
     const cap = (window as any).Capacitor;
+    const handlePageShow = () => restoreDocumentScroll();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        restoreDocumentScroll();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    removeScrollRecoveryListeners = () => {
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+    restoreDocumentScroll();
+    afterNavigate(() => {
+      restoreDocumentScroll();
+    });
+
     if (!cap?.isNativePlatform?.()) return;
 
     document.documentElement.setAttribute('data-native-mobile', 'true');
@@ -111,6 +147,7 @@ import { afterNavigate, goto } from '$app/navigation';
       removeBackListener?.();
       removeTelemetry?.();
       removeViewportListeners?.();
+      removeScrollRecoveryListeners?.();
       setKeyboardOffset(0);
       document.body.classList.remove('mobile-keyboard-open');
     };
