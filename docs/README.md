@@ -7,6 +7,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [Deployment and Operations](./deployment.md)
 - [Project Management (GitHub)](./project-management.md)
 - [System Architecture](./architecture.md)
+- [Shared Service Contract Audit](./shared-service-contracts.md)
 - [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
 - [Mobile Auth Token Contract](./mobile-auth-token-contract.md)
 - [Mobile Capacitor Bootstrap](./mobile-capacitor-bootstrap.md)
