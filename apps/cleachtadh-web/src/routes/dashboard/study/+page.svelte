@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { apiFetch } from '$lib/api/client';
   import { getAuthMe } from '$lib/api/auth-client';
   import { flip } from 'svelte/animate';
   import { goto } from '$app/navigation';
@@ -8,7 +7,6 @@
   import { MisButton } from '@decyphr/misneach-ui';
   import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
   import {
-    applyLessonProgressFromCatalog,
     endStudySession,
     loadCurrentStudySession,
     loadStudySession,
@@ -19,18 +17,16 @@
     setStepSkipped,
     studyCoordinatorHref,
     studyFlashcardsHref,
-    studyLessonHref,
     studyPracticeHref,
-    type StudyCatalogCourse,
     type StudySession,
     type StudyStep,
   } from '$lib/study-session';
 
-  const STEP_ORDER: StudyStep[] = ['lessons', 'practice', 'flashcards'];
+  const STEP_ORDER: StudyStep[] = ['practice', 'flashcards'];
   const STEP_LABEL: Record<StudyStep, string> = {
-    lessons: 'Lessons',
     practice: 'Practice',
     flashcards: 'Flashcards',
+    lessons: 'Lessons',
   };
 
   let loading = true;
@@ -44,21 +40,18 @@
 
   function stepTarget(step: StudyStep, nextSession: StudySession | null = session) {
     if (!nextSession) return 0;
-    if (step === 'lessons') return nextSession.targets.lessons;
     if (step === 'practice') return nextSession.targets.practice;
     return nextSession.targets.flashcards;
   }
 
   function stepCompleted(step: StudyStep, nextSession: StudySession | null = session) {
     if (!nextSession) return 0;
-    if (step === 'lessons') return nextSession.progress.lessonsCompleted;
     if (step === 'practice') return nextSession.progress.practiceCompleted;
     return nextSession.progress.flashcardsCompleted;
   }
 
   function stepSkipped(step: StudyStep, nextSession: StudySession | null = session) {
     if (!nextSession) return false;
-    if (step === 'lessons') return nextSession.progress.lessonsSkipped;
     if (step === 'practice') return nextSession.progress.practiceSkipped;
     return nextSession.progress.flashcardsSkipped;
   }
@@ -88,19 +81,8 @@
     return step;
   }
 
-  function lessonStepHref(next: StudySession) {
-    const idx = Math.min(
-      next.progress.lessonsCompleted,
-      Math.max(0, next.lessonPlan.lessonSlugs.length - 1),
-    );
-    const lessonSlug = next.lessonPlan.lessonSlugs[idx];
-    if (!lessonSlug || !next.activeCourse) return studyCoordinatorHref(next.id);
-    return studyLessonHref(next, lessonSlug);
-  }
-
   function stepHref(step: StudyStep) {
     if (!session) return '/dashboard';
-    if (step === 'lessons') return lessonStepHref(session);
     if (step === 'practice') return studyPracticeHref(session, studyCoordinatorHref(session.id));
     return studyFlashcardsHref(session, studyCoordinatorHref(session.id));
   }
@@ -163,15 +145,6 @@
 
       session = loaded;
 
-      const catalogRes = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
-      if (catalogRes.ok) {
-        const payload = await catalogRes.json();
-        const courses = (payload?.courses ?? []) as StudyCatalogCourse[];
-        if (session) {
-          applyLessonProgressFromCatalog(session, courses);
-          saveStudySession(session);
-        }
-      }
     } catch (err) {
       error = isLikelyNetworkError(err)
         ? 'You appear to be offline. Reconnect and retry.'
@@ -277,9 +250,7 @@
           {session.status === 'completed' ? 'Completed' : session.status === 'ended' ? 'Ended' : 'Active'}
         </p>
         <h2 class="text-2xl font-bold text-slate-900 mt-1">{session.minutes} minute balanced session</h2>
-        {#if session.activeCourse}
-          <p class="mt-1 text-slate-600">Active course: {session.activeCourse.courseTitle}</p>
-        {/if}
+        <p class="mt-1 text-slate-600">Cleachtadh now guides practice and flashcard review only.</p>
       </div>
 
       {#if visibleSteps(session).length === 0}

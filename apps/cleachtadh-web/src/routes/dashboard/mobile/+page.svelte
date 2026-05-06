@@ -4,39 +4,18 @@
   import { apiFetch } from '$lib/api/client';
   import { getAuthMe, requestLogout } from '$lib/api/auth-client';
   import { clearAuthSession } from '$lib/mobile/session-storage';
-  import { compareLessonsByHierarchy } from '$lib/course-order';
 
-  type Tab = 'learn' | 'practice' | 'phrases' | 'me';
-  let activeTab: Tab = 'learn';
+  type Tab = 'practice' | 'phrases' | 'me';
+  let activeTab: Tab = 'practice';
 
-  let lessonOpen = false;
   let flashOpen = false;
   let flashRevealed = false;
-  let picked: null | boolean = null;
   let loading = true;
 
   let greetingName = 'Aaron';
-  let streakDays = 7;
-  let phrasesLearned = 24;
-  let unitsDone = 2;
-  let progressPct = 40;
-  let progressStrokeOffset = 105;
-  let continueTitle = 'Unit 3 - Taking your order';
-  let continueSub = 'Lesson 2 of 6 - Sizes and alternatives';
-  let continueHref = '/dashboard/courses?view=all';
-
-  let units: Array<{
-    title: string;
-    subtitle: string;
-    status: 'complete' | 'progress' | 'locked';
-    progress: number;
-  }> = [
-    { title: 'Greeting & being greeted', subtitle: '6 lessons - 8 phrases', status: 'complete', progress: 100 },
-    { title: 'Ordering a drink', subtitle: '7 lessons - 10 phrases', status: 'complete', progress: 100 },
-    { title: 'Taking your order', subtitle: '6 lessons - 9 phrases', status: 'progress', progress: 33 },
-    { title: 'Paying & wrapping up', subtitle: '5 lessons - 7 phrases', status: 'locked', progress: 0 },
-    { title: 'Real world challenge', subtitle: 'Full interaction - 24 phrases', status: 'locked', progress: 0 }
-  ];
+  let streakDays = 0;
+  let phrasesLearned = 0;
+  let duePracticeCount = 0;
 
   let dueCards: Array<{ irish: string; english: string; dueLabel: string; dueNow: boolean }> = [
     { irish: 'Dia duit', english: 'Hello', dueLabel: 'Due now', dueNow: true },
@@ -59,20 +38,6 @@
     activeTab = tab;
   }
 
-  function showLesson() {
-    picked = null;
-    lessonOpen = true;
-  }
-
-  function hideLesson() {
-    lessonOpen = false;
-    picked = null;
-  }
-
-  function pickOpt(correct: boolean) {
-    picked = correct;
-  }
-
   function showFlash() {
     flashOpen = true;
     flashRevealed = false;
@@ -90,10 +55,6 @@
     flashRevealed = false;
   }
 
-  async function continueCourse() {
-    await goto(continueHref);
-  }
-
   async function openPracticeSession() {
     await goto('/dashboard/practice');
   }
@@ -102,11 +63,6 @@
     await requestLogout().catch(() => undefined);
     await clearAuthSession().catch(() => undefined);
     await goto('/auth/login');
-  }
-
-  function updateProgressRing() {
-    const pct = Math.max(0, Math.min(100, progressPct));
-    progressStrokeOffset = 175.9 - (175.9 * pct) / 100;
   }
 
   function formatDueLabel(dateRaw: unknown): string {
@@ -134,8 +90,7 @@
     }
 
     try {
-      const [catalogRes, progressRes, flashRes] = await Promise.all([
-        apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' }),
+      const [progressRes, flashRes] = await Promise.all([
         apiFetch('/api/proxy/practice/progress', { cache: 'no-store' }),
         apiFetch('/api/proxy/flashcards/study/due?limit=8', { cache: 'no-store' })
       ]);
@@ -144,6 +99,7 @@
         const payload = await progressRes.json();
         streakDays = Math.max(0, Number(payload?.streakDays || streakDays));
         phrasesLearned = Math.max(0, Number(payload?.totalTrackedPhrases || phrasesLearned));
+        duePracticeCount = Math.max(0, Number(payload?.duePhraseCount || 0));
       }
 
       if (flashRes.ok) {
@@ -157,45 +113,6 @@
           }));
         }
       }
-
-      if (catalogRes.ok) {
-        const payload = await catalogRes.json();
-        const courses = Array.isArray(payload?.courses) ? payload.courses : [];
-        const selected = courses[0];
-        const lessons = Array.isArray(selected?.lessons) ? [...selected.lessons].sort(compareLessonsByHierarchy) : [];
-
-        if (lessons.length > 0) {
-          const completeCount = lessons.filter((lesson: any) => lesson?.progress?.status === 'completed').length;
-          unitsDone = completeCount;
-          progressPct = Math.round((completeCount / lessons.length) * 100);
-          updateProgressRing();
-
-          const currentIdx = lessons.findIndex((lesson: any) => lesson?.progress?.status !== 'completed');
-          const idx = currentIdx >= 0 ? currentIdx : lessons.length - 1;
-          const current = lessons[idx];
-          continueTitle = String(current?.lessonTitle || continueTitle);
-          continueSub = `${String(selected?.courseTitle || 'Course')} - next lesson`;
-          if (selected?.courseSlug && current?.lessonSlug) {
-            continueHref = `/dashboard/courses/${encodeURIComponent(selected.courseSlug)}/${encodeURIComponent(current.lessonSlug)}`;
-          }
-
-          units = lessons.slice(0, 5).map((lesson: any) => {
-            const isDone = lesson?.progress?.status === 'completed';
-            const isCurrent = lesson === current;
-            return {
-              title: String(lesson?.lessonTitle || 'Lesson'),
-              subtitle: `${Math.max(1, Number(lesson?.estimatedMinutes || 4))} min`,
-              status: isDone ? 'complete' : isCurrent ? 'progress' : 'locked',
-              progress: Math.max(0, Math.min(100, Number(lesson?.progress?.progressPercent || 0)))
-            };
-          });
-
-          phraseRows = lessons.slice(0, 7).map((lesson: any) => ({
-            irish: String(lesson?.lessonTitle || 'Lesson'),
-            english: String(selected?.courseTitle || 'Course')
-          }));
-        }
-      }
     } catch {
       // keep fallback values
     } finally {
@@ -204,13 +121,12 @@
   }
 
   onMount(() => {
-    updateProgressRing();
     void loadMobileData();
   });
 </script>
 
 <svelte:head>
-  <title>Misneach -- Mobile App</title>
+  <title>Cleachtadh -- Mobile App</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,400&family=Instrument+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet"
@@ -227,83 +143,17 @@
     </div>
   </div>
 
-  <div class={`screen ${activeTab === 'learn' ? 'active' : ''}`} id="learn-screen">
-    <div class="learn-header">
-      <div style="height:var(--status-h)"></div>
-      <div class="lh-greeting">Dia duit, {greetingName}</div>
-      <div class="lh-name">Lean ar <em>aghaidh.</em></div>
-      <div class="streak-row">
-        <div class="streak-pill">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7ec99a" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          <span class="streak-num">{streakDays}</span>
-          <span class="streak-lbl">day streak</span>
-        </div>
-      </div>
-      <div class="progress-row">
-        <div class="progress-ring-wrap">
-          <svg width="64" height="64" viewBox="0 0 64 64">
-            <circle class="progress-ring-bg" cx="32" cy="32" r="28"/>
-            <circle class="progress-ring-fill" cx="32" cy="32" r="28" stroke-dasharray="175.9" stroke-dashoffset={progressStrokeOffset}/>
-          </svg>
-          <div class="progress-ring-label">
-            <div class="prl-num">{progressPct}%</div>
-            <div class="prl-sub">done</div>
-          </div>
-        </div>
-        <div class="progress-text">
-          <div class="pt-label">Course progress</div>
-          <div class="pt-value">{unitsDone} units complete</div>
-          <div class="pt-label" style="margin-top:6px">Phrases learned</div>
-          <div class="pt-value">{phrasesLearned} phrases</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="continue-card">
-      <div class="cc-eyebrow">Continue</div>
-      <div class="cc-title">{continueTitle}</div>
-      <div class="cc-sub">{continueSub}</div>
-      <div class="cc-progress-bar"><div class="cc-progress-fill"></div></div>
-      <button class="cc-btn" type="button" on:click={continueCourse}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Ar aghaidh -- Continue
-      </button>
-    </div>
-
-    <div class="section-head">
-      <div class="sh-title">All units</div>
-    </div>
-
-    {#each units as unit, i}
-      <div class={`unit-card ${unit.status === 'locked' ? 'locked' : ''} ${unit.status === 'complete' ? 'complete' : ''}`}>
-        <div class="uc-header">
-          <div class="uc-num">{i + 1}</div>
-          <div class="uc-info">
-            <div class="uc-title">{unit.title}</div>
-            <div class="uc-sub">{unit.subtitle}</div>
-          </div>
-          <div class={`uc-badge ${unit.status === 'complete' ? 'done' : unit.status === 'progress' ? 'progress' : 'locked'}`}>
-            {unit.status === 'complete' ? 'Complete' : unit.status === 'progress' ? 'In progress' : 'Locked'}
-          </div>
-        </div>
-        <div class="uc-progress"><div class="uc-progress-fill" style={`width:${unit.progress}%`}></div></div>
-      </div>
-    {/each}
-
-    <div style="height:16px"></div>
-  </div>
-
   <div class={`screen ${activeTab === 'practice' ? 'active' : ''}`} id="practice-screen">
     <div class="practice-warmup">
       <div style="height:var(--status-h)"></div>
       <div class="warmup-eyebrow">Practice session</div>
       <h2 class="warmup-headline">Ready to <em>cleachtadh?</em></h2>
-      <p class="warmup-sub">{dueCards.length} phrases are due for review today. Pick a mode or jump straight in.</p>
+      <p class="warmup-sub">{Math.max(duePracticeCount, dueCards.length)} phrases are due for review today. Pick a mode or jump straight in.</p>
 
       <div class="due-strip">
         <div class="due-pill primary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          {dueCards.length} due today
+          {Math.max(duePracticeCount, dueCards.length)} due today
         </div>
         <div class="due-pill secondary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
@@ -400,10 +250,10 @@
       <div class="me-sub">Early adopter - Joined March 2025</div>
     </div>
 
-    <div class="me-stats">
+      <div class="me-stats">
       <div class="me-stat"><div class="ms-num">{streakDays}</div><div class="ms-lbl">Day streak</div></div>
       <div class="me-stat"><div class="ms-num">{phrasesLearned}</div><div class="ms-lbl">Phrases</div></div>
-      <div class="me-stat"><div class="ms-num">{unitsDone}</div><div class="ms-lbl">Units done</div></div>
+      <div class="me-stat"><div class="ms-num">{Math.max(duePracticeCount, dueCards.length)}</div><div class="ms-lbl">Due now</div></div>
     </div>
 
     <div class="me-section">
@@ -418,27 +268,6 @@
     </div>
 
     <div style="height:16px"></div>
-  </div>
-
-  <div class={`lesson-screen ${lessonOpen ? 'active' : ''}`} id="lesson-screen">
-    <div class="lesson-topbar">
-      <button class="lesson-close" type="button" on:click={hideLesson}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
-      <div class="lesson-prog-track"><div class="lesson-prog-fill"></div></div>
-    </div>
-    <div class="lesson-body">
-      <div class="lesson-step-label">Unit 3 - Lesson 2</div>
-      <div class="lesson-phrase">An bhfuil bainne uait?</div>
-      <div class="lesson-translation">Do you want milk?</div>
-      <div class="lesson-context">The customer has ordered a tea. You need to ask if they want milk. <strong>An bhfuil</strong> is how you ask "is there / do you want" -- it's one of the most useful constructions in the whole course.</div>
-      <div class="lesson-options">
-        <button class={`lesson-opt ${picked === false ? 'wrong' : ''}`} type="button" on:click={() => pickOpt(false)}>Ar mhaith leat bainne?</button>
-        <button class={`lesson-opt ${picked === true ? 'correct' : ''}`} type="button" on:click={() => pickOpt(true)}>An bhfuil bainne uait?</button>
-        <button class={`lesson-opt ${picked === false ? 'wrong' : ''}`} type="button" on:click={() => pickOpt(false)}>Cá mhéad bainne?</button>
-      </div>
-    </div>
-    <div class="lesson-footer"><button class="lesson-continue" type="button" on:click={hideLesson}>Lean ar aghaidh</button></div>
   </div>
 
   <div class={`flash-screen ${flashOpen ? 'active' : ''}`} id="flash-screen">
@@ -463,12 +292,6 @@
   </div>
 
   <div class="bottom-nav">
-    <button class={`nav-item ${activeTab === 'learn' ? 'active' : ''}`} id="nav-learn" type="button" on:click={() => switchTab('learn')}>
-      <div class="nav-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-      </div>
-      <div class="nav-lbl">Learn</div>
-    </button>
     <button class={`nav-item ${activeTab === 'practice' ? 'active' : ''}`} id="nav-practice" type="button" on:click={() => switchTab('practice')}>
       <div class="nav-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>

@@ -419,7 +419,7 @@
       openInfoModal(
         mode === 'lesson' ? 'No practice phrases yet' : 'No recent mistakes',
         mode === 'lesson'
-          ? 'Continue with course material to unlock new phrases, then come back to practice.'
+          ? 'Add or save more phrases, then come back to practice.'
           : 'Great work. You have no recent mistakes to review right now.',
       );
     }
@@ -486,9 +486,9 @@
     startLesson(true).catch(() => undefined);
   }
 
-  function continueWithCourse() {
+  function continueWithPhrasebook() {
     showNoDueChoiceModal = false;
-    goto('/dashboard/courses?view=all');
+    goto('/dashboard/phrasebook');
   }
 
   async function startFlashcardReview() {
@@ -1057,13 +1057,13 @@
 <AppModal
   open={showNoDueChoiceModal}
   title="Daily due complete"
-  description="You've finished today's due phrases. Keep practicing saved phrases, or continue your course to unlock new ones."
+  description="You've finished today's due phrases. Keep practicing saved phrases, or open your phrasebook to add more."
   onclose={() => (showNoDueChoiceModal = false)}
 >
   <div slot="actions" class="modal-actions">
     <button type="button" class="btn-modal-ghost" onclick={() => (showNoDueChoiceModal = false)}>Cancel</button>
     <button type="button" class="btn-modal-soft" onclick={continueWithSavedPhrases}>Practice saved phrases</button>
-    <button type="button" class="btn-modal-primary" onclick={continueWithCourse}>Continue course</button>
+    <button type="button" class="btn-modal-primary" onclick={continueWithPhrasebook}>Open phrasebook</button>
   </div>
 </AppModal>
 

@@ -33,23 +33,10 @@
     };
   } | null;
 
-  type CourseCatalog = {
-    courses?: Array<{
-      summaryProgress?: {
-        completedLessons?: number;
-        totalLessons?: number;
-      };
-      lessons?: Array<{
-        progress?: {
-          lastSeenAt?: string | null;
-        };
-      }>;
-    }>;
-  };
-
   type PracticeProgress = {
     totalCorrect?: number;
     totalAttempts?: number;
+    streakDays?: number;
   } | null;
 
   type FlashcardsHealth = {
@@ -139,42 +126,15 @@
     return new Date(value.getFullYear(), value.getMonth(), value.getDate());
   }
 
-  function estimateStreakFromCatalog(payload: CourseCatalog) {
-    const oneDayMs = 24 * 60 * 60 * 1000;
+  function hydrateActiveDaySetFromStreak(streak: number) {
     const activeDays = new Set<number>();
-
-    const courses = Array.isArray(payload?.courses) ? payload.courses : [];
-    for (const course of courses) {
-      const lessons = Array.isArray(course?.lessons) ? course.lessons : [];
-      for (const lesson of lessons) {
-        const lastSeenAt = lesson?.progress?.lastSeenAt;
-        if (!lastSeenAt) continue;
-        const seen = new Date(lastSeenAt);
-        if (Number.isNaN(seen.getTime())) continue;
-        activeDays.add(startOfLocalDay(seen).getTime());
-      }
-    }
-
-    activeDaySet = activeDays;
-
-    if (activeDays.size === 0) return 0;
-
-    const today = startOfLocalDay(new Date()).getTime();
-    const yesterday = today - oneDayMs;
-    let cursor = today;
-
-    if (!activeDays.has(today)) {
-      if (!activeDays.has(yesterday)) return 0;
-      cursor = yesterday;
-    }
-
-    let streak = 0;
-    while (activeDays.has(cursor)) {
-      streak += 1;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    let cursor = startOfLocalDay(new Date()).getTime();
+    for (let i = 0; i < Math.max(0, streak); i += 1) {
+      activeDays.add(cursor);
       cursor -= oneDayMs;
     }
-
-    return streak;
+    activeDaySet = activeDays;
   }
 
   function weekDots() {
@@ -231,14 +191,14 @@
       {
         id: 'lessons',
         icon: '📖',
-        label: 'Lessons',
+        label: 'Practice sessions',
         current: lessonsCompleted,
         tiers: [
-          { name: 'Complete your first 3 lessons', target: 3 },
-          { name: 'Complete 5 lessons', target: 5 },
-          { name: 'Complete 10 lessons', target: 10 },
-          { name: `Complete all ${Math.max(12, lessonsTotal || 12)} lessons in Unit 1`, target: Math.max(12, lessonsTotal || 12) },
-          { name: 'Complete 20 lessons', target: 20 },
+          { name: 'Complete your first 3 practice sessions', target: 3 },
+          { name: 'Complete 5 practice sessions', target: 5 },
+          { name: 'Complete 10 practice sessions', target: 10 },
+          { name: 'Complete 12 practice sessions', target: Math.max(12, lessonsTotal || 12) },
+          { name: 'Complete 20 practice sessions', target: 20 },
         ],
       },
       {
@@ -353,23 +313,20 @@
     loading = true;
     error = '';
     try {
-      const [goalsRes, summaryRes, catalogRes, practiceRes, flashcardsRes] = await Promise.all([
+      const [goalsRes, summaryRes, practiceRes, flashcardsRes] = await Promise.all([
         apiFetch('/api/proxy/goals', { cache: 'no-store' }),
         apiFetch('/api/proxy/goals/progress/summary', { cache: 'no-store' }),
-        apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' }),
         apiFetch('/api/proxy/practice/progress', { cache: 'no-store' }),
         apiFetch('/api/proxy/flashcards/health?limit=50&lookbackDays=365', { cache: 'no-store' }),
       ]);
 
       if (!goalsRes.ok) throw new Error(await readError(goalsRes, 'Failed to load goals'));
       if (!summaryRes.ok) throw new Error(await readError(summaryRes, 'Failed to load goal summary'));
-      if (!catalogRes.ok) throw new Error(await readError(catalogRes, 'Failed to load course progress'));
       if (!practiceRes.ok) throw new Error(await readError(practiceRes, 'Failed to load practice progress'));
       if (!flashcardsRes.ok) throw new Error(await readError(flashcardsRes, 'Failed to load flashcard progress'));
 
       const goalsPayload = (await goalsRes.json()) as GoalRecord[];
       const summaryPayload = (await summaryRes.json()) as GoalsSummary;
-      const catalogPayload = (await catalogRes.json()) as CourseCatalog;
       const practicePayload = (await practiceRes.json()) as PracticeProgress;
       const flashcardsPayload = (await flashcardsRes.json()) as FlashcardsHealth;
 
@@ -379,17 +336,9 @@
       const activeGoals = goals.filter((goal) => goal.status !== 'archived');
       personalGoals = activeGoals.map(toPersonalGoal);
 
-      const courses = Array.isArray(catalogPayload?.courses) ? catalogPayload.courses : [];
-      const lessonsCompletedFromApi = courses.reduce(
-        (sum, course) => sum + Number(course?.summaryProgress?.completedLessons || 0),
-        0,
-      );
-      lessonsTotal = courses.reduce(
-        (sum, course) => sum + Number(course?.summaryProgress?.totalLessons || 0),
-        0,
-      );
-
-      streakDays = estimateStreakFromCatalog(catalogPayload);
+      const lessonsCompletedFromApi = 0;
+      streakDays = Math.max(0, Number(practicePayload?.streakDays || 0));
+      hydrateActiveDaySetFromStreak(streakDays);
       const mistakesCorrectedFromApi = Math.max(0, Number(practicePayload?.totalCorrect || 0));
       const flashcardsReviewedFromApi = (Array.isArray(flashcardsPayload?.rows) ? flashcardsPayload.rows : []).reduce(
         (sum, row) => sum + Math.max(0, Number(row?.reviewCount || 0)),
