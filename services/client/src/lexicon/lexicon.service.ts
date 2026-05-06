@@ -1,5 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import Redis from 'ioredis';
+import { Injectable, Logger } from '@nestjs/common';
 import { ulid } from 'ulid';
 
 import { AuthService } from 'src/auth/auth.service';
@@ -27,43 +26,74 @@ export class LexiconService {
   private readonly nlpUrl = process.env.NLP_SERVICE_URL || 'http://nlp:8300';
 
   constructor(
-    @Inject('REDIS') private readonly redis: Redis,
     private readonly translationsService: TranslationsService,
     private readonly authService: AuthService,
   ) { }
+
+  private resolveLexiconBaseUrls(): string[] {
+    const configured = (process.env.LEXICON_INTERNAL_URL || '').trim();
+    const configuredList = (process.env.LEXICON_INTERNAL_URLS || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const candidates = [
+      configured,
+      ...configuredList,
+      'http://lexicon:3010',
+      'http://127.0.0.1:3010',
+      'http://localhost:3010',
+    ].filter(Boolean);
+
+    return [...new Set(candidates)];
+  }
 
   /**
    * Get a user's lexicon with words and scores
    */
   async getUserLexicon(clientId: string, lang: string) {
     try {
-      const priorityKey = `user:${clientId}:priority:${lang}`;
+      const baseUrls = this.resolveLexiconBaseUrls();
+      let lastError: Error | null = null;
 
-      const flat = await this.redis.zrange(priorityKey, 0, -1, 'WITHSCORES');
+      for (const baseUrl of baseUrls) {
+        const url = `${baseUrl}/snapshot/${clientId}/${lang}`;
 
-      if (!flat.length) return [];
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            const bodyText = await response.text().catch(() => '');
+            this.logger.warn(
+              `User lexicon upstream returned ${response.status} from ${url}${bodyText ? `: ${bodyText}` : ''}`,
+            );
+            continue;
+          }
 
-      // Convert flat array to array of { id, score }
-      const wordIdsWithScores = [];
-      for (let i = 0; i < flat.length; i += 2) {
-        wordIdsWithScores.push({
-          id: flat[i],
-          score: parseFloat(flat[i + 1]),
-        });
+          const data = await response.json() as {
+            snapshot?: Array<{
+              id: number;
+              word: string;
+              stats?: { score?: number };
+            }>;
+          };
+
+          const snapshot = Array.isArray(data.snapshot) ? data.snapshot : [];
+          return snapshot.map((item) => ({
+            id: item.id,
+            score: Number(item.stats?.score ?? 0),
+            word: item.word ?? null,
+          }));
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          this.logger.warn(`User lexicon upstream request failed for ${url}: ${lastError.message}`);
+        }
       }
 
-      const wordIds = wordIdsWithScores.map((item) => item.id);
+      if (lastError) {
+        this.logger.error(`Failed to fetch user lexicon for ${clientId}`, lastError);
+      }
 
-      // Fetch words from lexicon:words hash
-      const pipeline = this.redis.pipeline();
-      wordIds.forEach((id) => pipeline.hget('lexicon:words', id));
-      const wordResults = await pipeline.exec();
-
-      return wordIdsWithScores.map((item, idx) => ({
-        id: item.id,
-        score: item.score,
-        word: wordResults[idx][1] || null,
-      }));
+      return [];
     } catch (err) {
       this.logger.error(`Failed to fetch lexicon for ${clientId}`, err);
       return [];
