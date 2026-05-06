@@ -33,7 +33,7 @@ Switch Capacitor runtime from hosted URL mode to bundled local web assets once e
 Phase gates:
 
 - Phase 1 -> Phase 2 gate: Mobile token auth contract and backend endpoints are in place; mobile-safe session storage abstraction exists.
-- Phase 2 -> Phase 3 gate: App no longer depends on app-web server routes for mobile-critical flows; parity smoke tests pass for auth, dashboard, courses, practice, and payments.
+- Phase 2 -> Phase 3 gate: App no longer depends on cleachtadh-web server routes for mobile-critical flows; parity smoke tests pass for auth, dashboard, courses, practice, and payments.
 
 ## Alternatives Considered
 

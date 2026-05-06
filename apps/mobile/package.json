@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "web:build:bundled": "npm run build:mobile --workspace app-web",
+    "web:build:bundled": "npm run build:mobile --workspace cleachtadh-web",
     "cap:sync": "npx cap sync",
     "cap:sync:bundled": "npm run web:build:bundled && npx cap sync",
     "cap:add:ios": "npx cap add ios",

@@ -8,8 +8,8 @@ const useHostedWeb = process.env.MOBILE_USE_HOSTED_WEB === 'true' && hostedWebUr
 const config: CapacitorConfig = {
   appId,
   appName,
-  // Phase 2 bundled-assets mode: load local app-web build output.
-  webDir: '../app-web/build',
+  // Phase 2 bundled-assets mode: load local cleachtadh-web build output.
+  webDir: '../cleachtadh-web/build',
   ...(useHostedWeb
     ? {
         // Optional rollback path to hosted-web mode.

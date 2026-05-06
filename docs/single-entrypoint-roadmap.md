@@ -14,11 +14,11 @@ This roadmap defines the migration to a single public backend entrypoint for fro
 Current:
 
 - `web` uses direct service proxies for `business` and `waitlist`.
-- `app-web` and `admin-web` already call `client`.
+- `cleachtadh-web` and `admin-web` already call `client`.
 
 Target:
 
-- `web`, `app-web`, and `admin-web` all call `client`.
+- `web`, `cleachtadh-web`, and `admin-web` all call `client`.
 - `client` owns cross-service orchestration and external-facing API surface.
 
 ## Phased Execution

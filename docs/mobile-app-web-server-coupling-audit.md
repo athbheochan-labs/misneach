@@ -1,4 +1,4 @@
-# Mobile Extraction Audit: app-web Server-Coupled Responsibilities
+# Mobile Extraction Audit: cleachtadh-web Server-Coupled Responsibilities
 
 - Date: 2026-04-08
 - Scope: `apps/web/src/hooks.server.ts`, all `apps/web/src/**/+server.ts`, and `apps/web/src/lib/server/*`
@@ -25,9 +25,9 @@
 
 | File | Current Responsibility | Target Backend Owner |
 | --- | --- | --- |
-| `apps/web/src/lib/server/api.ts` | `nestFetch` helper for server-side calls to upstream `client` API; injects internal auth headers and session-derived identity headers. | `client` gateway/BFF layer (auth context + proxying responsibilities outside app-web runtime) |
-| `apps/web/src/lib/server/auth.ts` | Signs/verifies JWT session cookie claims (`web_session`) using `WEB_SESSION_SECRET`. | `client` auth service (token/session issuance + verification), with app-web reduced to token transport only |
-| `apps/web/src/lib/server/db.ts` | Creates and exports MySQL pool for direct DB access from web runtime. | Platform-owned DB access only from backend services; remove direct DB dependency from app-web |
+| `apps/web/src/lib/server/api.ts` | `nestFetch` helper for server-side calls to upstream `client` API; injects internal auth headers and session-derived identity headers. | `client` gateway/BFF layer (auth context + proxying responsibilities outside cleachtadh-web runtime) |
+| `apps/web/src/lib/server/auth.ts` | Signs/verifies JWT session cookie claims (`web_session`) using `WEB_SESSION_SECRET`. | `client` auth service (token/session issuance + verification), with cleachtadh-web reduced to token transport only |
+| `apps/web/src/lib/server/db.ts` | Creates and exports MySQL pool for direct DB access from web runtime. | Platform-owned DB access only from backend services; remove direct DB dependency from cleachtadh-web |
 | `apps/web/src/lib/server/magic-link.ts` | User lookup/create, table discovery, default language setup, magic-link issuance/verification, and email delivery via Resend; direct DB writes/reads and token hashing. | `client` auth service (or dedicated auth backend) owning magic-link + DB + email workflows |
 | `apps/web/src/lib/server/discounts.ts` | Server-side discount quote client: forwards quote request to `discounts` service with internal auth header support. | `discounts` service + `client` gateway endpoint (web/mobile consume gateway contract only) |
 
@@ -35,7 +35,7 @@
 
 - **Primary target owner:** `client` backend gateway/auth modules
 - **Domain owners:** `waitlist` service, `discounts` service, `surveys` module, `courses` module
-- **Platform boundary:** DB/email operations should remain backend-only, not app-web runtime
+- **Platform boundary:** DB/email operations should remain backend-only, not cleachtadh-web runtime
 
 ## Extraction Notes for Mobile
 

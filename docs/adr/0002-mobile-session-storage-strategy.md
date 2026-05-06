@@ -17,7 +17,7 @@ For Capacitor delivery, this requires an abstraction that:
 
 ## Decision
 
-Use a dedicated mobile session storage abstraction in `app-web`:
+Use a dedicated mobile session storage abstraction in `cleachtadh-web`:
 
 - Primary native target: Capacitor secure storage plugin interface (`SecureStoragePlugin`/`SecureStorage`) backed by Keychain (iOS) and Keystore (Android)
 - Browser/dev fallback: `localStorage` adapter for non-native runtime only
@@ -25,7 +25,7 @@ Use a dedicated mobile session storage abstraction in `app-web`:
 
 Implementation path:
 
-- `apps/app-web/src/lib/mobile/session-storage.ts`
+- `apps/cleachtadh-web/src/lib/mobile/session-storage.ts`
 
 ## Alternatives Considered
 

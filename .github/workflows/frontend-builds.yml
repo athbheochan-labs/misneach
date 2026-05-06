@@ -5,7 +5,7 @@ on:
     paths:
       - '.github/workflows/frontend-builds.yml'
       - 'apps/web/**'
-      - 'apps/app-web/**'
+      - 'apps/cleachtadh-web/**'
       - 'apps/admin-web/**'
       - 'libs/**'
       - 'package.json'
@@ -15,7 +15,7 @@ on:
     paths:
       - '.github/workflows/frontend-builds.yml'
       - 'apps/web/**'
-      - 'apps/app-web/**'
+      - 'apps/cleachtadh-web/**'
       - 'apps/admin-web/**'
       - 'libs/**'
       - 'package.json'
@@ -36,9 +36,9 @@ jobs:
           - app_id: web
             workspace: web
             artifact_path: apps/web/build
-          - app_id: app-web
-            workspace: app-web
-            artifact_path: apps/app-web/build
+          - app_id: cleachtadh-web
+            workspace: cleachtadh-web
+            artifact_path: apps/cleachtadh-web/build
           - app_id: admin-web
             workspace: admin-web
             artifact_path: apps/admin-web/build
