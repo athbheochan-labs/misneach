@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/backend-images-dockerhub.yml'
-      - 'apps/app-web/**'
+      - 'apps/cleachtadh-web/**'
       - 'docker/Dockerfile.backend'
       - 'docker-compose.yml'
       - 'package.json'
@@ -47,7 +47,7 @@ on:
           - business
           - waitlist
           - client
-          - app-web
+          - cleachtadh-web
           - nlp
 
 jobs:
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
-      app_web: ${{ steps.filter.outputs.app_web }}
+      cleachtadh_web: ${{ steps.filter.outputs.cleachtadh_web }}
       nlp: ${{ steps.filter.outputs.nlp }}
     steps:
       - name: Checkout
@@ -86,8 +86,8 @@ jobs:
               - 'apps/discounts/**'
               - 'apps/business/**'
               - 'apps/waitlist/**'
-            app_web:
-              - 'apps/app-web/**'
+            cleachtadh_web:
+              - 'apps/cleachtadh-web/**'
               - 'libs/**'
               - 'package.json'
               - 'package-lock.json'
@@ -208,11 +208,11 @@ jobs:
             ${{ env.IMAGE_NAMESPACE }}/misneach-nlp:${{ github.sha }}
             ${{ env.IMAGE_NAMESPACE }}/misneach-nlp:latest
 
-  publish-app-web:
+  publish-cleachtadh-web:
     needs: detect
     if: |
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'app-web')) ||
-      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.app_web == 'true')
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'cleachtadh-web')) ||
+      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.cleachtadh_web == 'true')
     runs-on: ubuntu-latest
     env:
       IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
@@ -229,12 +229,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push app-web
+      - name: Build and push cleachtadh-web
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: apps/app-web/Dockerfile
+          file: apps/cleachtadh-web/Dockerfile
           push: true
           tags: |
-            ${{ env.IMAGE_NAMESPACE }}/misneach-app-web:${{ github.sha }}
-            ${{ env.IMAGE_NAMESPACE }}/misneach-app-web:latest
+            ${{ env.IMAGE_NAMESPACE }}/misneach-cleachtadh-web:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/misneach-cleachtadh-web:latest

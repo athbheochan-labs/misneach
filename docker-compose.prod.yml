@@ -222,13 +222,13 @@ services:
       retries: 10
       start_period: 20s
 
-  app-web:
+  cleachtadh-web:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-app-web:${IMAGE_TAG:-latest}
+    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-cleachtadh-web:${IMAGE_TAG:-latest}
     depends_on:
       - client
     env_file:
-      - ${ENV_DIR:-/opt/misneach/env}/app-web.env
+      - ${ENV_DIR:-/opt/misneach/env}/cleachtadh-web.env
     ports:
       - "5175:5175"
 

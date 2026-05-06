@@ -63,10 +63,10 @@ adb shell am start -a android.intent.action.VIEW -d "site.misneach.mobile://auth
 
 ## Notes
 
-- Default mode is bundled assets from `apps/app-web/build`.
-- `npm run cap:sync:bundled` rebuilds app-web in mobile static mode, then syncs native projects.
+- Default mode is bundled assets from `apps/cleachtadh-web/build`.
+- `npm run cap:sync:bundled` rebuilds cleachtadh-web in mobile static mode, then syncs native projects.
 - Hosted-web fallback can be enabled by setting `MOBILE_USE_HOSTED_WEB=true` and providing `MOBILE_WEB_URL`.
-- Deep links are handled in `apps/app-web/src/routes/+layout.svelte` using the Capacitor App plugin.
+- Deep links are handled in `apps/cleachtadh-web/src/routes/+layout.svelte` using the Capacitor App plugin.
 
 ## Mobile telemetry (events + crashes)
 

@@ -13,8 +13,8 @@ This runbook configures in-app routing from email/browser links for Android and 
 - Android intent filters in:
   - `apps/mobile/android/app/src/main/AndroidManifest.xml`
 - In-app URL handler in:
-  - `apps/app-web/src/routes/+layout.svelte`
-  - `apps/app-web/src/lib/mobile/deep-links.ts`
+  - `apps/cleachtadh-web/src/routes/+layout.svelte`
+  - `apps/cleachtadh-web/src/lib/mobile/deep-links.ts`
 
 ## Android App Links
 

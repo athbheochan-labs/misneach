@@ -212,17 +212,17 @@ services:
     env_file:
       - ./docker/env/web.env
 
-  app-web:
+  cleachtadh-web:
     build:
       context: .
-      dockerfile: ./apps/app-web/Dockerfile
+      dockerfile: ./apps/cleachtadh-web/Dockerfile
     ports:
       - "5175:5175"
     restart: always
     depends_on:
       - client
     env_file:
-      - ./docker/env/app-web.env
+      - ./docker/env/cleachtadh-web.env
 
   admin-web:
     build:

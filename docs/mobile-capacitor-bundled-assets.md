@@ -4,16 +4,16 @@ This runbook switches mobile delivery to local bundled web assets (Phase 3).
 
 ## What changed
 
-- Capacitor default mode now loads local files from `apps/app-web/build`.
+- Capacitor default mode now loads local files from `apps/cleachtadh-web/build`.
 - `server.url` hosted mode is now an opt-in rollback path.
-- `app-web` has a dedicated mobile build command using static adapter mode.
+- `cleachtadh-web` has a dedicated mobile build command using static adapter mode.
 
 ## Build and sync
 
 From repo root:
 
 ```bash
-npm install --workspace app-web --workspace mobile
+npm install --workspace cleachtadh-web --workspace mobile
 npm run cap:sync:bundled --workspace mobile
 ```
 

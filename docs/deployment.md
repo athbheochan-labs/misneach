@@ -21,9 +21,9 @@ GitHub Actions routes deployment behavior from PR labels:
    - Shared runtime image: `misneach-backend-runtime:<sha>`
    - Service tags: `misneach-<service>:<sha>` and `latest`
    - NLP image independently from `nlp/`
-4. Frontend builds run from `frontend-builds.yml` for `web`, `app-web`, and `admin-web`.
+4. Frontend builds run from `frontend-builds.yml` for `web`, `cleachtadh-web`, and `admin-web`.
 5. `web` production deploy is triggered to Amplify by `web-amplify-deploy.yml`.
-6. `app-web` and `admin-web` continue with container runtime deployment.
+6. `cleachtadh-web` and `admin-web` continue with container runtime deployment.
 
 Relevant workflows:
 

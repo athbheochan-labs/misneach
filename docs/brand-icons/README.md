@@ -14,7 +14,7 @@ Source assets for favicon/app-icon generation live here.
 ## Current usage
 
 - Web favicon is wired to:
-  - `apps/app-web/static/favicon.svg`
+  - `apps/cleachtadh-web/static/favicon.svg`
 
 ## Suggested future exports
 

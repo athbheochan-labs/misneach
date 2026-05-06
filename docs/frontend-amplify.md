@@ -5,7 +5,7 @@ This runbook deploys `apps/web` to AWS Amplify Hosting.
 ## What This Covers
 
 - `apps/web` deploys via Amplify.
-- `app-web` and `admin-web` remain on EC2/container runtime.
+- `cleachtadh-web` and `admin-web` remain on EC2/container runtime.
 
 ## Prerequisites
 
