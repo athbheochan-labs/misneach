@@ -5,7 +5,8 @@
   "workspaces": [
     "apps/*",
     "apps/translation/*",
-    "libs/*"
+    "libs/*",
+    "packages/*"
   ],
   "scripts": {
     "test": "npm run test --workspaces",
