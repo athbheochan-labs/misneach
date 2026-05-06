@@ -6,7 +6,7 @@ RUN npm install
 COPY apps/misneach-web ./
 COPY libs/misneach-ui /app/libs/misneach-ui
 COPY content /app/content
-COPY apps/courses/src/content /app/apps/courses/src/content
+COPY services/courses/src/content /app/services/courses/src/content
 
 RUN npm run build
 

@@ -29,7 +29,7 @@ services:
 
   translator:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/translation/translation-connector
+    working_dir: /usr/src/app/services/translation/translation-connector
     command: ["node", "dist/main"]
     ports:
       - "3009:3009"
@@ -37,7 +37,7 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/translation/translation-connector/.env
+      - ./services/translation/translation-connector/.env
 
   nlp:
     build:
@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
   lexicon:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/lexicon
+    working_dir: /usr/src/app/services/lexicon
     command: ["./entrypoint.sh"]
     ports:
       - "3010:3010"
@@ -56,10 +56,10 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/lexicon/.env
+      - ./services/lexicon/.env
   phrasebook:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/phrasebook
+    working_dir: /usr/src/app/services/phrasebook
     command: ["./entrypoint.sh"]
     ports:
       - "3011:3011"
@@ -67,11 +67,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/phrasebook/.env
+      - ./services/phrasebook/.env
 
   flashcards:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/flashcards
+    working_dir: /usr/src/app/services/flashcards
     command: ["./entrypoint.sh"]
     ports:
       - "3012:3012"
@@ -79,11 +79,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/flashcards/.env
+      - ./services/flashcards/.env
 
   focus:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/focus
+    working_dir: /usr/src/app/services/focus
     command: ["node", "dist/main"]
     expose:
       - "3013"
@@ -91,11 +91,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/focus/.env
+      - ./services/focus/.env
 
   practice:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/practice
+    working_dir: /usr/src/app/services/practice
     command: ["./entrypoint.sh"]
     expose:
       - "3014"
@@ -104,11 +104,11 @@ services:
       - mariadb
       - phrasebook
     env_file:
-      - ./apps/practice/.env
+      - ./services/practice/.env
 
   courses:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/courses
+    working_dir: /usr/src/app/services/courses
     command: ["./entrypoint.sh"]
     expose:
       - "3015"
@@ -116,11 +116,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/courses/.env
+      - ./services/courses/.env
 
   challenges:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/challenges
+    working_dir: /usr/src/app/services/challenges
     command: ["node", "dist/main"]
     expose:
       - "3016"
@@ -129,21 +129,21 @@ services:
       - mariadb
       - courses
     env_file:
-      - ./apps/challenges/.env
+      - ./services/challenges/.env
 
   payment:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/payment
+    working_dir: /usr/src/app/services/payment
     command: ["node", "dist/main"]
     expose:
       - "3017"
     restart: always
     env_file:
-      - ./apps/payment/.env
+      - ./services/payment/.env
 
   discounts:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/discounts
+    working_dir: /usr/src/app/services/discounts
     command: ["node", "dist/main"]
     expose:
       - "3020"
@@ -151,11 +151,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/discounts/.env
+      - ./services/discounts/.env
 
   business:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/business
+    working_dir: /usr/src/app/services/business
     command: ["node", "dist/main"]
     expose:
       - "3018"
@@ -164,11 +164,11 @@ services:
       - payment
       - discounts
     env_file:
-      - ./apps/business/.env
+      - ./services/business/.env
 
   waitlist:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/waitlist
+    working_dir: /usr/src/app/services/waitlist
     command: ["node", "dist/main"]
     expose:
       - "3021"
@@ -176,11 +176,11 @@ services:
     depends_on:
       - mariadb
     env_file:
-      - ./apps/waitlist/.env
+      - ./services/waitlist/.env
 
   client:
     <<: *backend-service
-    working_dir: /usr/src/app/apps/client
+    working_dir: /usr/src/app/services/client
     command: ["node", "dist/main"]
     ports:
       - "8000:8000"
@@ -196,7 +196,7 @@ services:
       - business
       - discounts
     env_file:
-      - ./apps/client/.env
+      - ./services/client/.env
       - ./docker/env/client.env
 
   web:

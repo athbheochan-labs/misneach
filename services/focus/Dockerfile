@@ -3,10 +3,10 @@ WORKDIR /usr/src/app
 
 COPY package*.json ./
 COPY tsconfig.base.json ./
-COPY apps/focus/package.json apps/focus/
+COPY services/focus/package.json services/focus/
 RUN npm ci --workspace focus --include-workspace-root
 
-COPY apps/focus apps/focus
+COPY services/focus services/focus
 
 RUN npm run build --workspace focus
 RUN npm prune --omit=dev --workspaces --include-workspace-root
@@ -17,8 +17,8 @@ ENV NODE_ENV=production
 
 COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/apps/focus/package.json ./apps/focus/package.json
-COPY --from=build /usr/src/app/apps/focus/dist ./apps/focus/dist
+COPY --from=build /usr/src/app/services/focus/package.json ./services/focus/package.json
+COPY --from=build /usr/src/app/services/focus/dist ./services/focus/dist
 
-WORKDIR /usr/src/app/apps/focus
+WORKDIR /usr/src/app/services/focus
 CMD ["node", "dist/main"]

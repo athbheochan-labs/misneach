@@ -1,4 +1,4 @@
-# Lexicon (apps/lexicon)
+# Lexicon (services/lexicon)
 
 A NestJS application in the decyphr monorepo that implements the **lexicon domain**.
 
@@ -192,7 +192,7 @@ Other configuration may exist in individual modules.
 
 ## Project layout
 
-apps/lexicon/
+services/lexicon/
 ├── Dockerfile
 ├── package.json
 ├── src/
