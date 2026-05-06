@@ -10,7 +10,7 @@ const allowedHosts = new Set([
 export function toInAppPath(rawUrl: string): string | null {
   try {
     const url = new URL(rawUrl);
-    const isCustomScheme = url.protocol === 'site.misneach.mobile:';
+    const isCustomScheme = url.protocol === 'ie.misneach.cleachtadh:';
     const isAllowedHttpHost =
       (url.protocol === 'https:' || url.protocol === 'http:') &&
       allowedHosts.has(url.hostname);
@@ -20,8 +20,8 @@ export function toInAppPath(rawUrl: string): string | null {
     let pathname = url.pathname || '/';
 
     // Android may deliver custom-scheme links as:
-    // - site.misneach.mobile:/auth/verify-request?...
-    // - site.misneach.mobile://auth/verify-request?...
+    // - ie.misneach.cleachtadh:/auth/verify-request?...
+    // - ie.misneach.cleachtadh://auth/verify-request?...
     // In the second form, "auth" is parsed as hostname and must be reattached.
     if (isCustomScheme && url.hostname) {
       const hostPart = url.hostname.startsWith('/') ? url.hostname : `/${url.hostname}`;

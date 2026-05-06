@@ -1,6 +1,6 @@
 # Mobile Capacitor Bootstrap
 
-This runbook bootstraps `apps/mobile` as the Phase 1 hosted-web Capacitor container.
+This runbook bootstraps `apps/cleachtadh-mobile` as the Phase 1 hosted-web Capacitor container.
 
 > Superseded for current delivery by `docs/mobile-capacitor-bundled-assets.md` (Phase 3 local assets).
 
@@ -11,15 +11,15 @@ This runbook bootstraps `apps/mobile` as the Phase 1 hosted-web Capacitor contai
 
 ## Workspace
 
-- Path: `apps/mobile`
-- Config: `apps/mobile/capacitor.config.ts`
+- Path: `apps/cleachtadh-mobile`
+- Config: `apps/cleachtadh-mobile/capacitor.config.ts`
 
 ## Environment
 
-Create `apps/mobile/.env` from `.env.example`:
+Create `apps/cleachtadh-mobile/.env` from `.env.example`:
 
 ```bash
-cp apps/mobile/.env.example apps/mobile/.env
+cp apps/cleachtadh-mobile/.env.example apps/cleachtadh-mobile/.env
 ```
 
 Key values:
@@ -33,10 +33,10 @@ Key values:
 From repo root:
 
 ```bash
-npm install --workspace mobile
+npm install --workspace cleachtadh-mobile
 ```
 
-From `apps/mobile`:
+From `apps/cleachtadh-mobile`:
 
 ```bash
 npm run cap:add:ios

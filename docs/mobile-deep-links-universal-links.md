@@ -11,7 +11,7 @@ This runbook configures in-app routing from email/browser links for Android and 
 ## Implemented in code
 
 - Android intent filters in:
-  - `apps/mobile/android/app/src/main/AndroidManifest.xml`
+  - `apps/cleachtadh-mobile/android/app/src/main/AndroidManifest.xml`
 - In-app URL handler in:
   - `apps/cleachtadh-web/src/routes/+layout.svelte`
   - `apps/cleachtadh-web/src/lib/mobile/deep-links.ts`
@@ -30,7 +30,7 @@ This runbook configures in-app routing from email/browser links for Android and 
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "site.misneach.mobile",
+      "package_name": "ie.misneach.cleachtadh",
       "sha256_cert_fingerprints": ["<RELEASE_CERT_SHA256>"]
     }
   }
@@ -56,7 +56,7 @@ adb shell am start -a android.intent.action.VIEW -d "https://www.misneach.site/a
   "applinks": {
     "details": [
       {
-        "appIDs": ["<APPLE_TEAM_ID>.site.misneach.mobile"],
+        "appIDs": ["<APPLE_TEAM_ID>.ie.misneach.cleachtadh"],
         "components": [{ "/": "/auth/*" }, { "/": "/dashboard/*" }]
       }
     ]
@@ -70,10 +70,10 @@ adb shell am start -a android.intent.action.VIEW -d "https://www.misneach.site/a
 
 ## Custom scheme fallback
 
-Custom scheme is `site.misneach.mobile://...` and is handled by the same app URL listener.
+Custom scheme is `ie.misneach.cleachtadh://...` and is handled by the same app URL listener.
 
 Android test:
 
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "site.misneach.mobile://auth/verify-request?token=test&email=test@example.com"
+adb shell am start -a android.intent.action.VIEW -d "ie.misneach.cleachtadh://auth/verify-request?token=test&email=test@example.com"
 ```
