@@ -3,10 +3,10 @@ WORKDIR /usr/src/app
 
 COPY package*.json ./
 COPY tsconfig.base.json ./
-COPY apps/challenges/package.json apps/challenges/
+COPY services/challenges/package.json services/challenges/
 RUN npm ci --workspace challenges --include-workspace-root
 
-COPY apps/challenges apps/challenges
+COPY services/challenges services/challenges
 
 RUN npm run build --workspace challenges
 RUN npm prune --omit=dev --workspaces --include-workspace-root
@@ -17,8 +17,8 @@ ENV NODE_ENV=production
 
 COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/apps/challenges/package.json ./apps/challenges/package.json
-COPY --from=build /usr/src/app/apps/challenges/dist ./apps/challenges/dist
+COPY --from=build /usr/src/app/services/challenges/package.json ./services/challenges/package.json
+COPY --from=build /usr/src/app/services/challenges/dist ./services/challenges/dist
 
-WORKDIR /usr/src/app/apps/challenges
+WORKDIR /usr/src/app/services/challenges
 CMD ["node", "dist/main"]

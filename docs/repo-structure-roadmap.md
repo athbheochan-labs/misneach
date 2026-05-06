@@ -1,6 +1,6 @@
 # Repo Structure Roadmap
 
-This note defines the target top-level repository layout after the product split, identifies which current entries under `apps/` should move to `services/`, and captures the migration risks and sequencing.
+This note documents the top-level repository structure after separating frontend applications from backend runtime services, captures the migration intent that drove the split, and records the remaining follow-up work.
 
 ## Goal
 
@@ -11,34 +11,38 @@ Make deployable product surfaces and backend runtimes visibly distinct at the to
 - `packages/` -> shared reusable code
 - `docs/` -> documentation
 
-This is a planning document only. It does not move code.
+The `apps/` -> `services/` migration is now complete for the workspace-backed backend runtimes covered by `#188`.
 
 ## Current Top-Level Inventory
 
-Current entries under `apps/`:
+Frontend and user-facing applications under `apps/`:
 
-- Frontend/product apps:
-  - `admin-web`
-  - `cleachtadh-mobile`
-  - `cleachtadh-web`
-  - `misneach-mobile`
-  - `misneach-web`
-  - `misneach-irish-week` (`apps/irish-week`)
-- Backend/runtime services:
-  - `business`
-  - `challenges`
-  - `client`
-  - `courses`
-  - `discounts`
-  - `flashcards`
-  - `focus`
-  - `lexicon`
-  - `payment`
-  - `phrasebook`
-  - `practice`
-  - `waitlist`
-- Special case:
-  - `translation-connector` under `apps/translation/translation-connector`
+- `admin-web`
+- `cleachtadh-mobile`
+- `cleachtadh-web`
+- `irish-week`
+- `misneach-mobile`
+- `misneach-web`
+
+Backend/runtime services under `services/`:
+
+- `business`
+- `challenges`
+- `client`
+- `courses`
+- `discounts`
+- `flashcards`
+- `focus`
+- `lexicon`
+- `payment`
+- `phrasebook`
+- `practice`
+- `translation/translation-connector`
+- `waitlist`
+
+Separate top-level runtime still outside `services/`:
+
+- `nlp/`
 
 ## Target Structure
 
@@ -47,9 +51,9 @@ apps/
   admin-web/
   cleachtadh-mobile/
   cleachtadh-web/
+  irish-week/
   misneach-mobile/
   misneach-web/
-  irish-week/
 
 services/
   business/
@@ -63,55 +67,46 @@ services/
   payment/
   phrasebook/
   practice/
-  waitlist/
   translation/
     translation-connector/
+  waitlist/
+  nlp/                    # follow-up move, not yet completed
 
 packages/
-  auth/
   analytics/
+  auth/
   email/
   ui/
 ```
 
-## Proposed Current-to-Target Mapping
+## Current-to-Target Mapping
 
-| Current Path | Current Role | Target Path | Notes |
-| --- | --- | --- | --- |
-| `apps/misneach-web` | frontend app | `apps/misneach-web` | no move |
-| `apps/cleachtadh-web` | frontend app | `apps/cleachtadh-web` | no move |
-| `apps/admin-web` | frontend app | `apps/admin-web` | no move |
-| `apps/cleachtadh-mobile` | frontend app | `apps/cleachtadh-mobile` | no move |
-| `apps/misneach-mobile` | frontend app | `apps/misneach-mobile` | no move |
-| `apps/irish-week` | frontend/microsite | `apps/irish-week` | rename optional; path can stay if brand-specific |
-| `apps/client` | backend gateway | `services/client` | highest-priority backend move |
-| `apps/business` | backend service | `services/business` | move with compose/workflow updates |
-| `apps/challenges` | backend service | `services/challenges` | move with compose/workflow updates |
-| `apps/courses` | backend service | `services/courses` | move with compose/workflow updates |
-| `apps/discounts` | backend service | `services/discounts` | move with compose/workflow updates |
-| `apps/flashcards` | backend service | `services/flashcards` | move with compose/workflow updates |
-| `apps/focus` | backend service | `services/focus` | move with compose/workflow updates |
-| `apps/lexicon` | backend service | `services/lexicon` | move with compose/workflow updates |
-| `apps/payment` | backend service | `services/payment` | move with compose/workflow updates |
-| `apps/phrasebook` | backend service | `services/phrasebook` | move with compose/workflow updates |
-| `apps/practice` | backend service | `services/practice` | move with compose/workflow updates |
-| `apps/waitlist` | backend service | `services/waitlist` | move with compose/workflow updates |
-| `apps/translation/translation-connector` | integration service/tooling | `services/translation/translation-connector` | decide if it remains a workspace package or becomes a service-only utility |
+| Current Path | Current Role | Target Path | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `apps/misneach-web` | frontend app | `apps/misneach-web` | current | no move |
+| `apps/cleachtadh-web` | frontend app | `apps/cleachtadh-web` | current | no move |
+| `apps/admin-web` | frontend app | `apps/admin-web` | current | no move |
+| `apps/cleachtadh-mobile` | frontend app | `apps/cleachtadh-mobile` | current | no move |
+| `apps/misneach-mobile` | frontend app | `apps/misneach-mobile` | current | no move |
+| `apps/irish-week` | frontend/microsite | `apps/irish-week` | current | rename optional; path can stay if brand-specific |
+| `apps/client` | backend gateway | `services/client` | completed | moved in `#188` |
+| `apps/business` | backend service | `services/business` | completed | moved in `#188` |
+| `apps/challenges` | backend service | `services/challenges` | completed | moved in `#188` |
+| `apps/courses` | backend service | `services/courses` | completed | moved in `#188` |
+| `apps/discounts` | backend service | `services/discounts` | completed | moved in `#188` |
+| `apps/flashcards` | backend service | `services/flashcards` | completed | moved in `#188` |
+| `apps/focus` | backend service | `services/focus` | completed | moved in `#188` |
+| `apps/lexicon` | backend service | `services/lexicon` | completed | moved in `#188` |
+| `apps/payment` | backend service | `services/payment` | completed | moved in `#188` |
+| `apps/phrasebook` | backend service | `services/phrasebook` | completed | moved in `#188` |
+| `apps/practice` | backend service | `services/practice` | completed | moved in `#188` |
+| `apps/waitlist` | backend service | `services/waitlist` | completed | moved in `#188` |
+| `apps/translation/translation-connector` | integration service/tooling | `services/translation/translation-connector` | completed | still nested |
+| `nlp` | standalone runtime service | `services/nlp` | pending | separate follow-up move |
 
 ## Workspace Strategy
 
-Current root workspaces:
-
-```json
-[
-  "apps/*",
-  "apps/translation/*",
-  "libs/*",
-  "packages/*"
-]
-```
-
-Target workspace strategy:
+Root workspaces now distinguish application and service boundaries explicitly:
 
 ```json
 [
@@ -125,86 +120,74 @@ Target workspace strategy:
 
 Notes:
 
-- Keep `libs/*` in place until there is a separate decision to rename or absorb it.
-- Do not combine `apps/` -> `services/` moves with `libs/` -> `packages/` moves.
-- Update workspace globs only in the branch that performs the mechanical path moves, not in this planning ticket.
+- `libs/*` remains unchanged for now.
+- `packages/*` is reserved for code intentionally shared across products or runtimes.
+- The `translation` subtree remains nested because `translation-connector` is not yet shaped like the other top-level services.
+- `nlp/` is still outside npm workspace management and should be treated as a separate structural follow-up.
 
 ## Tooling and Runtime Impact
 
-The path split affects more than imports. These areas must be updated together in the mechanical migration:
+The path split required coordinated updates in:
 
+- `package.json`
+- `package-lock.json`
 - `docker-compose.yml`
 - `docker-compose.prod.yml`
+- `docker/Dockerfile.backend`
 - `.github/workflows/backend-images-dockerhub.yml`
-- `.github/workflows/pr-metadata-guard.yml`
-- any scripts or docs that refer to `apps/<backend-service>`
-- Docker build contexts and `working_dir` values
-- env file references that point into `apps/<service>`
-- any CI filters keyed on `apps/**`
+- docs and file references that pointed at `apps/<backend-service>`
 
-Frontend-only workflows already correctly target frontend apps and should stay under `apps/`:
+Frontend-only workflows remain correctly scoped to application entries under `apps/`:
 
 - `.github/workflows/frontend-builds.yml`
 - `.github/workflows/web-amplify-deploy.yml`
 
-## Migration Risks
+## Migration Risks That Remain
 
-1. Path churn across Docker and CI
-   - Compose files and Docker build contexts currently point directly at `apps/<service>`.
-   - A partial move will break local boot and production deploys immediately.
+1. Top-level `nlp` inconsistency
+   - `nlp/` is still outside `services/`.
+   - That leaves the top-level structure conceptually inconsistent until it is moved.
 
-2. Workspace resolution drift
-   - Root `package.json` workspace globs will need to change atomically with the service moves.
-   - Lockfile churn should be expected.
+2. Translation subtree ambiguity
+   - `services/translation/translation-connector` does not match the flatter shape of the other runtime services.
+   - It may remain acceptable, but it should be an explicit choice.
 
-3. Hidden scripts and path assumptions
-   - Some scripts, docs, and PR guard rules match literal `apps/<service>` paths.
-   - Missed references will create silent CI blind spots.
+3. Shared-code boundary drift
+   - `libs/` and `packages/` now coexist.
+   - Without a deliberate rule, future code may be placed inconsistently.
 
-4. Large rename noise in git history
-   - Moving many directories at once will make review harder and can obscure accidental code changes.
-   - The implementation branch should be deliberately mechanical.
+4. Rename noise in future review
+   - Any follow-up path moves should stay mechanical and isolated.
+   - Mixing structure work with behavior changes will make regressions harder to see.
 
-5. Translation subtree ambiguity
-   - `apps/translation/translation-connector` is not shaped like the other backend services.
-   - Its target home should be confirmed before the mass move.
+## Acceptance Checklist for the Completed Move
 
-## Recommended Sequencing
-
-1. Finish product-boundary and domain work first
-   - Keep current repo paths stable while Misneach/Cleachtadh traffic and auth contracts settle.
-
-2. Land this planning document
-   - Use it as the source for implementation tickets.
-
-3. Open one mechanical migration ticket
-   - Move backend directories from `apps/` to `services/`
-   - Update root workspaces, compose files, CI filters, and docs in the same branch
-
-4. Validate the moved structure end-to-end
-   - install
-   - build
-   - docker compose boot
-   - backend image workflow path filters
-
-5. Only then consider secondary cleanup
-   - `libs/` rationalization
-   - service naming normalization
-   - further package extraction
-
-## Acceptance Checklist for the Mechanical Move
-
-- all backend runtimes live under `services/`
-- all frontend/product apps remain under `apps/`
-- root workspaces resolve correctly
+- backend runtimes covered by `#188` now live under `services/`
+- frontend/product apps remain under `apps/`
+- root workspaces resolve `services/*`
 - compose files use `services/<name>` paths
 - backend CI path filters track `services/**`
-- docs no longer describe backend runtimes as app entries
+- docs no longer describe migrated backend runtimes as app entries
 
-## Follow-Up Tickets
+## Residual Follow-Up Work
 
-This plan implies three follow-up tracks:
+1. Move `nlp/` to `services/nlp`
+   - keep this as a separate mechanical change
 
-1. `Monorepo: Migrate backend services from apps/ to services/`
-2. `Monorepo: Standardize naming conventions for apps, services, and packages`
-3. optional: `Monorepo: Reconcile libs/ and packages/ shared-code strategy`
+2. Standardize naming conventions
+   - decide whether `irish-week` should remain under that path or be renamed for consistency
+   - decide whether `translation/translation-connector` should stay nested or move to something flatter such as `services/translator`
+
+3. Reconcile `libs/` and `packages/`
+   - keep them distinct unless there is a deliberate consolidation plan
+   - do not combine that refactor with more path churn
+
+4. Verify deployment/docs drift periodically
+   - any new backend service should be added under `services/`
+   - any new user-facing application should be added under `apps/`
+
+## Repository Rule Going Forward
+
+- If it is a deployable user-facing application, place it under `apps/`.
+- If it is a deployable backend/runtime service, place it under `services/`.
+- If it is imported shared code rather than a runtime, place it under `packages/` or `libs/` according to the existing shared-code strategy.

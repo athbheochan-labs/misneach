@@ -4,6 +4,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 COPY tsconfig.base.json ./
 COPY apps ./apps
+COPY services ./services
 COPY libs ./libs
 
 RUN npm ci
@@ -35,55 +36,55 @@ COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/libs/messaging/package.json ./libs/messaging/package.json
 COPY --from=build /usr/src/app/libs/messaging/dist ./libs/messaging/dist
 
-COPY --from=build /usr/src/app/apps/translation/translation-connector/package.json ./apps/translation/translation-connector/package.json
-COPY --from=build /usr/src/app/apps/translation/translation-connector/dist ./apps/translation/translation-connector/dist
+COPY --from=build /usr/src/app/services/translation/translation-connector/package.json ./services/translation/translation-connector/package.json
+COPY --from=build /usr/src/app/services/translation/translation-connector/dist ./services/translation/translation-connector/dist
 
-COPY --from=build /usr/src/app/apps/lexicon/package.json ./apps/lexicon/package.json
-COPY --from=build /usr/src/app/apps/lexicon/dist ./apps/lexicon/dist
-COPY --from=build /usr/src/app/apps/lexicon/entrypoint.sh ./apps/lexicon/entrypoint.sh
+COPY --from=build /usr/src/app/services/lexicon/package.json ./services/lexicon/package.json
+COPY --from=build /usr/src/app/services/lexicon/dist ./services/lexicon/dist
+COPY --from=build /usr/src/app/services/lexicon/entrypoint.sh ./services/lexicon/entrypoint.sh
 
-COPY --from=build /usr/src/app/apps/phrasebook/package.json ./apps/phrasebook/package.json
-COPY --from=build /usr/src/app/apps/phrasebook/dist ./apps/phrasebook/dist
-COPY --from=build /usr/src/app/apps/phrasebook/entrypoint.sh ./apps/phrasebook/entrypoint.sh
+COPY --from=build /usr/src/app/services/phrasebook/package.json ./services/phrasebook/package.json
+COPY --from=build /usr/src/app/services/phrasebook/dist ./services/phrasebook/dist
+COPY --from=build /usr/src/app/services/phrasebook/entrypoint.sh ./services/phrasebook/entrypoint.sh
 
-COPY --from=build /usr/src/app/apps/flashcards/package.json ./apps/flashcards/package.json
-COPY --from=build /usr/src/app/apps/flashcards/dist ./apps/flashcards/dist
-COPY --from=build /usr/src/app/apps/flashcards/entrypoint.sh ./apps/flashcards/entrypoint.sh
+COPY --from=build /usr/src/app/services/flashcards/package.json ./services/flashcards/package.json
+COPY --from=build /usr/src/app/services/flashcards/dist ./services/flashcards/dist
+COPY --from=build /usr/src/app/services/flashcards/entrypoint.sh ./services/flashcards/entrypoint.sh
 
-COPY --from=build /usr/src/app/apps/focus/package.json ./apps/focus/package.json
-COPY --from=build /usr/src/app/apps/focus/dist ./apps/focus/dist
+COPY --from=build /usr/src/app/services/focus/package.json ./services/focus/package.json
+COPY --from=build /usr/src/app/services/focus/dist ./services/focus/dist
 
-COPY --from=build /usr/src/app/apps/practice/package.json ./apps/practice/package.json
-COPY --from=build /usr/src/app/apps/practice/dist ./apps/practice/dist
-COPY --from=build /usr/src/app/apps/practice/entrypoint.sh ./apps/practice/entrypoint.sh
+COPY --from=build /usr/src/app/services/practice/package.json ./services/practice/package.json
+COPY --from=build /usr/src/app/services/practice/dist ./services/practice/dist
+COPY --from=build /usr/src/app/services/practice/entrypoint.sh ./services/practice/entrypoint.sh
 
-COPY --from=build /usr/src/app/apps/courses/package.json ./apps/courses/package.json
-COPY --from=build /usr/src/app/apps/courses/dist ./apps/courses/dist
-COPY --from=build /usr/src/app/apps/courses/entrypoint.sh ./apps/courses/entrypoint.sh
-COPY --from=build /usr/src/app/apps/courses/src/content ./apps/courses/src/content
+COPY --from=build /usr/src/app/services/courses/package.json ./services/courses/package.json
+COPY --from=build /usr/src/app/services/courses/dist ./services/courses/dist
+COPY --from=build /usr/src/app/services/courses/entrypoint.sh ./services/courses/entrypoint.sh
+COPY --from=build /usr/src/app/services/courses/src/content ./services/courses/src/content
 
-COPY --from=build /usr/src/app/apps/challenges/package.json ./apps/challenges/package.json
-COPY --from=build /usr/src/app/apps/challenges/dist ./apps/challenges/dist
+COPY --from=build /usr/src/app/services/challenges/package.json ./services/challenges/package.json
+COPY --from=build /usr/src/app/services/challenges/dist ./services/challenges/dist
 
-COPY --from=build /usr/src/app/apps/payment/package.json ./apps/payment/package.json
-COPY --from=build /usr/src/app/apps/payment/dist ./apps/payment/dist
+COPY --from=build /usr/src/app/services/payment/package.json ./services/payment/package.json
+COPY --from=build /usr/src/app/services/payment/dist ./services/payment/dist
 
-COPY --from=build /usr/src/app/apps/discounts/package.json ./apps/discounts/package.json
-COPY --from=build /usr/src/app/apps/discounts/dist ./apps/discounts/dist
+COPY --from=build /usr/src/app/services/discounts/package.json ./services/discounts/package.json
+COPY --from=build /usr/src/app/services/discounts/dist ./services/discounts/dist
 
-COPY --from=build /usr/src/app/apps/business/package.json ./apps/business/package.json
-COPY --from=build /usr/src/app/apps/business/dist ./apps/business/dist
+COPY --from=build /usr/src/app/services/business/package.json ./services/business/package.json
+COPY --from=build /usr/src/app/services/business/dist ./services/business/dist
 
-COPY --from=build /usr/src/app/apps/waitlist/package.json ./apps/waitlist/package.json
-COPY --from=build /usr/src/app/apps/waitlist/dist ./apps/waitlist/dist
+COPY --from=build /usr/src/app/services/waitlist/package.json ./services/waitlist/package.json
+COPY --from=build /usr/src/app/services/waitlist/dist ./services/waitlist/dist
 
-COPY --from=build /usr/src/app/apps/client/package.json ./apps/client/package.json
-COPY --from=build /usr/src/app/apps/client/dist ./apps/client/dist
-COPY --from=build /usr/src/app/apps/client/node_modules ./apps/client/node_modules
-COPY --from=build /usr/src/app/apps/client/public ./apps/client/public
+COPY --from=build /usr/src/app/services/client/package.json ./services/client/package.json
+COPY --from=build /usr/src/app/services/client/dist ./services/client/dist
+COPY --from=build /usr/src/app/services/client/node_modules ./services/client/node_modules
+COPY --from=build /usr/src/app/services/client/public ./services/client/public
 
-RUN chmod +x /usr/src/app/apps/lexicon/entrypoint.sh \
-    && chmod +x /usr/src/app/apps/phrasebook/entrypoint.sh \
-    && chmod +x /usr/src/app/apps/flashcards/entrypoint.sh \
-    && chmod +x /usr/src/app/apps/practice/entrypoint.sh \
-    && chmod +x /usr/src/app/apps/courses/entrypoint.sh
+RUN chmod +x /usr/src/app/services/lexicon/entrypoint.sh \
+    && chmod +x /usr/src/app/services/phrasebook/entrypoint.sh \
+    && chmod +x /usr/src/app/services/flashcards/entrypoint.sh \
+    && chmod +x /usr/src/app/services/practice/entrypoint.sh \
+    && chmod +x /usr/src/app/services/courses/entrypoint.sh
