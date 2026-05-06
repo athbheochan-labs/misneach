@@ -1,7 +1,7 @@
 # Mobile Auth API Contract (Token-Based)
 
 - Status: Proposed for implementation
-- Scope: Mobile clients (`apps/mobile`) and any non-browser clients
+- Scope: Mobile clients (`apps/cleachtadh-mobile`) and any non-browser clients
 - Related tickets: Define mobile auth contract (token-based), Build token auth endpoints in backend
 
 ## Goal

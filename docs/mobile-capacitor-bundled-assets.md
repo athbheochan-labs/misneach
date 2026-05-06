@@ -13,13 +13,13 @@ This runbook switches mobile delivery to local bundled web assets (Phase 3).
 From repo root:
 
 ```bash
-npm install --workspace cleachtadh-web --workspace mobile
-npm run cap:sync:bundled --workspace mobile
+npm install --workspace cleachtadh-web --workspace cleachtadh-mobile
+npm run cap:sync:bundled --workspace cleachtadh-mobile
 ```
 
 ## Run Android
 
-From `apps/mobile`:
+From `apps/cleachtadh-mobile`:
 
 ```bash
 npm run cap:run:android
@@ -27,7 +27,7 @@ npm run cap:run:android
 
 ## Optional rollback to hosted mode
 
-Set in `apps/mobile/.env`:
+Set in `apps/cleachtadh-mobile/.env`:
 
 ```bash
 MOBILE_USE_HOSTED_WEB=true
@@ -37,5 +37,5 @@ MOBILE_WEB_URL=https://www.misneach.site
 Then run:
 
 ```bash
-npm run cap:sync --workspace mobile
+npm run cap:sync --workspace cleachtadh-mobile
 ```

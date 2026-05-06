@@ -47,7 +47,7 @@ Rejected for now to avoid coupling web builds to native-only plugin install timi
 
 - Tradeoffs
   - Browser fallback is not secure storage and must remain non-production-mobile only
-  - Final native plugin package installation/config is still required in `apps/mobile` phase
+  - Final native plugin package installation/config is still required in `apps/cleachtadh-mobile` phase
 
 - Operational impact
   - Mobile runtime must provide the secure plugin implementation before app-store release
