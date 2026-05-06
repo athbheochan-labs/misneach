@@ -1,8 +1,9 @@
 import type { Handle } from '@sveltejs/kit';
 import { sessionCookieName, verifySession } from '$lib/server/auth';
+import { getAuthMode } from '$lib/server/upstreams';
 
 export const handle: Handle = async ({ event, resolve }) => {
-  const authMode = (process.env.AUTH_MODE || 'token').toLowerCase();
+  const authMode = getAuthMode();
   const tokenModeEnabled = authMode !== 'session';
   const token = event.cookies.get(sessionCookieName());
   event.locals.auth = token ? await verifySession(token) : null;

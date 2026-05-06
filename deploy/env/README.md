@@ -25,3 +25,12 @@ This directory defines production/staging env file templates.
 - Any new runtime env var must be added to the relevant `.env.example`.
 - Any removed env var must be removed from examples and deployment docs.
 - Keep this README aligned with `docs/deployment.md`.
+
+## Web App Contract
+
+Use this contract for web apps unless a product-specific proxy needs extra service URLs:
+
+- `APP_BASE_URL`: public app URL
+- `PUBLIC_API_BASE_URL`: browser-facing API base URL
+- `API_INTERNAL_URL`: primary server-side upstream for proxy/server requests
+- `API_INTERNAL_URLS`: optional comma-separated fallback upstreams

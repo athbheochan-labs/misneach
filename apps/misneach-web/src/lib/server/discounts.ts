@@ -1,4 +1,4 @@
-import * as privateEnv from '$env/static/private';
+import { getInternalAuthSecret } from '$lib/server/upstreams';
 
 type DiscountQuoteInput = {
   code: string;
@@ -44,8 +44,9 @@ export async function quoteDiscount(input: DiscountQuoteInput): Promise<Discount
   for (const baseUrl of baseUrls) {
     try {
       const headers = new Headers({ 'content-type': 'application/json' });
-      if (privateEnv.INTERNAL_AUTH_SECRET) {
-        headers.set('x-internal-auth', privateEnv.INTERNAL_AUTH_SECRET);
+      const internalAuthSecret = getInternalAuthSecret();
+      if (internalAuthSecret) {
+        headers.set('x-internal-auth', internalAuthSecret);
       }
 
       const res = await fetch(`${baseUrl}/discounts/quote`, {

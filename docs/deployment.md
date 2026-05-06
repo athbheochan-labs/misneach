@@ -42,16 +42,29 @@ Relevant workflows:
 
 ### Web Runtime API Variables
 
-`apps/misneach-web` should target a single API entrypoint (`client`) for public integration routes.
+`misneach-web` and `cleachtadh-web` use the same env contract:
 
-- `CLIENT_API_URL`: primary upstream for web survey/waitlist routes.
-- `NEST_INTERNAL_URL`: optional fallback upstream (often equal to `CLIENT_API_URL`).
+- `APP_BASE_URL`: public frontend URL
+- `PUBLIC_API_BASE_URL`: browser-facing API base URL
+- `API_INTERNAL_URL`: primary server-side upstream for SvelteKit proxy/server requests
+- `API_INTERNAL_URLS`: optional comma-separated fallback upstreams
+
+`misneach-web` also adds:
+
+- `BUSINESS_INTERNAL_URL`: primary direct upstream for the business service
+- `BUSINESS_INTERNAL_URLS`: optional comma-separated business-service fallbacks
 
 Recommended values by environment:
 
-- host-based local dev: `CLIENT_API_URL=http://localhost:8000`
-- docker local dev: `CLIENT_API_URL=http://client:8000`
-- production: `CLIENT_API_URL=https://api.<your-domain>`
+- host-based local dev:
+  - `PUBLIC_API_BASE_URL=http://localhost:8000`
+  - `API_INTERNAL_URL=http://localhost:8000`
+- docker local dev:
+  - `PUBLIC_API_BASE_URL=http://localhost:8000`
+  - `API_INTERNAL_URL=http://client:8000`
+- production:
+  - `PUBLIC_API_BASE_URL=https://api.<your-domain>`
+  - `API_INTERNAL_URL=https://api.<your-domain>`
 
 See: [Environment Files README](../deploy/env/README.md)
 

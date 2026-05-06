@@ -1,23 +1,5 @@
 import type { RequestEvent } from '@sveltejs/kit';
-import * as privateEnv from '$env/static/private';
-
-function resolveNestBaseUrls(): string[] {
-  const configured = (privateEnv.NEST_INTERNAL_URL || '').trim();
-  const configuredList = (privateEnv.NEST_INTERNAL_URLS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  const candidates = [
-    configured,
-    ...configuredList,
-    'http://client:8000',
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-  ].filter(Boolean);
-
-  return [...new Set(candidates)];
-}
+import { getInternalAuthSecret, resolveApiBaseUrls } from '$lib/server/upstreams';
 
 export async function nestFetch(
   event: RequestEvent,
@@ -25,7 +7,7 @@ export async function nestFetch(
   init: RequestInit = {},
   requireAuth = true
 ) {
-  const baseUrls = resolveNestBaseUrls();
+  const baseUrls = resolveApiBaseUrls();
   const headers = new Headers(init.headers || {});
 
   if (requireAuth) {
@@ -42,8 +24,9 @@ export async function nestFetch(
     if (event.locals.auth.role) {
       headers.set('x-user-role', event.locals.auth.role);
     }
-    if (privateEnv.INTERNAL_AUTH_SECRET) {
-      headers.set('x-internal-auth', privateEnv.INTERNAL_AUTH_SECRET);
+    const internalAuthSecret = getInternalAuthSecret();
+    if (internalAuthSecret) {
+      headers.set('x-internal-auth', internalAuthSecret);
     }
   }
 

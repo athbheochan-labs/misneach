@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { quoteDiscount } from '$lib/server/discounts';
 import { nestFetch } from '$lib/server/api';
+import { getInternalAuthSecret } from '$lib/server/upstreams';
 
 type Plan = 'monthly' | 'annual';
 
@@ -49,8 +50,9 @@ async function postPayment(path: string, body: unknown): Promise<Response> {
   for (const baseUrl of baseUrls) {
     try {
       const headers = new Headers({ 'content-type': 'application/json' });
-      if (process.env.INTERNAL_AUTH_SECRET) {
-        headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+      const internalAuthSecret = getInternalAuthSecret();
+      if (internalAuthSecret) {
+        headers.set('x-internal-auth', internalAuthSecret);
       }
 
       return await fetch(`${baseUrl}${path}`, {
@@ -70,8 +72,9 @@ async function postPayment(path: string, body: unknown): Promise<Response> {
 
 async function resolveSignupUser(event: Parameters<RequestHandler>[0], email: string) {
   const headers = new Headers({ 'content-type': 'application/json' });
-  if (process.env.INTERNAL_AUTH_SECRET) {
-    headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+  const internalAuthSecret = getInternalAuthSecret();
+  if (internalAuthSecret) {
+    headers.set('x-internal-auth', internalAuthSecret);
   }
 
   const response = await nestFetch(
@@ -102,8 +105,9 @@ async function resolveSignupUser(event: Parameters<RequestHandler>[0], email: st
 
 async function markSignupComplete(event: Parameters<RequestHandler>[0], userId: number) {
   const headers = new Headers({ 'content-type': 'application/json' });
-  if (process.env.INTERNAL_AUTH_SECRET) {
-    headers.set('x-internal-auth', process.env.INTERNAL_AUTH_SECRET);
+  const internalAuthSecret = getInternalAuthSecret();
+  if (internalAuthSecret) {
+    headers.set('x-internal-auth', internalAuthSecret);
   }
 
   const response = await nestFetch(
