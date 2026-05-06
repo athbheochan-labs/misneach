@@ -18,7 +18,7 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 | `practice` | `cleachtadh-web` | via `client` proxy | Good | Practice remains product-agnostic at the service boundary. |
 | `flashcards` | `cleachtadh-web` | via `client` proxy | Good | Shared service boundary is clean. |
 | `lexicon` | `cleachtadh-web` | via `client` proxy | Good | Shared service boundary is clean. |
-| `focus` | `cleachtadh-web`, dormant in `misneach-web` | via `client` proxy | Mixed | Cleachtadh uses the shared path. Misneach still has a leftover focus store pointing at `/api/proxy`, but no corresponding route. |
+| `focus` | `cleachtadh-web` | via `client` proxy | Good | Focus remains a Cleachtadh-side concern. Misneach no longer carries dormant focus runtime code. |
 | `goals` / `challenges` | `cleachtadh-web` | via `client` proxy | Good | Cleachtadh-only product features at present, but service access pattern is clean. |
 | `courses` | `misneach-web`, stubs remain in `cleachtadh-web` | Misneach app-local proxy to `client` | Mixed | Correct owner should be `misneach-web`; Cleachtadh only has redirect stubs now. |
 | `surveys` | `misneach-web` | app-local proxy to `client` | Good | Product-specific but contract is still service-based, not app-coupled. |
@@ -64,7 +64,7 @@ That is acceptable. The product shell is not importing implementation from Cleac
 ### Remaining leaks
 
 1. `misneach-web` hook behavior currently sets `event.locals.auth = null` unconditionally in [apps/misneach-web/src/hooks.server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/hooks.server.ts).
-2. `misneach-web` still contains a leftover focus store in [apps/misneach-web/src/lib/stores/focus.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/lib/stores/focus.ts) that assumes `/api/proxy/focus/*`, but no such proxy exists in this app.
+2. `misneach-web` no longer carries dormant focus/practice runtime code; remaining cleanup is limited to product-owned routes and env conventions.
 
 The remaining issue is not auth duplication anymore. It is that Misneach still has a few leftover UI/runtime assumptions that do not map cleanly to its current product boundary.
 
@@ -78,8 +78,7 @@ The remaining issue is not auth duplication anymore. It is that Misneach still h
 ## Recommended Follow-Ups
 
 1. Remove business onboarding flow from Cleachtadh and relocate it under Misneach ownership.
-2. Delete or replace Misneach’s leftover focus store if focus is not a Misneach feature.
-3. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
+2. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
 
 ## Verdict
 

@@ -37,5 +37,6 @@
 ## Extraction Notes for Mobile
 
 - The previous local magic-link/JWT implementation has been removed from `misneach-web`; auth now follows the same backend token contract as `cleachtadh-web`.
+- Dormant focus/practice frontend stores have been removed from `misneach-web`; no dead `/api/proxy/focus/*` assumptions remain.
 - `+server.ts` proxy routes are transport wrappers that should be removed once equivalent backend gateway routes are consumed directly by mobile/web clients.
 - `auth.ts` cookie session assumptions should be replaced by token-based mobile contract while preserving web compatibility during transition.
