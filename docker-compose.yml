@@ -202,7 +202,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: ./apps/web/Dockerfile
+      dockerfile: ./apps/misneach-web/Dockerfile
     ports:
       - "5173:5173"
     restart: always

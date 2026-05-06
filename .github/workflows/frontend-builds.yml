@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/frontend-builds.yml'
-      - 'apps/web/**'
+      - 'apps/misneach-web/**'
       - 'apps/cleachtadh-web/**'
       - 'apps/admin-web/**'
       - 'libs/**'
@@ -14,7 +14,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/frontend-builds.yml'
-      - 'apps/web/**'
+      - 'apps/misneach-web/**'
       - 'apps/cleachtadh-web/**'
       - 'apps/admin-web/**'
       - 'libs/**'
@@ -33,9 +33,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - app_id: web
-            workspace: web
-            artifact_path: apps/web/build
+          - app_id: misneach-web
+            workspace: misneach-web
+            artifact_path: apps/misneach-web/build
           - app_id: cleachtadh-web
             workspace: cleachtadh-web
             artifact_path: apps/cleachtadh-web/build

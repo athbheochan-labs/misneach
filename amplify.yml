@@ -1,6 +1,6 @@
 version: 1
 applications:
-  - appRoot: apps/web
+  - appRoot: apps/misneach-web
     frontend:
       # Run commands from repo root so npm workspace scripts resolve correctly.
       buildPath: /
@@ -10,21 +10,21 @@ applications:
             - npm ci
         build:
           commands:
-            - rm -f apps/web/.env.production
-            - printf 'NEST_INTERNAL_URL=%s\n' "${NEST_INTERNAL_URL:-}" >> apps/web/.env.production
-            - printf 'NEST_INTERNAL_URLS=%s\n' "${NEST_INTERNAL_URLS:-}" >> apps/web/.env.production
-            - printf 'CLIENT_API_URL=%s\n' "${CLIENT_API_URL:-}" >> apps/web/.env.production
-            - printf 'INTERNAL_AUTH_SECRET=%s\n' "${INTERNAL_AUTH_SECRET:-}" >> apps/web/.env.production
-            - printf 'DISCOUNT_SERVICE_URL=%s\n' "${DISCOUNT_SERVICE_URL:-}" >> apps/web/.env.production
-            - printf 'DISCOUNT_SERVICE_URLS=%s\n' "${DISCOUNT_SERVICE_URLS:-}" >> apps/web/.env.production
-            - printf 'APP_BASE_URL=%s\n' "${APP_BASE_URL:-}" >> apps/web/.env.production
-            - printf 'WEB_APP_URL=%s\n' "${WEB_APP_URL:-}" >> apps/web/.env.production
-            - npm run build --workspace web
+            - rm -f apps/misneach-web/.env.production
+            - printf 'NEST_INTERNAL_URL=%s\n' "${NEST_INTERNAL_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'NEST_INTERNAL_URLS=%s\n' "${NEST_INTERNAL_URLS:-}" >> apps/misneach-web/.env.production
+            - printf 'CLIENT_API_URL=%s\n' "${CLIENT_API_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'INTERNAL_AUTH_SECRET=%s\n' "${INTERNAL_AUTH_SECRET:-}" >> apps/misneach-web/.env.production
+            - printf 'DISCOUNT_SERVICE_URL=%s\n' "${DISCOUNT_SERVICE_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'DISCOUNT_SERVICE_URLS=%s\n' "${DISCOUNT_SERVICE_URLS:-}" >> apps/misneach-web/.env.production
+            - printf 'APP_BASE_URL=%s\n' "${APP_BASE_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'WEB_APP_URL=%s\n' "${WEB_APP_URL:-}" >> apps/misneach-web/.env.production
+            - npm run build --workspace misneach-web
             # Install runtime dependencies for the SSR compute bundle.
-            - cd apps/web/build/compute/default
+            - cd apps/misneach-web/build/compute/default
             - npm i --omit=dev
       artifacts:
-        baseDirectory: apps/web/build
+        baseDirectory: apps/misneach-web/build
         files:
           - '**/*'
       cache:
