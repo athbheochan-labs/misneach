@@ -309,22 +309,20 @@
     journeyLoading = true;
     journeyError = '';
     try {
-      const catalogRes = await apiFetch('/api/proxy/courses/catalog', { cache: 'no-store' });
-      if (!catalogRes.ok) throw new Error('Failed to load your course journey.');
+      const progressRes = await apiFetch('/api/proxy/practice/progress', { cache: 'no-store' });
+      if (!progressRes.ok) throw new Error('Failed to load your practice summary.');
 
-      const catalogPayload = await catalogRes.json();
-      const courses = ((catalogPayload?.courses ?? []) as CourseItem[]).slice();
-      const selected = selectCurrentJourneyCourse(courses);
-
-      journeyCourse = selected;
-      journeyLessons = (selected?.lessons ?? []).slice().sort(compareLessonsByHierarchy);
-      nextLessonIndex = firstOpenLessonIndex(journeyLessons);
-      streakDays = estimateStreak(
-        courses.flatMap((course) => (Array.isArray(course.lessons) ? course.lessons : [])),
-      );
+      const payload = await progressRes.json();
+      journeyCourse = null;
+      journeyLessons = [];
+      nextLessonIndex = 0;
+      streakDays = Math.max(0, Number(payload?.streakDays || 0));
       saveDashboardCache();
     } catch (err) {
-      journeyError = resolveLoadError(err, 'Failed to load your course journey.');
+      journeyError = resolveLoadError(err, 'Failed to load your practice summary.');
+      journeyCourse = null;
+      journeyLessons = [];
+      nextLessonIndex = 0;
     } finally {
       journeyLoading = false;
     }
@@ -566,19 +564,17 @@
   }
 
   function nextLessonHref() {
-    if (!journeyCourse || !journeyLessons.length) {
-      return '/dashboard/courses?view=all';
-    }
-
-    const lesson = journeyLessons[nextLessonIndex] || journeyLessons[journeyLessons.length - 1];
-    return lessonHref(journeyCourse, lesson);
+    return '/dashboard/practice';
   }
 
   function nextLessonDescription() {
-    const lesson = journeyLessons[nextLessonIndex];
-    const summary = String(lesson?.summary || '').trim();
-    if (summary) return summary;
-    return 'Continue your next lesson to build confidence with practical, everyday Irish.';
+    if (duePracticeCount > 0) {
+      return `You have ${duePracticeCount} phrase${duePracticeCount === 1 ? '' : 's'} ready for targeted review.`;
+    }
+    if (dueFlashcardCount > 0) {
+      return `Your flashcards are up to date enough to do a short review of ${dueFlashcardCount} due card${dueFlashcardCount === 1 ? '' : 's'}.`;
+    }
+    return 'Jump into a short practice run and keep your Irish active.';
   }
 
   async function markChallengeDone() {
@@ -751,10 +747,6 @@
     </div>
   {/if}
 
-  {#if journeyError}
-    <div class="journey-error-banner">{journeyError}</div>
-  {/if}
-
   <div class="page">
       <header class="page-header fade-up">
         <div class="greeting">
@@ -762,15 +754,14 @@
           <div class="greeting-name">Dia <em>duit,</em> {greetingName()}.</div>
           <div class="greeting-sub">
             {#if journeyLoading}
-              Loading your course progress...
+              Loading your practice summary...
             {:else}
-            {#if journeyCourse && journeyLessons.length}
-              You're on lesson {Math.min(nextLessonIndex + 1, journeyLessons.length)} of {journeyLessons.length} — {journeyCourse.courseTitle}
-            {:else}
-              Pick a course to begin
-            {/if}
+              {duePracticeCount} phrase{duePracticeCount === 1 ? '' : 's'} need practice and {dueFlashcardCount} flashcard{dueFlashcardCount === 1 ? '' : 's'} are due.
             {/if}
           </div>
+          {#if journeyError}
+            <div class="journey-error-banner">{journeyError}</div>
+          {/if}
         </div>
         <div class="header-streak">
           <span class="streak-num">{streakDays}</span>
@@ -784,11 +775,13 @@
             <div class="next-tag">Next up</div>
             <div class="next-lesson-title">
               {#if journeyLoading}
-                Loading <em>lesson...</em>
-              {:else if journeyLessons[nextLessonIndex]?.lessonTitle}
-                {journeyLessons[nextLessonIndex]?.lessonTitle}
+                Loading <em>practice...</em>
+              {:else if duePracticeCount > 0}
+                Phrase <em>practice</em>
+              {:else if dueFlashcardCount > 0}
+                Flashcard <em>review</em>
               {:else}
-                Payment & <em>cárta nó airgead</em>
+                Daily <em>practice</em>
               {/if}
             </div>
             <div class="next-desc">
@@ -797,7 +790,13 @@
             <div class="next-meta">
               <span class="next-btn">Tosaigh - Begin</span>
               <span class="next-lesson-num">
-                Lesson {Math.min(nextLessonIndex + 1, journeyLessons.length || 1)} of {journeyLessons.length || 12} · ~{journeyLessons[nextLessonIndex]?.estimatedMinutes || 6} min
+                {#if duePracticeCount > 0}
+                  {duePracticeCount} phrase{duePracticeCount === 1 ? '' : 's'} due · ~5 min
+                {:else if dueFlashcardCount > 0}
+                  {dueFlashcardCount} card{dueFlashcardCount === 1 ? '' : 's'} due · ~3 min
+                {:else}
+                  Short review · ~5 min
+                {/if}
               </span>
             </div>
           </a>
@@ -807,53 +806,33 @@
           <div class="section-head">
             <MisSectionHeader
               className="unit-heading"
-              headline={`${journeyCourse?.courseTitle || 'Coffee Shop'}${
-                currentUnitNumber ? ` <em>Unit ${currentUnitNumber}</em>` : ''
-              }`}
+              headline={`Today's <em>focus</em>`}
             />
-            <a href="/dashboard/courses?view=all" class="section-link">All courses -></a>
+            <a href="/dashboard/phrasebook" class="section-link">Phrasebook -></a>
           </div>
 
           <div class="lessons-grid">
-            {#if unitLessons.length}
-              {#each unitLessons as lesson, index}
-                {@const isDone = lesson.progress.status === 'completed'}
-                {@const isActive = index === unitNextLessonIndex && !isDone}
-                {@const isLocked = !isDone && !isActive}
-                {@const cardClass = isDone ? 'done' : isActive ? 'active' : 'locked'}
-                {@const lessonNumber = String(index + 1).padStart(2, '0')}
-
-                {#if isLocked}
-                  <div class={`lesson-pip ${cardClass}`}>
-                    <span class="lesson-pip-num">{lessonNumber}</span>
-                    <span class="lesson-pip-name">{lesson.lessonTitle}</span>
-                  </div>
-                {:else}
-                  <a
-                    href={journeyCourse ? lessonHref(journeyCourse, lesson) : '/dashboard/courses?view=all'}
-                    class={`lesson-pip ${cardClass}`}
-                    aria-label={`Open lesson ${lessonNumber}: ${lesson.lessonTitle}`}
-                  >
-                    <span class="lesson-pip-num">{lessonNumber}</span>
-                    <span class="lesson-pip-name">{lesson.lessonTitle}</span>
-                    {#if isDone}
-                      <div class="lesson-pip-check">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      </div>
-                    {/if}
-                  </a>
-                {/if}
-              {/each}
-            {:else}
-              {#each Array.from({ length: 12 }) as _, index}
-                <div class="lesson-pip locked">
-                  <span class="lesson-pip-num">{String(index + 1).padStart(2, '0')}</span>
-                  <span class="lesson-pip-name">Lesson {index + 1}</span>
-                </div>
-              {/each}
-            {/if}
+            <a href="/dashboard/practice" class="lesson-pip active" aria-label="Open practice">
+              <span class="lesson-pip-num">01</span>
+              <span class="lesson-pip-name">Practice due phrases</span>
+            </a>
+            <a href="/dashboard/flashcards/study" class="lesson-pip done" aria-label="Open flashcards">
+              <span class="lesson-pip-num">02</span>
+              <span class="lesson-pip-name">Review flashcards</span>
+              <div class="lesson-pip-check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+            </a>
+            <a href="/dashboard/phrasebook" class="lesson-pip" aria-label="Open phrasebook">
+              <span class="lesson-pip-num">03</span>
+              <span class="lesson-pip-name">Browse saved phrases</span>
+            </a>
+            <a href="/dashboard/goals" class="lesson-pip" aria-label="Open goals">
+              <span class="lesson-pip-num">04</span>
+              <span class="lesson-pip-name">Track your goals</span>
+            </a>
           </div>
         </section>
 
