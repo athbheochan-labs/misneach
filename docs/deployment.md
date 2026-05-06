@@ -42,7 +42,7 @@ Relevant workflows:
 
 ### Web Runtime API Variables
 
-`apps/web` should target a single API entrypoint (`client`) for public integration routes.
+`apps/misneach-web` should target a single API entrypoint (`client`) for public integration routes.
 
 - `CLIENT_API_URL`: primary upstream for web survey/waitlist routes.
 - `NEST_INTERNAL_URL`: optional fallback upstream (often equal to `CLIENT_API_URL`).

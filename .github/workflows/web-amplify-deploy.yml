@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'apps/web/**'
+      - 'apps/misneach-web/**'
       - 'amplify.yml'
       - 'package.json'
       - 'package-lock.json'
@@ -53,8 +53,8 @@ jobs:
         run: |
           set -euo pipefail
           npm ci
-          npm run build --workspace web
-          cd apps/web/build/compute/default
+          npm run build --workspace misneach-web
+          cd apps/misneach-web/build/compute/default
           npm i --omit=dev
 
       - name: Upload artifact and start Amplify deployment
@@ -72,7 +72,7 @@ jobs:
             BRANCH_NAME="$INPUT_BRANCH"
           fi
 
-          cd apps/web/build
+          cd apps/misneach-web/build
           zip -r /tmp/web-build.zip .
 
           read -r JOB_ID ZIP_UPLOAD_URL <<< "$(aws amplify create-deployment \
