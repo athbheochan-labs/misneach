@@ -18,9 +18,10 @@ This runbook deploys `apps/misneach-web` to AWS Amplify Hosting.
    - `AWS_SECRET_ACCESS_KEY`
 4. In Amplify app environment variables, set any `PUBLIC_*` variables needed by `apps/misneach-web`.
 5. Set web runtime API variables in Amplify environment:
-   - `CLIENT_API_URL` = public client API URL (for example `https://api.misneach.site`)
-   - `NEST_INTERNAL_URL` = optional fallback (can be same as `CLIENT_API_URL`)
-   - `WEB_APP_URL` / `APP_BASE_URL` = public web URL (for example `https://misneach.site`)
+   - `PUBLIC_API_BASE_URL` = browser-facing API URL
+   - `API_INTERNAL_URL` = primary server-side upstream
+   - `API_INTERNAL_URLS` = optional comma-separated fallback upstreams
+   - `APP_BASE_URL` = public web URL (for example `https://misneach.site`)
 
 ## Deploy Flows
 

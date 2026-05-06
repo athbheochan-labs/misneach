@@ -45,13 +45,17 @@ export class AuthController {
    */
   @Post('magic-link')
   async sendMagicLink(
-    @Body() body: { email: string },
+    @Body() body: { email: string; appBaseUrl?: string },
+    @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
     this.logger.log(`Magic link requested for ${body.email}`);
 
     try {
-      const result = await this.authService.handleMagicLink(body.email);
+      const result = await this.authService.handleMagicLink(
+        body.email,
+        this.resolveRequestedAppBaseUrl(req, body?.appBaseUrl),
+      );
       return res.status(HttpStatus.OK).json(result);
     } catch (err) {
       this.logger.error(
@@ -71,7 +75,7 @@ export class AuthController {
    */
   @Post('login')
   async login(
-    @Body() body: { email: string; token?: string },
+    @Body() body: { email: string; token?: string; appBaseUrl?: string },
     @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
@@ -86,7 +90,10 @@ export class AuthController {
     }
 
     if (!token) {
-      await this.authService.handleMagicLink(email);
+      await this.authService.handleMagicLink(
+        email,
+        this.resolveRequestedAppBaseUrl(req, body?.appBaseUrl),
+      );
       return res.status(HttpStatus.OK).json({
         ok: true,
         status: 'pending_verification',
@@ -96,6 +103,28 @@ export class AuthController {
 
     const tokenPair = await this.authService.issueTokenPairFromMagicLink(email, token);
     return res.status(HttpStatus.OK).json(tokenPair);
+  }
+
+  private resolveRequestedAppBaseUrl(
+    req: AuthenticatedRequest,
+    bodyAppBaseUrl?: string,
+  ): string | undefined {
+    const explicit = String(bodyAppBaseUrl || '').trim();
+    if (explicit) return explicit;
+
+    const origin = Array.isArray(req.headers.origin) ? req.headers.origin[0] : req.headers.origin;
+    if (typeof origin === 'string' && origin.trim()) return origin.trim();
+
+    const referer = Array.isArray(req.headers.referer) ? req.headers.referer[0] : req.headers.referer;
+    if (typeof referer === 'string' && referer.trim()) {
+      try {
+        return new URL(referer).origin;
+      } catch {
+        return undefined;
+      }
+    }
+
+    return undefined;
   }
 
   @Post('refresh')

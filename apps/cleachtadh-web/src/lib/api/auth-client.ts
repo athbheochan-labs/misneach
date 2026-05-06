@@ -16,10 +16,11 @@ export type AuthMeResult = {
 };
 
 export async function requestMagicLink(email: string): Promise<Response> {
+  const appBaseUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
   return apiFetch('/api/proxy/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, appBaseUrl }),
   });
 }
 

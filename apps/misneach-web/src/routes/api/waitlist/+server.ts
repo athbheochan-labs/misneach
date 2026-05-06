@@ -1,22 +1,6 @@
 import { json } from '@sveltejs/kit';
-import * as privateEnv from '$env/static/private';
 import type { RequestHandler } from './$types';
-
-function baseUrls() {
-  const configured = (privateEnv.CLIENT_API_URL || '').trim();
-  const configuredNest = (privateEnv.NEST_INTERNAL_URL || '').trim();
-  const candidates = [
-    configured,
-    configuredNest,
-    'http://client:8000',
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-  ]
-    .filter(Boolean)
-    .map((url) => url.replace(/\/$/, ''));
-
-  return [...new Set(candidates)];
-}
+import { resolveApiBaseUrls } from '$lib/server/upstreams';
 
 export const POST: RequestHandler = async ({ request, fetch, url }) => {
   const body = await request.json().catch(() => null);
@@ -42,7 +26,7 @@ export const POST: RequestHandler = async ({ request, fetch, url }) => {
   };
 
   let lastError: unknown;
-  for (const baseUrl of baseUrls()) {
+  for (const baseUrl of resolveApiBaseUrls()) {
     try {
       const response = await fetch(`${baseUrl}/waitlist/join`, {
         method: 'POST',

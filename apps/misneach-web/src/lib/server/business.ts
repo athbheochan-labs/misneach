@@ -1,22 +1,4 @@
-import * as privateEnv from '$env/static/private';
-
-function resolveBusinessBaseUrls(): string[] {
-  const configured = (privateEnv.BUSINESS_SERVICE_URL || '').trim();
-  const configuredList = (privateEnv.BUSINESS_SERVICE_URLS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  const candidates = [
-    configured,
-    ...configuredList,
-    'http://business:3018',
-    'http://127.0.0.1:3018',
-    'http://localhost:3018',
-  ].filter(Boolean);
-
-  return [...new Set(candidates.map((url) => url.replace(/\/+$/, '')))];
-}
+import { resolveBusinessBaseUrls } from '$lib/server/upstreams';
 
 export async function forwardBusinessRequest(request: Request, path: string, search: string, method: string) {
   const headers = new Headers(request.headers);

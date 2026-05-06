@@ -272,7 +272,30 @@ export class AuthService {
     );
   }
 
-  async handleMagicLink(email: string): Promise<{ message: string }> {
+  private normalizeAppUrl(value: string): string {
+    return value.replace(/\/+$/, '');
+  }
+
+  private resolveMagicLinkAppUrl(candidate?: string): string {
+    const fallback = this.normalizeAppUrl(this.config.get<string>('APP_URL') || '');
+    const allowed = [
+      fallback,
+      ...String(this.config.get<string>('AUTH_ALLOWED_APP_URLS') || '')
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => this.normalizeAppUrl(entry)),
+    ].filter(Boolean);
+
+    const normalizedCandidate = this.normalizeAppUrl(String(candidate || '').trim());
+    if (normalizedCandidate && allowed.includes(normalizedCandidate)) {
+      return normalizedCandidate;
+    }
+
+    return fallback;
+  }
+
+  async handleMagicLink(email: string, appBaseUrl?: string): Promise<{ message: string }> {
     if (!email) {
       throw new Error('Email is required');
     }
@@ -302,7 +325,7 @@ export class AuthService {
     });
     await this.magicLinkRepo.save(magicLink);
 
-    const appUrl = this.config.get<string>('APP_URL');
+    const appUrl = this.resolveMagicLinkAppUrl(appBaseUrl);
     const verifyUrl = `${appUrl}/auth/verify-request?token=${token}&email=${email}`;
 
     const userLang = user.languageSettings?.[0]?.firstLanguage || 'en';
