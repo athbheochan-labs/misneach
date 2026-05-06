@@ -350,7 +350,7 @@
         <p class="terms-note">By continuing you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
 
         <div class="back-link" style="margin-top:20px">
-          <a href="/" style="color:rgba(245,240,232,0.3);text-decoration:none;font-size:13px">← Back to cleachtadh.misneach.site</a>
+          <a href="/" style="color:rgba(245,240,232,0.3);text-decoration:none;font-size:13px">← Back to Cleachtadh</a>
         </div>
       </div>
     {/if}

@@ -31,7 +31,7 @@ Set in `apps/cleachtadh-mobile/.env`:
 
 ```bash
 MOBILE_USE_HOSTED_WEB=true
-MOBILE_WEB_URL=https://www.misneach.site
+MOBILE_WEB_URL=https://cleachtadh.misneach.site
 ```
 
 Then run:

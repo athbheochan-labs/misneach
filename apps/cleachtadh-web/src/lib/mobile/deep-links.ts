@@ -1,6 +1,6 @@
 const allowedHosts = new Set([
-  'misneach.site',
-  'www.misneach.site',
+  'misneach.ie',
+  'www.misneach.ie',
   'cleachtadh.misneach.site',
   'localhost',
   '127.0.0.1',

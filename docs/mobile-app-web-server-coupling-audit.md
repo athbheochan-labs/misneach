@@ -1,4 +1,4 @@
-# Mobile Extraction Audit: cleachtadh-web Server-Coupled Responsibilities
+# Mobile Extraction Audit: misneach-web Server-Coupled Responsibilities
 
 - Date: 2026-04-08
 - Scope: `apps/misneach-web/src/hooks.server.ts`, all `apps/misneach-web/src/**/+server.ts`, and `apps/misneach-web/src/lib/server/*`
