@@ -57,7 +57,7 @@
 </script>
 
 <svelte:head>
-  <title>Misneach — Sign in</title>
+  <title>Cleachtadh — Sign in</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700&family=Instrument+Sans:wght@400;500;600&display=swap"
     rel="stylesheet"
@@ -82,7 +82,7 @@
         <path d="M33 48C36 38,44 28,50 22" stroke="#f5f0e8" stroke-width="4" stroke-linecap="round" />
         <circle cx="33.5" cy="47" r="3.5" fill="#7ec99a" />
       </svg>
-      <div class="brand-word">Misne<em>ach</em></div>
+      <div class="brand-word">Cleacht<em>adh</em></div>
     </a>
 
     <div class="state" class:active={state === 'unsent'}>
@@ -116,7 +116,7 @@
       </form>
 
       <div class="note">
-        Don't have an account? <a href="https://misneach.site/pricing">Start for free</a> — no card required.
+        Don't have an account? <a href="/auth/signup">Start for free</a> — no card required.
       </div>
     </div>
 

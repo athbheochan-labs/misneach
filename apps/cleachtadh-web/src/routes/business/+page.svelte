@@ -1,5 +1,5 @@
 <svelte:head>
-  <title>Business Portal — Misneach</title>
+  <title>Business Portal — Cleachtadh</title>
 </svelte:head>
 
 <div class="min-h-screen bg-[#f5f0e8] text-[#1c2b22] p-8">

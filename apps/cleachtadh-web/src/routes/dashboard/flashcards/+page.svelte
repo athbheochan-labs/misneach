@@ -178,7 +178,7 @@
       </svg>
       Dashboard
     </MisButton>
-    <div class="nav-brand">Misne<em>ach</em></div>
+    <div class="nav-brand">Cleacht<em>adh</em></div>
   </nav>
 
   <header class="page-head">

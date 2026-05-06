@@ -9,7 +9,7 @@ const trackLocalhost =
   import.meta.env.DEV && import.meta.env.PUBLIC_PLAUSIBLE_TRACK_LOCALHOST === 'true';
 
 configurePlausible({
-  domain: 'misneach.ie',
+  domain: 'cleachtadh.misneach.site',
   trackLocalhost,
 });
 

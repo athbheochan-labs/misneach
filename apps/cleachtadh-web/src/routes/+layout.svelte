@@ -155,7 +155,7 @@ import { afterNavigate, goto } from '$app/navigation';
 </script>
 
 <svelte:head>
-  <title>Misneach</title>
+  <title>Cleachtadh</title>
 </svelte:head>
 
 {@render children()}

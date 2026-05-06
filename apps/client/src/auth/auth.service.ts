@@ -24,28 +24,28 @@ import { AuthenticatedRequest } from './types/request';
 // TODO: Read these from the i18n service
 const translations = {
   en: {
-    subject: 'Your Magic Login Link',
-    greeting: 'Welcome to Misneach!',
+    subject: 'Your Cleachtadh Magic Login Link',
+    greeting: 'Welcome to Cleachtadh!',
     intro: 'Click the button below to access your account securely.',
     button: 'Login Now',
     note: 'If you didn’t request this link, you can safely ignore this email.',
-    footer: '© 2025 Misneach. All rights reserved.',
+    footer: '© 2025 Cleachtadh. All rights reserved.',
   },
   ga: {
     subject: 'Do Nasc Draíochta Logála Isteach',
-    greeting: 'Fáilte go Misneach!',
+    greeting: 'Fáilte go Cleachtadh!',
     intro: 'Cliceáil an cnaipe thíos chun rochtain shlán a fháil ar do chuntas.',
     button: 'Logáil Isteach Anois',
     note: 'Mura ndearna tú iarratas ar an nasc seo, is féidir leat neamhaird a dhéanamh de.',
-    footer: '© 2025 Misneach. Gach ceart ar cosaint.',
+    footer: '© 2025 Cleachtadh. Gach ceart ar cosaint.',
   },
   pt: {
-    subject: 'Seu Link Mágico de Login',
-    greeting: 'Bem-vindo ao Misneach!',
+    subject: 'Seu Link Mágico de Login do Cleachtadh',
+    greeting: 'Bem-vindo ao Cleachtadh!',
     intro: 'Clique no botão abaixo para acessar sua conta com segurança.',
     button: 'Entrar Agora',
     note: 'Se você não solicitou este link, pode ignorar este e-mail com segurança.',
-    footer: '© 2025 Misneach. Todos os direitos reservados.',
+    footer: '© 2025 Cleachtadh. Todos os direitos reservados.',
   },
 };
 
