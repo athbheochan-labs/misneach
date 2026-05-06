@@ -6,7 +6,7 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 
 - No direct app-to-app imports were found between `misneach-web` and `cleachtadh-web`.
 - `cleachtadh-web` is mostly aligned with the target architecture: it talks to shared backend services through the `client` gateway or app-local proxy routes.
-- `misneach-web` is only partially aligned: it proxies `courses`, `surveys`, and `waitlist`, but still owns app-local auth/email/database logic for magic links.
+- `misneach-web` now uses the same backend-owned token auth flow as `cleachtadh-web` for magic-link issuance and verification.
 - Shared backend services are viable for both products, but auth and a few product-specific routes still need cleanup before the split can be considered fully contract-safe.
 
 ## Contract Matrix
@@ -24,8 +24,8 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 | `surveys` | `misneach-web` | app-local proxy to `client` | Good | Product-specific but contract is still service-based, not app-coupled. |
 | `waitlist` | `misneach-web` | app-local proxy to `client` | Good | Product-specific but contract is clean. |
 | `business` / onboarding / payment bootstrap | `cleachtadh-web` | via `client` proxy + app-local payment endpoint | Leaking | This looks Misneach-owned but still lives in Cleachtadh routes. |
-| Auth session verification | both apps | duplicated local JWT verification | Leaking | Same `web_session` contract is duplicated in both apps. |
-| Magic-link issuance | `cleachtadh-web`, `misneach-web` | Cleachtadh via backend; Misneach via local DB/Resend logic | Leaking | Auth boundary is inconsistent across products. |
+| Auth token issuance / refresh / verification | both apps | backend `client` auth endpoints | Good | Both products now use the same token bundle contract. |
+| Legacy cookie session verification | `cleachtadh-web` only | app-local JWT verification in optional session mode | Mixed | Legacy fallback still exists in Cleachtadh, but Misneach no longer duplicates it. |
 
 ## Cleachtadh-Web Findings
 
@@ -64,12 +64,10 @@ That is acceptable. The product shell is not importing implementation from Cleac
 
 ### Remaining leaks
 
-1. `misneach-web` still owns direct DB + email magic-link logic in [apps/misneach-web/src/lib/server/magic-link.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/lib/server/magic-link.ts).
-2. `misneach-web` duplicates the JWT session utility in [apps/misneach-web/src/lib/server/auth.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/lib/server/auth.ts).
-3. `misneach-web` hook behavior currently sets `event.locals.auth = null` unconditionally in [apps/misneach-web/src/hooks.server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/hooks.server.ts).
-4. `misneach-web` still contains a leftover focus store in [apps/misneach-web/src/lib/stores/focus.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/lib/stores/focus.ts) that assumes `/api/proxy/focus/*`, but no such proxy exists in this app.
+1. `misneach-web` hook behavior currently sets `event.locals.auth = null` unconditionally in [apps/misneach-web/src/hooks.server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/hooks.server.ts).
+2. `misneach-web` still contains a leftover focus store in [apps/misneach-web/src/lib/stores/focus.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/misneach-web/src/lib/stores/focus.ts) that assumes `/api/proxy/focus/*`, but no such proxy exists in this app.
 
-The key issue is not service sharing itself. It is that Misneach still owns its own auth implementation rather than consuming a unified backend contract.
+The remaining issue is not auth duplication anymore. It is that Misneach still has a few leftover UI/runtime assumptions that do not map cleanly to its current product boundary.
 
 ## Verified Non-Issues
 
@@ -80,14 +78,13 @@ The key issue is not service sharing itself. It is that Misneach still owns its 
 
 ## Recommended Follow-Ups
 
-1. Move magic-link issuance and verification behind a single backend auth contract consumed by both products.
-2. Remove business onboarding flow from Cleachtadh and relocate it under Misneach ownership.
-3. Remove course-preview logic from Cleachtadh once Misneach owns all course/admin preview behavior.
-4. Delete or replace Misneach’s leftover focus store if focus is not a Misneach feature.
-5. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
+1. Remove business onboarding flow from Cleachtadh and relocate it under Misneach ownership.
+2. Remove course-preview logic from Cleachtadh once Misneach owns all course/admin preview behavior.
+3. Delete or replace Misneach’s leftover focus store if focus is not a Misneach feature.
+4. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
 
 ## Verdict
 
 The split is viable.
 
-The backend service model is already mostly compatible with two products. The main remaining risk is not shared-domain-service coupling; it is duplicated auth behavior and a handful of routes still living in the wrong frontend shell.
+The backend service model is already mostly compatible with two products. The main remaining risk is not shared-domain-service coupling; it is a handful of routes and runtime leftovers still living in the wrong frontend shell.

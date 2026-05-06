@@ -92,7 +92,7 @@
     </details>
     <a href="/for-businesses" class="nav-link" on:click={trackBusinessKitSelected}>For businesses</a>
     <a href="/pricing" class="nav-link active">Pricing</a>
-    <a href="/waitlist?interest=individual_course_access" class="nav-cta">Sign in</a>
+    <a href="/auth/login" class="nav-cta">Sign in</a>
   </div>
 </nav>
 
@@ -264,7 +264,7 @@
     <a href="/how-it-works" class="footer-link">How it works</a>
     <a href="/for-businesses" class="footer-link" on:click={trackBusinessKitSelected}>For businesses</a>
     <a href="/pricing" class="footer-link">Pricing</a>
-    <a href="/waitlist?interest=individual_course_access" class="footer-link">Sign in</a>
+    <a href="/auth/login" class="footer-link">Sign in</a>
   </div>
 </footer>
 

@@ -52,7 +52,7 @@
     </details>
     <a href="/for-businesses" class="nav-link active">For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
-    <a href="/waitlist?interest=individual_course_access" class="nav-cta">Sign in</a>
+    <a href="/auth/login" class="nav-cta">Sign in</a>
   </div>
 </nav>
 
@@ -325,7 +325,7 @@
     <svg width="20" height="20" viewBox="0 0 80 80" fill="none"><path d="M40 7 C19 7, 9 19, 9 34 C9 50, 19 61, 37 62 L30 73 L47 62 C63 60, 71 50, 71 34 C71 19, 61 7, 40 7Z" fill="#f5f0e8"/><path d="M33 46 C35.5 37, 42 30, 47 25" stroke="#1c2b22" stroke-width="5" stroke-linecap="round" fill="none"/><circle cx="33.5" cy="45" r="3" fill="#1c2b22"/></svg>
     <div><div class="footer-name">Misne<em>ach</em></div><div class="footer-tagline">Irish, out loud.</div></div>
   </div>
-  <div class="footer-links"><a href="/how-it-works" class="footer-link">How it works</a><a href="/for-businesses" class="footer-link">For businesses</a><a href="/waitlist?interest=individual_course_access" class="footer-link">Sign in</a></div>
+  <div class="footer-links"><a href="/how-it-works" class="footer-link">How it works</a><a href="/for-businesses" class="footer-link">For businesses</a><a href="/auth/login" class="footer-link">Sign in</a></div>
 </footer>
 
 <style>
