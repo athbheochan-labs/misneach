@@ -45,8 +45,7 @@ This is the right direction for a multi-product setup.
 ### Remaining leaks
 
 1. `cleachtadh-web` still contains business onboarding flow under [apps/cleachtadh-web/src/routes/business/setup/+page.svelte](/home/aaronsinnott/Documents/projects/decyphr/apps/cleachtadh-web/src/routes/business/setup/+page.svelte).
-2. `cleachtadh-web` still has course-preview cookie logic in [apps/cleachtadh-web/src/hooks.server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/cleachtadh-web/src/hooks.server.ts).
-3. `cleachtadh-web` still owns an app-local signup payment route under [apps/cleachtadh-web/src/routes/api/auth/signup/payment/+server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/cleachtadh-web/src/routes/api/auth/signup/payment/+server.ts).
+2. `cleachtadh-web` still owns an app-local signup payment route under [apps/cleachtadh-web/src/routes/api/auth/signup/payment/+server.ts](/home/aaronsinnott/Documents/projects/decyphr/apps/cleachtadh-web/src/routes/api/auth/signup/payment/+server.ts).
 
 These are product-boundary violations, not service-contract failures.
 
@@ -79,9 +78,8 @@ The remaining issue is not auth duplication anymore. It is that Misneach still h
 ## Recommended Follow-Ups
 
 1. Remove business onboarding flow from Cleachtadh and relocate it under Misneach ownership.
-2. Remove course-preview logic from Cleachtadh once Misneach owns all course/admin preview behavior.
-3. Delete or replace Misneach’s leftover focus store if focus is not a Misneach feature.
-4. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
+2. Delete or replace Misneach’s leftover focus store if focus is not a Misneach feature.
+3. Standardize env naming for shared backend entrypoints so both apps resolve the same gateway contract consistently.
 
 ## Verdict
 

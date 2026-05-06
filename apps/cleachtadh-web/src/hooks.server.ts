@@ -1,8 +1,6 @@
 import type { Handle } from '@sveltejs/kit';
 import { sessionCookieName, verifySession } from '$lib/server/auth';
 
-const COURSE_PREVIEW_COOKIE = 'courses_preview_token';
-
 export const handle: Handle = async ({ event, resolve }) => {
   const authMode = (process.env.AUTH_MODE || 'token').toLowerCase();
   const tokenModeEnabled = authMode !== 'session';
@@ -33,25 +31,6 @@ export const handle: Handle = async ({ event, resolve }) => {
       headers: { Location: '/dashboard' }
     });
   }
-
-  if (!tokenModeEnabled && event.locals.auth?.role === 'admin') {
-    const previewToken = event.url.searchParams.get('previewToken');
-    if (previewToken === 'off') {
-      event.cookies.delete(COURSE_PREVIEW_COOKIE, { path: '/' });
-    } else if (previewToken && process.env.COURSES_PREVIEW_ENABLED !== 'false') {
-      event.cookies.set(COURSE_PREVIEW_COOKIE, previewToken, {
-        path: '/',
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 60,
-      });
-    }
-  } else {
-    event.cookies.delete(COURSE_PREVIEW_COOKIE, { path: '/' });
-  }
-
-  event.locals.previewToken = event.cookies.get(COURSE_PREVIEW_COOKIE) || null;
 
   return resolve(event);
 };
