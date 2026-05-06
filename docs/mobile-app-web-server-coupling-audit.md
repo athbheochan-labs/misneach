@@ -26,19 +26,16 @@
 | File | Current Responsibility | Target Backend Owner |
 | --- | --- | --- |
 | `apps/misneach-web/src/lib/server/api.ts` | `nestFetch` helper for server-side calls to upstream `client` API; injects internal auth headers and session-derived identity headers. | `client` gateway/BFF layer (auth context + proxying responsibilities outside cleachtadh-web runtime) |
-| `apps/misneach-web/src/lib/server/auth.ts` | Signs/verifies JWT session cookie claims (`web_session`) using `WEB_SESSION_SECRET`. | `client` auth service (token/session issuance + verification), with cleachtadh-web reduced to token transport only |
-| `apps/misneach-web/src/lib/server/db.ts` | Creates and exports MySQL pool for direct DB access from web runtime. | Platform-owned DB access only from backend services; remove direct DB dependency from cleachtadh-web |
-| `apps/misneach-web/src/lib/server/magic-link.ts` | User lookup/create, table discovery, default language setup, magic-link issuance/verification, and email delivery via Resend; direct DB writes/reads and token hashing. | `client` auth service (or dedicated auth backend) owning magic-link + DB + email workflows |
 | `apps/misneach-web/src/lib/server/discounts.ts` | Server-side discount quote client: forwards quote request to `discounts` service with internal auth header support. | `discounts` service + `client` gateway endpoint (web/mobile consume gateway contract only) |
 
 ## Ownership Summary
 
 - **Primary target owner:** `client` backend gateway/auth modules
 - **Domain owners:** `waitlist` service, `discounts` service, `surveys` module, `courses` module
-- **Platform boundary:** DB/email operations should remain backend-only, not cleachtadh-web runtime
+- **Platform boundary:** DB/email operations should remain backend-only, not frontend runtime
 
 ## Extraction Notes for Mobile
 
-- `magic-link.ts` and `db.ts` are the highest-risk mobile blockers because they embed backend data/email logic in web runtime.
+- The previous local magic-link/JWT implementation has been removed from `misneach-web`; auth now follows the same backend token contract as `cleachtadh-web`.
 - `+server.ts` proxy routes are transport wrappers that should be removed once equivalent backend gateway routes are consumed directly by mobile/web clients.
 - `auth.ts` cookie session assumptions should be replaced by token-based mobile contract while preserving web compatibility during transition.

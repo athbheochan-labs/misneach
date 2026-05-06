@@ -23,7 +23,7 @@
       initialIndex={0}
       homeHref="/"
       showAuthLinks={true}
-      signInHref="/waitlist?interest=individual_course_access"
+      signInHref="/auth/login"
       registerHref="/waitlist?interest=individual_course_access"
       showExit={false}
       primaryCtaHref="/waitlist?interest=individual_course_access"
