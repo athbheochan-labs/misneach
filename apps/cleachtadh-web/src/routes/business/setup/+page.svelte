@@ -376,7 +376,7 @@
 </script>
 
 <svelte:head>
-  <title>Misneach - Set up your account</title>
+  <title>Cleachtadh - Set up your account</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet"
@@ -386,7 +386,7 @@
 <div class="biz-page">
   <div class="top-bar">
     <a class="brand" href="/business">
-      <div class="brand-word">Misne<em>ach</em></div>
+      <div class="brand-word">Cleacht<em>adh</em></div>
     </a>
     <div class="top-step-label">{topLabel}</div>
   </div>

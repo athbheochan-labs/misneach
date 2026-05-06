@@ -98,7 +98,7 @@
             <path d="M33 46 C35.5 37, 42 30, 47 25" stroke="#f5f0e8" stroke-width="5" stroke-linecap="round" fill="none"></path>
             <circle cx="33.5" cy="45" r="3" fill="#7ec99a"></circle>
           </svg>
-          <span class="nav-name">Misne<em>ach</em></span>
+          <span class="nav-name">Cleacht<em>adh</em></span>
       </a>
 
       <div class="nav-right">

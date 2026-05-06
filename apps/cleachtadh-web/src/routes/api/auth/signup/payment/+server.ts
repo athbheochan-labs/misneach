@@ -179,7 +179,7 @@ export const POST: RequestHandler = async (event) => {
       clientId: user.clientId,
       amountCents,
       currency: 'eur',
-      description: `Misneach ${plan} signup`,
+      description: `Cleachtadh ${plan} signup`,
       successUrl,
       cancelUrl,
       metadata: {

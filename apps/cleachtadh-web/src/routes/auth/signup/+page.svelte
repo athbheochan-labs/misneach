@@ -196,7 +196,7 @@
 </script>
 
 <svelte:head>
-  <title>Misneach - Get started</title>
+  <title>Cleachtadh - Get started</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet"
@@ -218,13 +218,13 @@
           <path d="M33 46 C35.5 37,42 30,47 25" stroke="#1c2b22" stroke-width="5" stroke-linecap="round" fill="none"></path>
           <circle cx="33.5" cy="45" r="3" fill="#1c2b22"></circle>
         </svg>
-        <span class="brand-name">Misne<em>ach</em></span>
+        <span class="brand-name">Cleacht<em>adh</em></span>
       </a>
 
       {#if step === 1}
         <div>
           <h2 class="left-headline">Irish,<br /><em>out loud.</em></h2>
-          <p class="left-sub">Your Irish is already in there. Misneach puts it somewhere real - in the actual conversations that happen every day.</p>
+          <p class="left-sub">Your Irish is already in there. Cleachtadh gives you a place to use it every day through review, recall, and output.</p>
           <div class="proof-quote visible">
             <div class="pq-text">"Everybody that comes in uses their cupla focal."</div>
             <div class="pq-attr">Courtney Nic Uilis - An Nead, Monaghan</div>
@@ -350,7 +350,7 @@
         <p class="terms-note">By continuing you agree to our <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a></p>
 
         <div class="back-link" style="margin-top:20px">
-          <a href="/" style="color:rgba(245,240,232,0.3);text-decoration:none;font-size:13px">← Back to misneach.ie</a>
+          <a href="/" style="color:rgba(245,240,232,0.3);text-decoration:none;font-size:13px">← Back to cleachtadh.misneach.site</a>
         </div>
       </div>
     {/if}
@@ -485,7 +485,7 @@
               <div class="next-card-num">03</div>
               <div class="next-card-body">
                 <div class="next-card-title">Find a Failte cafe near you</div>
-                <div class="next-card-desc">Businesses in the Misneach network are ready for you. Your cupla focal belongs out there.</div>
+                <div class="next-card-desc">Your saved phrases are ready for review. Keep showing up and your cúpla focal will stay active.</div>
               </div>
             </div>
           </div>

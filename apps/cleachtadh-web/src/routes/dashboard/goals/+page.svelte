@@ -476,7 +476,7 @@
 </script>
 
 <svelte:head>
-  <title>Misneach — Goals</title>
+  <title>Cleachtadh — Goals</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300;1,9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet"
@@ -489,7 +489,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
       Dashboard
     </MisButton>
-    <div class="nav-brand">Misne<em>ach</em></div>
+    <div class="nav-brand">Cleacht<em>adh</em></div>
   </nav>
 
   <header class="hero">

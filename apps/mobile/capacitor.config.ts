@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const appName = process.env.MOBILE_APP_NAME || 'Misneach';
+const appName = process.env.MOBILE_APP_NAME || 'Cleachtadh';
 const appId = process.env.MOBILE_APP_ID || 'site.misneach.mobile';
 const hostedWebUrl = (process.env.MOBILE_WEB_URL || '').trim();
 const useHostedWeb = process.env.MOBILE_USE_HOSTED_WEB === 'true' && hostedWebUrl.length > 0;
