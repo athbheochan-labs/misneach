@@ -7,6 +7,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [Deployment and Operations](./deployment.md)
 - [Project Management (GitHub)](./project-management.md)
 - [System Architecture](./architecture.md)
+- [Naming Conventions](./naming-conventions.md)
 - [Repo Structure Roadmap](./repo-structure-roadmap.md)
 - [Shared Service Contract Audit](./shared-service-contracts.md)
 - [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)

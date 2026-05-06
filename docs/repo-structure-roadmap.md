@@ -191,3 +191,5 @@ Frontend-only workflows remain correctly scoped to application entries under `ap
 - If it is a deployable user-facing application, place it under `apps/`.
 - If it is a deployable backend/runtime service, place it under `services/`.
 - If it is imported shared code rather than a runtime, place it under `packages/` or `libs/` according to the existing shared-code strategy.
+
+Related policy: [Naming Conventions](./naming-conventions.md)
