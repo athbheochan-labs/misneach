@@ -8,12 +8,7 @@ async function forward(event: Parameters<RequestHandler>[0], method: string) {
     const rawPath = event.params.path || '';
     const upstreamPath = '/' + rawPath;
     const upstreamUrl = new URL(`http://internal${upstreamPath}${event.url.search}`);
-    const isCoursesPath = rawPath.startsWith('courses/');
     const isAuthPath = rawPath.startsWith('auth/');
-    const previewToken = event.locals.auth?.role === 'admin' ? event.locals.previewToken : null;
-    if (isCoursesPath && previewToken && !upstreamUrl.searchParams.has('previewToken')) {
-      upstreamUrl.searchParams.set('previewToken', previewToken);
-    }
     attemptedPath = `${upstreamUrl.pathname}${upstreamUrl.search}`;
 
     const headers = new Headers(event.request.headers);

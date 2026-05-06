@@ -9,7 +9,6 @@ declare global {
         role?: 'learner' | 'admin';
         signupComplete?: boolean;
       } | null;
-      previewToken?: string | null;
     }
 
     interface PageData {
