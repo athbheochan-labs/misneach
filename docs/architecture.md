@@ -20,7 +20,7 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph Frontends
-    web[web]
+    web[misneach-web]
     appweb[cleachtadh-web]
     adminweb[admin-web]
   end
@@ -86,7 +86,7 @@ flowchart TB
 
 ### Request Flow (User Feature Path)
 
-1. User request hits frontend (`web`, `cleachtadh-web`, or `admin-web`).
+1. User request hits frontend (`misneach-web`, `cleachtadh-web`, or `admin-web`).
 2. Frontend calls `client` API endpoints.
 3. `client` orchestrates across domain services (`focus`, `practice`, `courses`, `challenges`, `payment`, `business`, `discounts`).
 4. Services persist/query MariaDB and call internal HTTP endpoints where needed.
@@ -96,7 +96,7 @@ flowchart TB
 
 | Service | Depends On | Inbound Interface | Outbound Interface | Data Stores | Owner |
 | --- | --- | --- | --- | --- | --- |
-| `web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
+| `misneach-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `cleachtadh-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `admin-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `api-proxy` | `client` | HTTP API ingress | HTTP proxy to `client` | None | TBD |
@@ -137,7 +137,7 @@ Public gateway routes exposed via `client` should return normalized error payloa
 
 Frontend ingress is consolidated through `client`:
 
-- `web`, `cleachtadh-web`, and `admin-web` call `client` endpoints.
+- `misneach-web`, `cleachtadh-web`, and `admin-web` call `client` endpoints.
 - Public API ingress should remain a single `client` entrypoint.
 - Domain services remain internal-only.
 

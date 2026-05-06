@@ -82,7 +82,7 @@
     </details>
     <a href="/for-businesses" class="nav-link">For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
-    <a href="/waitlist?interest=individual_course_access" class="nav-cta">Sign in</a>
+    <a href="/auth/login" class="nav-cta">Sign in</a>
   </div>
 </nav>
 

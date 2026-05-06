@@ -52,7 +52,7 @@ npm run cap:open:android
 Launch via app link:
 
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "https://www.misneach.site/auth/verify-request?token=test&email=test@example.com"
+adb shell am start -a android.intent.action.VIEW -d "https://cleachtadh.misneach.site/auth/verify-request?token=test&email=test@example.com"
 ```
 
 Launch via custom scheme:

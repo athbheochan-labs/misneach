@@ -21,32 +21,57 @@ import { MagicLink } from './entities/MagicLink';
 import { User } from './entities/User';
 import { AuthenticatedRequest } from './types/request';
 
+type AppBrand = {
+  name: string;
+  tagline: string;
+};
+
+type EmailTranslations = {
+  subject: string;
+  greeting: string;
+  intro: string;
+  button: string;
+  note: string;
+  footer: string;
+};
+
+const appBrands: Record<'cleachtadh' | 'misneach', AppBrand> = {
+  cleachtadh: {
+    name: 'Cleachtadh',
+    tagline: 'Daily Irish practice',
+  },
+  misneach: {
+    name: 'Misneach',
+    tagline: 'Confidence through language',
+  },
+};
+
 // TODO: Read these from the i18n service
 const translations = {
-  en: {
-    subject: 'Your Cleachtadh Magic Login Link',
-    greeting: 'Welcome to Cleachtadh!',
+  en: (brand: AppBrand): EmailTranslations => ({
+    subject: `Your ${brand.name} Magic Login Link`,
+    greeting: `Welcome to ${brand.name}!`,
     intro: 'Click the button below to access your account securely.',
     button: 'Login Now',
     note: 'If you didn’t request this link, you can safely ignore this email.',
-    footer: '© 2025 Cleachtadh. All rights reserved.',
-  },
-  ga: {
-    subject: 'Do Nasc Draíochta Logála Isteach',
-    greeting: 'Fáilte go Cleachtadh!',
+    footer: `© 2025 ${brand.name}. All rights reserved.`,
+  }),
+  ga: (brand: AppBrand): EmailTranslations => ({
+    subject: `Do Nasc Draíochta Logála Isteach ${brand.name}`,
+    greeting: `Fáilte go ${brand.name}!`,
     intro: 'Cliceáil an cnaipe thíos chun rochtain shlán a fháil ar do chuntas.',
     button: 'Logáil Isteach Anois',
     note: 'Mura ndearna tú iarratas ar an nasc seo, is féidir leat neamhaird a dhéanamh de.',
-    footer: '© 2025 Cleachtadh. Gach ceart ar cosaint.',
-  },
-  pt: {
-    subject: 'Seu Link Mágico de Login do Cleachtadh',
-    greeting: 'Bem-vindo ao Cleachtadh!',
+    footer: `© 2025 ${brand.name}. Gach ceart ar cosaint.`,
+  }),
+  pt: (brand: AppBrand): EmailTranslations => ({
+    subject: `Seu Link Mágico de Login do ${brand.name}`,
+    greeting: `Bem-vindo ao ${brand.name}!`,
     intro: 'Clique no botão abaixo para acessar sua conta com segurança.',
     button: 'Entrar Agora',
     note: 'Se você não solicitou este link, pode ignorar este e-mail com segurança.',
-    footer: '© 2025 Cleachtadh. Todos os direitos reservados.',
-  },
+    footer: `© 2025 ${brand.name}. Todos os direitos reservados.`,
+  }),
 };
 
 @Injectable()
@@ -276,6 +301,19 @@ export class AuthService {
     return value.replace(/\/+$/, '');
   }
 
+  private resolveAppBrand(appUrl: string): AppBrand {
+    try {
+      const hostname = new URL(appUrl).hostname.toLowerCase();
+      if (hostname === 'cleachtadh.misneach.site') {
+        return appBrands.cleachtadh;
+      }
+    } catch {
+      // Fall through to default brand.
+    }
+
+    return appBrands.misneach;
+  }
+
   private resolveMagicLinkAppUrl(candidate?: string): string {
     const fallback = this.normalizeAppUrl(this.config.get<string>('APP_URL') || '');
     const allowed = [
@@ -327,15 +365,19 @@ export class AuthService {
 
     const appUrl = this.resolveMagicLinkAppUrl(appBaseUrl);
     const verifyUrl = `${appUrl}/auth/verify-request?token=${token}&email=${email}`;
+    const brand = this.resolveAppBrand(appUrl);
 
     const userLang = user.languageSettings?.[0]?.firstLanguage || 'en';
-    const selectedTranslations = translations[userLang] || translations.en;
+    const translationFactory = translations[userLang] || translations.en;
+    const selectedTranslations = translationFactory(brand);
 
     const emailTemplatePath = join(__dirname, '..', '..', 'public', 'email', 'magic-link.html');
     let emailHtml = await readFile(emailTemplatePath, 'utf-8');
 
     emailHtml = emailHtml
       .replace(/{{verifyUrl}}/g, verifyUrl)
+      .replace(/{{brandName}}/g, brand.name)
+      .replace(/{{brandTagline}}/g, brand.tagline)
       .replace(/{{t\.subject}}/g, selectedTranslations.subject)
       .replace(/{{t\.greeting}}/g, selectedTranslations.greeting)
       .replace(/{{t\.intro}}/g, selectedTranslations.intro)

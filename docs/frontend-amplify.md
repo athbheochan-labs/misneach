@@ -21,7 +21,7 @@ This runbook deploys `apps/misneach-web` to AWS Amplify Hosting.
    - `PUBLIC_API_BASE_URL` = browser-facing API URL
    - `API_INTERNAL_URL` = primary server-side upstream
    - `API_INTERNAL_URLS` = optional comma-separated fallback upstreams
-   - `APP_BASE_URL` = public web URL (for example `https://misneach.site`)
+   - `APP_BASE_URL` = public web URL (for example `https://misneach.ie`)
 
 ## Deploy Flows
 

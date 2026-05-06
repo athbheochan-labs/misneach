@@ -36,8 +36,8 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="misneach.site" />
-                <data android:scheme="https" android:host="www.misneach.site" />
+                <data android:scheme="https" android:host="misneach.ie" />
+                <data android:scheme="https" android:host="www.misneach.ie" />
                 <data android:scheme="https" android:host="cleachtadh.misneach.site" />
             </intent-filter>
 

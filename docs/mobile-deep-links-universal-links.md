@@ -19,8 +19,7 @@ This runbook configures in-app routing from email/browser links for Android and 
 ## Android App Links
 
 1. Publish `assetlinks.json` at:
-   - `https://misneach.site/.well-known/assetlinks.json`
-   - `https://www.misneach.site/.well-known/assetlinks.json`
+   - `https://cleachtadh.misneach.site/.well-known/assetlinks.json`
 
 2. Include your release signing cert SHA-256 fingerprint and package:
 
@@ -40,14 +39,13 @@ This runbook configures in-app routing from email/browser links for Android and 
 3. Verify:
 
 ```bash
-adb shell am start -a android.intent.action.VIEW -d "https://www.misneach.site/auth/verify-request?token=test&email=test@example.com"
+adb shell am start -a android.intent.action.VIEW -d "https://cleachtadh.misneach.site/auth/verify-request?token=test&email=test@example.com"
 ```
 
 ## iOS Universal Links
 
 1. Publish `apple-app-site-association` at:
-   - `https://misneach.site/.well-known/apple-app-site-association`
-   - `https://www.misneach.site/.well-known/apple-app-site-association`
+   - `https://cleachtadh.misneach.site/.well-known/apple-app-site-association`
 
 2. Template:
 
@@ -65,8 +63,7 @@ adb shell am start -a android.intent.action.VIEW -d "https://www.misneach.site/a
 ```
 
 3. In Xcode for the iOS target, enable Associated Domains:
-   - `applinks:misneach.site`
-   - `applinks:www.misneach.site`
+   - `applinks:cleachtadh.misneach.site`
 
 ## Custom scheme fallback
 

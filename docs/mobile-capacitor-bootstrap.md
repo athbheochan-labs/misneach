@@ -26,7 +26,7 @@ Key values:
 
 - `MOBILE_APP_NAME`
 - `MOBILE_APP_ID`
-- `MOBILE_WEB_URL` (for example `https://www.misneach.site`)
+- `MOBILE_WEB_URL` (for example `https://cleachtadh.misneach.site`)
 
 ## Commands
 
