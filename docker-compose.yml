@@ -41,7 +41,7 @@ services:
 
   nlp:
     build:
-      context: ./nlp
+      context: ./services/nlp
     container_name: nlp
     ports:
       - "8300:8300"
