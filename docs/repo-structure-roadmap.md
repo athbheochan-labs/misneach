@@ -40,10 +40,6 @@ Backend/runtime services under `services/`:
 - `translation/translation-connector`
 - `waitlist`
 
-Separate top-level runtime still outside `services/`:
-
-- `nlp/`
-
 ## Target Structure
 
 ```text
@@ -70,7 +66,7 @@ services/
   translation/
     translation-connector/
   waitlist/
-  nlp/                    # follow-up move, not yet completed
+  nlp/
 
 packages/
   analytics/
@@ -102,7 +98,7 @@ packages/
 | `apps/practice` | backend service | `services/practice` | completed | moved in `#188` |
 | `apps/waitlist` | backend service | `services/waitlist` | completed | moved in `#188` |
 | `apps/translation/translation-connector` | integration service/tooling | `services/translation/translation-connector` | completed | still nested |
-| `nlp` | standalone runtime service | `services/nlp` | pending | separate follow-up move |
+| `services/nlp` | standalone runtime service | `services/nlp` | completed | moved in `#198` |
 
 ## Workspace Strategy
 
@@ -123,7 +119,7 @@ Notes:
 - `libs/*` remains unchanged for now.
 - `packages/*` is reserved for code intentionally shared across products or runtimes.
 - The `translation` subtree remains nested because `translation-connector` is not yet shaped like the other top-level services.
-- `nlp/` is still outside npm workspace management and should be treated as a separate structural follow-up.
+- `services/nlp` remains outside npm workspace management and should continue to be treated as a standalone Docker service.
 
 ## Tooling and Runtime Impact
 
@@ -144,19 +140,15 @@ Frontend-only workflows remain correctly scoped to application entries under `ap
 
 ## Migration Risks That Remain
 
-1. Top-level `nlp` inconsistency
-   - `nlp/` is still outside `services/`.
-   - That leaves the top-level structure conceptually inconsistent until it is moved.
-
-2. Translation subtree ambiguity
+1. Translation subtree ambiguity
    - `services/translation/translation-connector` does not match the flatter shape of the other runtime services.
    - It may remain acceptable, but it should be an explicit choice.
 
-3. Shared-code boundary drift
+2. Shared-code boundary drift
    - `libs/` and `packages/` now coexist.
    - Without a deliberate rule, future code may be placed inconsistently.
 
-4. Rename noise in future review
+3. Rename noise in future review
    - Any follow-up path moves should stay mechanical and isolated.
    - Mixing structure work with behavior changes will make regressions harder to see.
 
@@ -171,18 +163,15 @@ Frontend-only workflows remain correctly scoped to application entries under `ap
 
 ## Residual Follow-Up Work
 
-1. Move `nlp/` to `services/nlp`
-   - keep this as a separate mechanical change
-
-2. Standardize naming conventions
+1. Standardize naming conventions
    - decide whether `irish-week` should remain under that path or be renamed for consistency
    - decide whether `translation/translation-connector` should stay nested or move to something flatter such as `services/translator`
 
-3. Reconcile `libs/` and `packages/`
+2. Reconcile `libs/` and `packages/`
    - keep them distinct unless there is a deliberate consolidation plan
    - do not combine that refactor with more path churn
 
-4. Verify deployment/docs drift periodically
+3. Verify deployment/docs drift periodically
    - any new backend service should be added under `services/`
    - any new user-facing application should be added under `apps/`
 

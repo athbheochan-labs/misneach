@@ -154,9 +154,9 @@ The repository mostly follows the intended pattern now:
    - this is acceptable if it remains the public API gateway abstraction
    - if it evolves into a stricter BFF/API platform layer, a future rename to something like `api-gateway` could be considered, but that is not recommended now
 
-4. top-level `nlp/`
-   - still outside `services/`
-   - structural inconsistency more than naming inconsistency
+4. `services/nlp`
+   - now matches the top-level backend layout
+   - still differs operationally because it is a standalone Docker service rather than an npm workspace service
 
 ## Follow-Up Rename Work
 
@@ -171,8 +171,8 @@ These are the only follow-up naming changes worth considering from the current s
    - `services/translation-connector`
    - keep current nested structure intentionally
 
-3. Move `nlp/` to `services/nlp`
-   - this is primarily structural, but it also completes the naming model
+3. Decide whether `services/nlp` should remain a standalone Docker service outside npm workspace management
+   - this is not a naming problem now, but it is still an architectural distinction worth keeping explicit
 
 ## Recommendation
 
@@ -189,6 +189,6 @@ The naming model is already good enough to standardize without more immediate ch
 
 The only worthwhile follow-up changes are:
 
-1. move `nlp/` under `services/`
-2. make an explicit decision on `irish-week`
-3. make an explicit decision on `translation-connector`
+1. make an explicit decision on `irish-week`
+2. make an explicit decision on `translation-connector`
+3. keep the `services/nlp` standalone-service treatment explicit in docs and tooling
