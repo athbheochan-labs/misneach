@@ -47,7 +47,7 @@
   }
 
   function isPracticeRoute(pathname: string) {
-    return pathname === '/dashboard/practice';
+    return pathname === '/dashboard/practice' || pathname.startsWith('/dashboard/practice/');
   }
 
   const immersiveLessonRoute = $derived(isImmersiveLessonRoute(page.url.pathname));
