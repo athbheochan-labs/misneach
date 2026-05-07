@@ -38,6 +38,7 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 - lexicon calls go through `/api/proxy/snapshot/*` and `/api/proxy/lexicon/*`
 - phrasebook calls go through `/api/proxy/phrasebook/*`
 - mobile telemetry goes through `/api/proxy/mobile/telemetry`
+- signup discount quoting now goes through the `client` gateway discount endpoint
 
 This is the right direction for a multi-product setup.
 

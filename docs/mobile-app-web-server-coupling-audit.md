@@ -26,7 +26,7 @@
 | File | Current Responsibility | Target Backend Owner |
 | --- | --- | --- |
 | `apps/misneach-web/src/lib/server/api.ts` | `nestFetch` helper for server-side calls to upstream `client` API; injects internal auth headers and session-derived identity headers. | `client` gateway/BFF layer (auth context + proxying responsibilities outside cleachtadh-web runtime) |
-| `apps/misneach-web/src/lib/server/discounts.ts` | Server-side discount quote client: forwards quote request to `discounts` service with internal auth header support. | `discounts` service + `client` gateway endpoint (web/mobile consume gateway contract only) |
+| `apps/misneach-web/src/lib/server/discounts.ts` | Server-side discount quote client: forwards quote requests to the `client` gateway discount endpoint. | `client` gateway discount endpoint |
 
 ## Ownership Summary
 

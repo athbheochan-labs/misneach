@@ -1,4 +1,4 @@
-import { getInternalAuthSecret } from '$lib/server/upstreams';
+import { getInternalAuthSecret, resolveApiBaseUrls } from '$lib/server/upstreams';
 
 type DiscountQuoteInput = {
   code: string;
@@ -19,26 +19,8 @@ type DiscountQuoteResponse = {
   discountValue?: number;
 };
 
-function resolveClientBaseUrls(): string[] {
-  const configured = (process.env.DISCOUNT_SERVICE_URL || '').trim();
-  const configuredList = (process.env.DISCOUNT_SERVICE_URLS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  const candidates = [
-    configured,
-    ...configuredList,
-    'http://discounts:3020',
-    'http://127.0.0.1:3020',
-    'http://localhost:3020'
-  ].filter(Boolean);
-
-  return [...new Set(candidates)];
-}
-
 export async function quoteDiscount(input: DiscountQuoteInput): Promise<DiscountQuoteResponse> {
-  const baseUrls = resolveClientBaseUrls();
+  const baseUrls = resolveApiBaseUrls();
   let lastError: unknown;
 
   for (const baseUrl of baseUrls) {
