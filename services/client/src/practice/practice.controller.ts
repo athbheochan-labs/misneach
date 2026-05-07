@@ -25,6 +25,12 @@ export class PracticeController {
     return this.practiceService.post('/practice/attempt', clientId, body);
   }
 
+  @Post('review')
+  async reviewItem(@Req() req: AuthenticatedRequest, @Body() body: any) {
+    const clientId = await this.authService.getClientIdFromSession(req);
+    return this.practiceService.post('/practice/review', clientId, body);
+  }
+
   @Get('mistakes')
   async getMistakes(
     @Req() req: AuthenticatedRequest,

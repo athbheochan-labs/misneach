@@ -3,13 +3,12 @@ import {
   IsArray,
   IsEnum,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
-import { EXERCISE_TYPES, ExerciseType } from './practice.types';
+import { EXERCISE_TYPES, ExerciseType, PracticeRating } from './practice.types';
 
 export class DuePracticeQueryDto {
   @IsOptional()
@@ -57,6 +56,26 @@ export class SubmitPracticeAttemptDto {
   @IsInt()
   @Min(0)
   hintsUsed?: number;
+}
+
+export class ReviewPracticeItemDto {
+  @IsEnum(EXERCISE_TYPES)
+  exerciseType!: ExerciseType;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  phraseId!: number;
+
+  @IsOptional()
+  @IsString()
+  attemptId?: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  rating!: PracticeRating;
 }
 
 export class PracticeProgressQueryDto {
@@ -141,7 +160,7 @@ export class PracticeWarmupQueryDto {
 export class ResetProfilesDto {
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
   @Min(0)
   phraseId?: number;
 }
