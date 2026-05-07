@@ -2,8 +2,9 @@ import type { RequestHandler } from './$types';
 import { nestFetch } from '$lib/server/api';
 
 export const GET: RequestHandler = async (event) => {
-  const clientId = event.locals.auth?.clientId;
-  if (!clientId) {
+  const clientId = event.url.searchParams.get('clientId')?.trim() || '';
+  const accessToken = event.url.searchParams.get('accessToken')?.trim() || '';
+  if (!clientId || !accessToken) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -16,6 +17,7 @@ export const GET: RequestHandler = async (event) => {
         method: 'GET',
         headers: {
           Accept: 'text/event-stream',
+          Authorization: `Bearer ${accessToken}`,
         },
       },
       true,

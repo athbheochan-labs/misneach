@@ -1,6 +1,7 @@
 <script lang="ts">
   import { apiFetch } from '$lib/api/client';
   import { getAuthMe } from '$lib/api/auth-client';
+  import { loadAuthSession } from '$lib/mobile/session-storage';
   import { afterUpdate, onDestroy, onMount } from 'svelte';
   import { MisButton, MisTextarea } from '@decyphr/misneach-ui';
 
@@ -36,6 +37,7 @@
   let eventSource: EventSource | null = null;
   let translationCache: Record<string, any> = {};
   let tokenHover: string | null = null;
+  let authAccessToken = '';
 
   $: totalPages = Math.max(1, Math.ceil(translations.length / limit));
   $: page = Math.min(page, totalPages);
@@ -140,8 +142,13 @@
 
   function openSSE() {
     if (eventSource) return;
+    if (!clientId || !authAccessToken) return;
 
-    eventSource = new EventSource('/api/translations/stream');
+    const params = new URLSearchParams({
+      clientId,
+      accessToken: authAccessToken
+    });
+    eventSource = new EventSource(`/api/translations/stream?${params.toString()}`);
 
     eventSource.onmessage = (ev) => {
       try {
@@ -206,6 +213,9 @@
       if (!auth.loggedIn || !auth.user) throw new Error('Failed to load session');
       clientId = String(auth.user.clientId || '').trim();
       if (!clientId) throw new Error('Client ID missing');
+      const session = await loadAuthSession().catch(() => null);
+      authAccessToken = String(session?.accessToken || '').trim();
+      if (!authAccessToken) throw new Error('Access token missing');
 
       await loadExistingTranslations();
       openSSE();
