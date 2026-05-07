@@ -592,7 +592,7 @@
   }
 
   function startWriteAboutYourDay() {
-    goto('/dashboard/translations').catch(() => undefined);
+    goto('/dashboard/practice/daily').catch(() => undefined);
   }
 
   async function startFlashcardReview() {

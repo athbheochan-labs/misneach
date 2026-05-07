@@ -24,6 +24,8 @@ import { WaitlistModule } from './waitlist/waitlist.module';
 import { SurveysModule } from './surveys/surveys.module';
 import { HealthController } from './health.controller';
 import { MobileModule } from './mobile/mobile.module';
+import { DailyNote } from './daily-notes/daily-note.entity';
+import { DailyNotesModule } from './daily-notes/daily-notes.module';
 
 @Module({
   imports: [
@@ -37,7 +39,7 @@ import { MobileModule } from './mobile/mobile.module';
       username: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [User, MagicLink, LanguageSetting],
+      entities: [User, MagicLink, LanguageSetting, DailyNote],
       synchronize: true,
     }),
     AuthModule,
@@ -59,6 +61,7 @@ import { MobileModule } from './mobile/mobile.module';
     ChallengesModule,
     AdminModule,
     MobileModule,
+    DailyNotesModule,
   ],
   controllers: [HealthController],
 })
