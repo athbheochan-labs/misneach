@@ -64,6 +64,9 @@
   let showAnswer = false;
   let showClozeHint = false;
   let hintRevealCount = 0;
+  let inputErrorFlash = false;
+  let sentenceErrorFlash = false;
+  let interactionStateResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   let feedback: {
     isCorrect: boolean;
@@ -280,10 +283,16 @@
   }
 
   $: current = queue[index] || null;
+  $: expectedSentenceTokens = current?.exerciseType === 'sentence_builder' ? current.expectedAnswer.split(/\s+/).filter(Boolean) : [];
   $: selectedSentenceTokens = sentenceChoices
     .filter((token) => token.selectedAt != null)
     .sort((a, b) => Number(a.selectedAt) - Number(b.selectedAt))
     .map((token) => token.value);
+  $: selectedSentenceTokenStates = selectedSentenceTokens.map((token, tokenIndex) => {
+    if (!feedback || feedback.isCorrect) return 'correct';
+    const expectedToken = expectedSentenceTokens[tokenIndex] || '';
+    return normalizeToken(token) === normalizeToken(expectedToken) ? 'correct' : 'wrong';
+  });
   $: progress =
     sessionMode === 'flash'
       ? flashcards.length > 0
@@ -433,7 +442,28 @@
     }
   }
 
+  function clearInteractionStateResetTimer() {
+    if (!interactionStateResetTimer) return;
+    clearTimeout(interactionStateResetTimer);
+    interactionStateResetTimer = null;
+  }
+
+  function clearTransientInteractionStates() {
+    inputErrorFlash = false;
+    sentenceErrorFlash = false;
+  }
+
+  function queueTransientInteractionReset() {
+    clearInteractionStateResetTimer();
+    interactionStateResetTimer = setTimeout(() => {
+      clearTransientInteractionStates();
+      interactionStateResetTimer = null;
+    }, 600);
+  }
+
   function resetAnswerState() {
+    clearInteractionStateResetTimer();
+    clearTransientInteractionStates();
     freeTextAnswer = '';
     showAnswer = false;
     showClozeHint = false;
@@ -644,28 +674,28 @@
 
   function toggleSentenceToken(tokenIndex: number) {
     const token = sentenceChoices[tokenIndex];
-    if (!token) return;
+    if (!token || feedback || token.selectedAt != null) return;
 
     sentenceChoices = sentenceChoices.map((item, idx) =>
       idx === tokenIndex
         ? {
             ...item,
-            selectedAt: item.selectedAt == null ? sentenceSelectionCounter : null,
+            selectedAt: sentenceSelectionCounter,
           }
         : item,
     );
 
-    if (token.selectedAt == null) {
-      sentenceSelectionCounter += 1;
-    }
+    sentenceSelectionCounter += 1;
   }
 
   function clearSentenceSelection() {
+    if (feedback) return;
     sentenceChoices = sentenceChoices.map((item) => ({ ...item, selectedAt: null }));
     sentenceSelectionCounter = 0;
   }
 
   function removeSelectedToken(selectionIndex: number) {
+    if (feedback) return;
     const selected = sentenceChoices
       .map((token, tokenIndex) => ({ token, tokenIndex }))
       .filter((entry) => entry.token.selectedAt != null)
@@ -673,7 +703,14 @@
 
     const target = selected[selectionIndex];
     if (!target) return;
-    toggleSentenceToken(target.tokenIndex);
+    sentenceChoices = sentenceChoices.map((item, idx) =>
+      idx === target.tokenIndex
+        ? {
+            ...item,
+            selectedAt: null,
+          }
+        : item,
+    );
   }
 
   function nextQuestion() {
@@ -747,6 +784,16 @@
         expectedAnswerHtml: diff.expectedHtml,
       };
       feedbackMessage = isCorrect ? pickRandom(successMessages) : pickRandom(retryMessages);
+      clearInteractionStateResetTimer();
+      clearTransientInteractionStates();
+      if (!isCorrect) {
+        if (current.exerciseType === 'sentence_builder') {
+          sentenceErrorFlash = true;
+        } else {
+          inputErrorFlash = true;
+        }
+        queueTransientInteractionReset();
+      }
       if (isCorrect) sessionCorrectCount += 1;
       else sessionWrongCount += 1;
 
@@ -865,6 +912,7 @@
   });
 
   onDestroy(() => {
+    clearInteractionStateResetTimer();
     practiceSessionChromeActive.set(false);
   });
 </script>
@@ -1072,12 +1120,21 @@
                 <button class="btn-clear" type="button" onclick={clearSentenceSelection} disabled={selectedSentenceTokens.length === 0}>Clear</button>
               </div>
 
-              <div class={`answer-tray ${selectedSentenceTokens.length ? 'has-words' : ''}`}>
+              <div
+                class={`answer-tray ${selectedSentenceTokens.length ? 'has-words' : ''} ${feedback ? (feedback.isCorrect ? 'correct-state' : 'wrong-state') : ''} ${sentenceErrorFlash ? 'shake-state' : ''}`}
+              >
                 {#if selectedSentenceTokens.length === 0}
                   <span class="answer-tray-placeholder">Tap words below to build your answer...</span>
                 {:else}
                   {#each selectedSentenceTokens as token, tokenIndex (`${token}-${tokenIndex}`)}
-                    <button class="word-token placed" type="button" onclick={() => removeSelectedToken(tokenIndex)}>{token}</button>
+                    <button
+                      class={`word-token placed ${feedback ? `tok-${selectedSentenceTokenStates[tokenIndex]}` : ''}`}
+                      type="button"
+                      onclick={() => removeSelectedToken(tokenIndex)}
+                      disabled={!!feedback}
+                    >
+                      {token}
+                    </button>
                   {/each}
                 {/if}
               </div>
@@ -1086,9 +1143,10 @@
                 <div class="word-bank-label">Word bank</div>
                 {#each sentenceChoices as token, tokenIndex (token.id)}
                   <button
-                    class={`word-token bank ${token.selectedAt != null ? 'selected' : ''}`}
+                    class={`word-token bank ${token.selectedAt != null ? 'used' : ''}`}
                     type="button"
                     onclick={() => toggleSentenceToken(tokenIndex)}
+                    disabled={token.selectedAt != null || !!feedback}
                   >
                     {token.value}
                   </button>
@@ -1099,7 +1157,7 @@
                 <input
                   id="practice-answer"
                   bind:value={freeTextAnswer}
-                  class={`fill-input ${feedback ? (feedback.isCorrect ? 'correct-input' : 'error-input') : ''}`}
+                  class={`fill-input ${feedback?.isCorrect ? 'correct-input' : ''} ${inputErrorFlash ? 'error-input shake-state' : ''}`}
                   type="text"
                   placeholder={sessionMode === 'fix_mistakes' ? 'Type your answer...' : 'Type your answer...'}
                   autocomplete="off"
@@ -1167,14 +1225,25 @@
 
           <div class="action-bar">
             {#if !feedback}
-              <button class="btn-show" type="button" onclick={() => (showAnswer = !showAnswer)}>
+              <button class="btn-show" type="button" onclick={() => (showAnswer = !showAnswer)} disabled={submitting}>
                 {showAnswer ? 'Hide answer' : 'Show answer'}
               </button>
-              <button class="btn-check" type="button" onclick={submitAttempt} disabled={submitting || !canSubmit}>
+              <button
+                class={`btn-check ${showAnswer ? 'correct-btn' : ''}`}
+                type="button"
+                onclick={submitAttempt}
+                disabled={submitting || !canSubmit}
+              >
                 {submitting ? 'Checking...' : 'Check'}
               </button>
             {:else}
-              <button class="btn-check" type="button" onclick={continueAfterFeedback}>Next</button>
+              <button
+                class={`btn-check ${feedback.isCorrect ? 'correct-btn' : 'error-btn'}`}
+                type="button"
+                onclick={continueAfterFeedback}
+              >
+                Next
+              </button>
             {/if}
           </div>
         </div>
@@ -1761,6 +1830,23 @@
     align-items: center;
     gap: 6px;
     margin-bottom: 16px;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+  }
+
+  .answer-tray.has-words {
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .answer-tray.correct-state {
+    border-color: var(--correct-border);
+    background: var(--correct-bg);
+    box-shadow: 0 0 0 3px rgba(45, 122, 80, 0.08);
+  }
+
+  .answer-tray.wrong-state {
+    border-color: var(--error-border);
+    background: var(--error-bg);
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.06);
   }
 
   .answer-tray-placeholder {
@@ -1781,12 +1867,43 @@
     border: 1.5px solid transparent;
     user-select: none;
     white-space: nowrap;
+    transition: transform .12s ease, border-color .12s ease, background .12s ease, color .12s ease, opacity .12s ease;
   }
 
   .word-token.bank { background: white; border-color: var(--parchment-dark); color: var(--forest); }
-  .word-token.bank:hover { border-color: var(--moss); background: rgba(45,122,80,.04); }
-  .word-token.bank.selected { border-color: var(--moss); background: rgba(45,122,80,.08); color: var(--moss); }
+  .word-token.bank:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: var(--moss);
+    background: rgba(45,122,80,.04);
+    box-shadow: 0 6px 14px rgba(45,122,80,.08);
+  }
+  .word-token.bank.used {
+    opacity: .42;
+    background: rgba(232,224,208,.6);
+    color: rgba(28,43,34,.45);
+    pointer-events: none;
+  }
   .word-token.placed { background: var(--forest); border-color: var(--forest); color: var(--parchment); }
+  .word-token.placed:hover:not(:disabled) {
+    background: #243529;
+    border-color: #243529;
+    transform: translateY(-1px);
+  }
+  .word-token.tok-correct {
+    background: var(--correct);
+    border-color: var(--correct);
+    color: var(--parchment);
+    pointer-events: none;
+  }
+  .word-token.tok-wrong {
+    background: var(--error);
+    border-color: var(--error);
+    color: #fff;
+    pointer-events: none;
+  }
+  .word-token:disabled {
+    cursor: default;
+  }
 
   .word-bank {
     display: flex;
@@ -1821,12 +1938,25 @@
     color: var(--forest);
     background: white;
     outline: none;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
   }
 
   .fill-input::placeholder { color: #ccc; }
   .fill-input:focus { border-color: var(--moss); box-shadow: 0 0 0 3px rgba(45,122,80,.08); }
   .fill-input.correct-input { border-color: var(--correct-border); background: var(--correct-bg); color: var(--correct); }
   .fill-input.error-input { border-color: var(--error-border); background: var(--error-bg); color: var(--error); }
+
+  @keyframes practiceShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); }
+    40% { transform: translateX(5px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  .shake-state {
+    animation: practiceShake .45s ease;
+  }
 
   .input-hint {
     font-size: 12px;
@@ -1918,9 +2048,13 @@
     font-size: 15px;
     font-weight: 700;
     cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
   }
 
   .btn-check:disabled { opacity: .35; cursor: not-allowed; }
+  .btn-check.correct-btn { background: var(--correct); color: #fff; }
+  .btn-check.error-btn { background: var(--error); color: #fff; }
+  .btn-check:not(:disabled):hover { transform: translateY(-1px); }
 
   .btn-show {
     padding: 15px 18px;
@@ -1933,6 +2067,17 @@
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
+  }
+
+  .btn-show:hover:not(:disabled) {
+    border-color: var(--moss);
+    color: var(--forest);
+  }
+
+  .btn-show:disabled {
+    opacity: .45;
+    cursor: not-allowed;
   }
 
   .flashcard-wrap {
