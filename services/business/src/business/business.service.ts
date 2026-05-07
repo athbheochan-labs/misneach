@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -18,6 +19,7 @@ type PaymentIntentResult = {
 
 type DiscountQuoteResult = {
   valid: boolean;
+  reason?: string | null;
   promoCode: string | null;
   discountCents: number;
   totalCents: number;
@@ -30,6 +32,7 @@ type BusinessOnboardingState = {
   details: BusinessDetailsDto | null;
   staffEmails: string[];
   promoCode: string | null;
+  promoRedeemed: boolean;
   paymentIntentId: string | null;
   paymentStatus: 'pending' | 'succeeded' | 'waived';
   activatedAt: string | null;
@@ -61,6 +64,7 @@ export class BusinessService {
       details: null,
       staffEmails: [],
       promoCode: null,
+      promoRedeemed: false,
       paymentIntentId: null,
       paymentStatus: 'pending',
       activatedAt: null,
@@ -79,37 +83,6 @@ export class BusinessService {
       unique.add(email);
     }
     return [...unique];
-  }
-
-  private parsePromo(code?: string | null) {
-    const normalized = (code || '').trim().toUpperCase();
-    const promoMap = (process.env.BUSINESS_PROMO_CODES || 'MISNEACH2025:100')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const [promoCode, discountRaw] = entry.split(':');
-        const discountPercent = Number.parseInt(discountRaw || '0', 10);
-        return {
-          promoCode: (promoCode || '').trim().toUpperCase(),
-          discountPercent: Number.isFinite(discountPercent)
-            ? Math.max(0, Math.min(100, discountPercent))
-            : 0,
-        };
-      });
-
-    const match = promoMap.find((item) => item.promoCode === normalized);
-    return {
-      valid: Boolean(match),
-      promoCode: match?.promoCode ?? null,
-      discountPercent: match?.discountPercent ?? 0,
-    };
-  }
-
-  private calculateTotalCents(discountPercent: number) {
-    if (discountPercent <= 0) return DEFAULT_PRICE_CENTS;
-    const discounted = Math.round(DEFAULT_PRICE_CENTS * (1 - discountPercent / 100));
-    return Math.max(0, discounted);
   }
 
   private async quoteExternalDiscount(code?: string | null): Promise<DiscountQuoteResult> {
@@ -151,26 +124,65 @@ export class BusinessService {
       const payload = (await response.json()) as DiscountQuoteResult;
       return {
         valid: Boolean(payload.valid),
+        reason: payload.reason ?? null,
         promoCode: payload.promoCode || null,
         discountCents: Number(payload.discountCents || 0),
         totalCents: Number(payload.totalCents || DEFAULT_PRICE_CENTS),
         currency: String(payload.currency || DEFAULT_CURRENCY),
       };
     } catch (error) {
-      this.logger.warn(
-        `Discount service unavailable, falling back to BUSINESS_PROMO_CODES: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-      const fallback = this.parsePromo(normalized);
+      this.logger.warn(`Discount service unavailable: ${error instanceof Error ? error.message : String(error)}`);
       return {
-        valid: fallback.valid,
-        promoCode: fallback.promoCode,
-        discountCents: DEFAULT_PRICE_CENTS - this.calculateTotalCents(fallback.discountPercent),
-        totalCents: this.calculateTotalCents(fallback.discountPercent),
+        valid: false,
+        reason: 'unavailable',
+        promoCode: null,
+        discountCents: 0,
+        totalCents: DEFAULT_PRICE_CENTS,
         currency: DEFAULT_CURRENCY,
       };
     }
+  }
+
+  private async redeemExternalDiscount(code?: string | null): Promise<DiscountQuoteResult> {
+    const normalized = (code || '').trim().toUpperCase();
+    if (!normalized) {
+      return {
+        valid: false,
+        reason: null,
+        promoCode: null,
+        discountCents: 0,
+        totalCents: DEFAULT_PRICE_CENTS,
+        currency: DEFAULT_CURRENCY,
+      };
+    }
+
+    const response = await fetch(`${this.discountUrl}/discounts/redeem`, {
+      method: 'POST',
+      headers: this.internalHeaders(),
+      body: JSON.stringify({
+        code: normalized,
+        audience: 'business',
+        appliesTo: 'business-kit',
+        baseCents: DEFAULT_PRICE_CENTS,
+        currency: DEFAULT_CURRENCY,
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(`Discount redemption failed (${response.status}): ${text}`);
+      throw new InternalServerErrorException('Unable to redeem discount code');
+    }
+
+    const payload = (await response.json()) as DiscountQuoteResult;
+    return {
+      valid: Boolean(payload.valid),
+      reason: payload.reason ?? null,
+      promoCode: payload.promoCode || null,
+      discountCents: Number(payload.discountCents || 0),
+      totalCents: Number(payload.totalCents || DEFAULT_PRICE_CENTS),
+      currency: String(payload.currency || DEFAULT_CURRENCY),
+    };
   }
 
   private internalHeaders() {
@@ -278,6 +290,7 @@ export class BusinessService {
     const state = this.upsertState(clientId);
     const quote = await this.quoteExternalDiscount(promoCode);
     state.promoCode = quote.valid ? quote.promoCode : null;
+    state.promoRedeemed = false;
 
     const discountPercent =
       DEFAULT_PRICE_CENTS <= 0
@@ -295,10 +308,18 @@ export class BusinessService {
 
   async createPaymentIntent(clientId: string, promoCode?: string) {
     const state = this.upsertState(clientId);
-    const quote = await this.quoteExternalDiscount(promoCode);
+    const quote = await this.redeemExternalDiscount(promoCode);
     const totalCents = quote.totalCents;
 
+    if (promoCode && !quote.valid) {
+      if (quote.reason === 'usage_cap_reached') {
+        throw new ConflictException('Discount code usage cap reached');
+      }
+      throw new BadRequestException('Invalid discount code');
+    }
+
     state.promoCode = quote.valid ? quote.promoCode : null;
+    state.promoRedeemed = Boolean(quote.valid && quote.promoCode);
 
     if (totalCents === 0) {
       return {
@@ -331,8 +352,25 @@ export class BusinessService {
       throw new BadRequestException('Business details are required before activation');
     }
 
-    const quote = await this.quoteExternalDiscount(payload.promoCode || state.promoCode);
+    const quote =
+      payload.promoCode || state.promoCode
+        ? state.promoRedeemed && !payload.promoCode
+          ? await this.quoteExternalDiscount(state.promoCode)
+          : await this.redeemExternalDiscount(payload.promoCode || state.promoCode)
+        : await this.quoteExternalDiscount(null);
     const totalCents = quote.totalCents;
+
+    if ((payload.promoCode || state.promoCode) && !quote.valid) {
+      if (quote.reason === 'usage_cap_reached') {
+        throw new ConflictException('Discount code usage cap reached');
+      }
+      throw new BadRequestException('Invalid discount code');
+    }
+
+    if (quote.valid && quote.promoCode) {
+      state.promoCode = quote.promoCode;
+      state.promoRedeemed = true;
+    }
 
     if (totalCents === 0) {
       state.paymentStatus = 'waived';

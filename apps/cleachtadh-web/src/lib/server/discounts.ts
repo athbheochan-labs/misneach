@@ -15,11 +15,25 @@ type DiscountQuoteResponse = {
   discountCents: number;
   totalCents: number;
   currency: string;
+  currentUses?: number;
+  maxUses?: number | null;
+  remainingUses?: number | null;
   discountType?: 'percent' | 'fixed_cents';
   discountValue?: number;
 };
 
 export async function quoteDiscount(input: DiscountQuoteInput): Promise<DiscountQuoteResponse> {
+  return sendDiscountRequest('/discounts/quote', input);
+}
+
+export async function redeemDiscount(input: DiscountQuoteInput): Promise<DiscountQuoteResponse> {
+  return sendDiscountRequest('/discounts/redeem', input);
+}
+
+async function sendDiscountRequest(
+  path: '/discounts/quote' | '/discounts/redeem',
+  input: DiscountQuoteInput,
+): Promise<DiscountQuoteResponse> {
   const baseUrls = resolveApiBaseUrls();
   let lastError: unknown;
 
@@ -31,7 +45,7 @@ export async function quoteDiscount(input: DiscountQuoteInput): Promise<Discount
         headers.set('x-internal-auth', internalAuthSecret);
       }
 
-      const res = await fetch(`${baseUrl}/discounts/quote`, {
+      const res = await fetch(`${baseUrl}${path}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(input)

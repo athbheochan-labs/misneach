@@ -13,6 +13,7 @@ import {
 import { Request } from 'express';
 import {
   QuoteDiscountDto,
+  RedeemDiscountDto,
   ToggleDiscountCodeDto,
   UpsertDiscountCodeDto,
 } from './discounts.dto';
@@ -36,6 +37,12 @@ export class DiscountsController {
   async quote(@Req() req: Request, @Body() body: QuoteDiscountDto) {
     this.verifyInternalAccess(req);
     return this.discountsService.quote(body);
+  }
+
+  @Post('discounts/redeem')
+  async redeem(@Req() req: Request, @Body() body: RedeemDiscountDto) {
+    this.verifyInternalAccess(req);
+    return this.discountsService.redeem(body);
   }
 
   @Get('admin/discount-codes')

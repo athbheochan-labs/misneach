@@ -54,6 +54,12 @@ export class DiscountCode {
   @Column({ type: 'boolean', default: true })
   isEnabled!: boolean;
 
+  @Column({ type: 'int', nullable: true })
+  maxUses!: number | null;
+
+  @Column({ type: 'int', default: 0 })
+  currentUses!: number;
+
   @Column({ type: 'datetime', nullable: true })
   startsAt!: Date | null;
 

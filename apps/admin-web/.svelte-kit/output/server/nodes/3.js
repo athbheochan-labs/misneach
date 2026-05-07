@@ -2,7 +2,7 @@
 
 export const index = 3;
 let component_cache;
-export const component = async () => component_cache ??= (await import('../entries/pages/admin/courses/_page.svelte.js')).default;
-export const imports = ["_app/immutable/nodes/3.D_jm3j8B.js","_app/immutable/chunks/DWl0aRWR.js","_app/immutable/chunks/DQOCauAi.js","_app/immutable/chunks/7TiLPmAh.js","_app/immutable/chunks/DxYGrXeO.js","_app/immutable/chunks/BS0r5F2C.js","_app/immutable/chunks/BWY7TCjC.js","_app/immutable/chunks/Bj3vS0LG.js","_app/immutable/chunks/Dc51ihQV.js","_app/immutable/chunks/DqOkPA8j.js","_app/immutable/chunks/NncHjJFE.js"];
+export const component = async () => component_cache ??= (await import('../entries/pages/admin/analytics/_page.svelte.js')).default;
+export const imports = ["_app/immutable/nodes/3._QNKbqay.js","_app/immutable/chunks/CV-uo2Ve.js","_app/immutable/chunks/CFwErDml.js","_app/immutable/chunks/ZzBmS5aR.js","_app/immutable/chunks/BxzefiSg.js"];
 export const stylesheets = [];
 export const fonts = [];

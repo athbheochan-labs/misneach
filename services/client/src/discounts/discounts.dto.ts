@@ -35,6 +35,8 @@ export class QuoteDiscountDto {
   currency?: string;
 }
 
+export class RedeemDiscountDto extends QuoteDiscountDto {}
+
 export class UpsertDiscountCodeDto {
   @IsString()
   @IsNotEmpty()
@@ -71,6 +73,11 @@ export class UpsertDiscountCodeDto {
 
   @IsBoolean()
   isEnabled!: boolean;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  maxUses?: number | null;
 
   @IsString()
   @IsOptional()
