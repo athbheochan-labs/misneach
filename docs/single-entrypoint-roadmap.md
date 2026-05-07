@@ -44,7 +44,7 @@ Production compose baseline includes:
 
 - `api-proxy` (nginx) as single public API ingress.
 - `client` exposed only on the internal Docker network.
-- Healthchecks for `mariadb`, `redis`, `client`, and `api-proxy`.
+- Healthchecks for `mariadb`, `client`, and `api-proxy`.
 
 ## Rollback Strategy
 

@@ -10,7 +10,6 @@ flowchart LR
   W --> C[Client API Gateway]
   C --> S[Domain Services]
   S --> DB[(MariaDB)]
-  C --> R[(Redis)]
   T[Translator Service] --> N[NLP Service]
   T --> DB
 ```
@@ -45,7 +44,6 @@ flowchart TB
 
   subgraph DataInfra
     mariadb[(mariadb)]
-    redis[(redis)]
   end
 
   web --> apiproxy
@@ -69,7 +67,6 @@ flowchart TB
   translator --> nlp
 
   client --> mariadb
-  client --> redis
   lexicon --> mariadb
   phrasebook --> mariadb
   flashcards --> mariadb
@@ -100,7 +97,7 @@ flowchart TB
 | `cleachtadh-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `admin-web` | `client` | HTTP (browser) | HTTP to `client` | None | TBD |
 | `api-proxy` | `client` | HTTP API ingress | HTTP proxy to `client` | None | TBD |
-| `client` | `mariadb`, domain services | internal HTTP API | HTTP to domain services, Redis | MariaDB, Redis | TBD |
+| `client` | `mariadb`, domain services | internal HTTP API | HTTP to domain services | MariaDB | TBD |
 | `translator` | `mariadb`, `nlp` | HTTP API | HTTP to `nlp` and DB-backed translation persistence | MariaDB | TBD |
 | `nlp` | none | HTTP API | none | None | TBD |
 | `lexicon` | `mariadb` | HTTP API | HTTP to `nlp` + DB operations | MariaDB | TBD |
@@ -115,7 +112,6 @@ flowchart TB
 | `business` | `payment`, `discounts` | HTTP API | HTTP to `payment`/`discounts` | None | TBD |
 | `waitlist` | `mariadb` | HTTP API | DB operations | MariaDB | TBD |
 | `mariadb` | none | SQL | none | persistent volume | Platform |
-| `redis` | none | Redis protocol | none | persistent volume | Platform |
 
 ## Architecture Contract
 
