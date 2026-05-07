@@ -32,6 +32,7 @@ Relevant workflows:
 - [frontend-builds.yml](../.github/workflows/frontend-builds.yml)
 - [web-amplify-deploy.yml](../.github/workflows/web-amplify-deploy.yml)
 - [Frontend Amplify Runbook](./frontend-amplify.md)
+- [Auth Runbook](./auth-runbook.md)
 
 ## Environment Variable Strategy
 

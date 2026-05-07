@@ -94,6 +94,7 @@ export class AuthController {
         email,
         this.resolveRequestedAppBaseUrl(req, body?.appBaseUrl),
       );
+      this.logger.log(`auth_login_pending email=${email}`);
       return res.status(HttpStatus.OK).json({
         ok: true,
         status: 'pending_verification',
@@ -101,8 +102,17 @@ export class AuthController {
       });
     }
 
-    const tokenPair = await this.authService.issueTokenPairFromMagicLink(email, token);
-    return res.status(HttpStatus.OK).json(tokenPair);
+    try {
+      const tokenPair = await this.authService.issueTokenPairFromMagicLink(email, token);
+      this.logger.log(
+        `auth_login_succeeded userId=${tokenPair.user.id} clientId=${tokenPair.user.clientId} signupComplete=${tokenPair.user.signupComplete}`,
+      );
+      return res.status(HttpStatus.OK).json(tokenPair);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`auth_login_failed email=${email} cause=${message}`);
+      throw err;
+    }
   }
 
   private resolveRequestedAppBaseUrl(
@@ -131,14 +141,19 @@ export class AuthController {
   async refresh(@Body() body: { refreshToken: string }, @Res() res: Response) {
     const refreshToken = String(body?.refreshToken || '').trim();
     if (!refreshToken) {
+      this.logger.warn('auth_refresh_failed cause=missing_refresh_token');
       return res.status(HttpStatus.BAD_REQUEST).json({ error: 'refreshToken is required' });
     }
 
     try {
       const tokenPair = await this.authService.refreshTokenPair(refreshToken);
+      this.logger.log(
+        `auth_refresh_succeeded userId=${tokenPair.user.id} clientId=${tokenPair.user.clientId}`,
+      );
       return res.status(HttpStatus.OK).json(tokenPair);
     } catch (err) {
       if (err instanceof UnauthorizedException) {
+        this.logger.warn(`auth_refresh_failed cause=${err.message}`);
         return res.status(HttpStatus.UNAUTHORIZED).json({ error: err.message });
       }
       throw err;
@@ -281,6 +296,7 @@ export class AuthController {
           },
         };
       } catch {
+        this.logger.warn('auth_me_unauthenticated mode=bearer');
         return { loggedIn: false, user: null };
       }
     }
@@ -294,12 +310,13 @@ export class AuthController {
           clientId: user.clientId,
           email: user.email,
           role: user.role,
-          signupComplete: user.hasCompletedSignup,
-        },
-      };
-    } catch {
-      return { loggedIn: false, user: null };
-    }
+            signupComplete: user.hasCompletedSignup,
+          },
+        };
+      } catch {
+        this.logger.warn('auth_me_unauthenticated mode=session');
+        return { loggedIn: false, user: null };
+      }
   }
 
   /**
@@ -307,6 +324,7 @@ export class AuthController {
    */
   @Post('logout')
   logout(@Body() _body: { refreshToken?: string }, @Res() res: Response) {
+    this.logger.log('auth_logout_requested');
     res.clearCookie(AUTH_COOKIE, {
       path: '/',
       httpOnly: true,

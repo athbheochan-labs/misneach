@@ -335,6 +335,7 @@ export class AuthService {
 
   async handleMagicLink(email: string, appBaseUrl?: string): Promise<{ message: string }> {
     if (!email) {
+      this.logger.warn('magic_link_rejected cause=missing_email');
       throw new Error('Email is required');
     }
 
@@ -366,6 +367,9 @@ export class AuthService {
     const appUrl = this.resolveMagicLinkAppUrl(appBaseUrl);
     const verifyUrl = `${appUrl}/auth/verify-request?token=${token}&email=${email}`;
     const brand = this.resolveAppBrand(appUrl);
+    this.logger.log(
+      `magic_link_generated userId=${user.id} clientId=${user.clientId} appUrl=${appUrl} deliveryMode=${this.config.get<string>('EMAIL_DELIVERY', 'send')}`,
+    );
 
     const userLang = user.languageSettings?.[0]?.firstLanguage || 'en';
     const translationFactory = translations[userLang] || translations.en;
@@ -393,6 +397,7 @@ export class AuthService {
       console.log('To:', email);
       console.log('Verify URL:', verifyUrl);
       console.log('———————————————');
+      this.logger.log(`magic_link_delivery_logged userId=${user.id} clientId=${user.clientId}`);
 
       return {
         message: 'Magic link generated (email delivery disabled)',
@@ -405,12 +410,14 @@ export class AuthService {
       subject: selectedTranslations.subject,
       html: emailHtml,
     });
+    this.logger.log(`magic_link_delivered userId=${user.id} clientId=${user.clientId}`);
 
     return { message: 'Magic link sent!' };
   }
 
   async verifyMagicLinkToken(token: string, email: string): Promise<User> {
     if (!token || !email) {
+      this.logger.warn('magic_link_verify_failed cause=invalid_request');
       throw new BadRequestException('Invalid request');
     }
 
@@ -421,24 +428,35 @@ export class AuthService {
       .orderBy('magicLink.createdAt', 'DESC')
       .getOne();
 
-    if (!magicLink) throw new NotFoundException('Token not found');
+    if (!magicLink) {
+      this.logger.warn(`magic_link_verify_failed email=${email} cause=token_not_found`);
+      throw new NotFoundException('Token not found');
+    }
 
     if (new Date(magicLink.expiresAt) < new Date()) {
+      this.logger.warn(`magic_link_verify_failed email=${email} cause=token_expired`);
       throw new UnauthorizedException('Token expired');
     }
 
     const isValid = await bcrypt.compare(token, magicLink.token);
-    if (!isValid) throw new UnauthorizedException('Invalid token');
+    if (!isValid) {
+      this.logger.warn(`magic_link_verify_failed email=${email} cause=token_invalid`);
+      throw new UnauthorizedException('Invalid token');
+    }
 
     const user = await this.userRepo.findOne({
       where: { email },
       relations: ['languageSettings'],
     });
     if (!user?.clientId) {
+      this.logger.error(`magic_link_verify_failed email=${email} cause=missing_client_id`);
       throw new InternalServerErrorException('Client ID missing');
     }
 
     await this.ensureDefaultLanguageSettings(user);
+    this.logger.log(
+      `magic_link_verify_succeeded userId=${user.id} clientId=${user.clientId} signupComplete=${user.hasCompletedSignup}`,
+    );
 
     return user;
   }
