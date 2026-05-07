@@ -10,6 +10,7 @@ This repository keeps operational and engineering documentation versioned with c
 - [Naming Conventions](./naming-conventions.md)
 - [Repo Structure Roadmap](./repo-structure-roadmap.md)
 - [Shared Service Contract Audit](./shared-service-contracts.md)
+- [Auth Runbook](./auth-runbook.md)
 - [Single Entrypoint Roadmap](./single-entrypoint-roadmap.md)
 - [Mobile Auth Token Contract](./mobile-auth-token-contract.md)
 - [Mobile Capacitor Bootstrap](./mobile-capacitor-bootstrap.md)
