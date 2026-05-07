@@ -6,6 +6,7 @@
   import { fade, fly } from 'svelte/transition';
   import { clearAuthSession } from '$lib/mobile/session-storage';
   import { getAuthMe, requestLogout } from '$lib/api/auth-client';
+  import { practiceSessionChromeActive } from '$lib/stores/practice-session-chrome';
 
   let { data, children } = $props();
 
@@ -45,8 +46,14 @@
     return pathname === '/dashboard/mobile';
   }
 
+  function isPracticeRoute(pathname: string) {
+    return pathname === '/dashboard/practice';
+  }
+
   const immersiveLessonRoute = $derived(isImmersiveLessonRoute(page.url.pathname));
   const mobileShellRoute = $derived(isMobileShellRoute(page.url.pathname));
+  const practiceRoute = $derived(isPracticeRoute(page.url.pathname));
+  const practiceSessionRouteActive = $derived($practiceSessionChromeActive && practiceRoute);
 
   function initIcons() {
     // @ts-ignore
@@ -87,38 +94,68 @@
     await clearAuthSession();
     await goto('/auth/login');
   }
+
+  function closePracticeProfileMenu(event: MouseEvent) {
+    const details = event.currentTarget?.closest('details');
+    if (details instanceof HTMLDetailsElement) details.open = false;
+  }
 </script>
 
 <div class="dash-app">
-  {#if !immersiveLessonRoute && !mobileShellRoute}
-    <nav class="dash-nav">
-      <a href="/dashboard" class="nav-brand">
-          <svg width="22" height="22" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-            <path d="M40 7 C19 7, 9 19, 9 34 C9 50, 19 61, 37 62 L30 73 L47 62 C63 60, 71 50, 71 34 C71 19, 61 7, 40 7Z" fill="#1c2b22"></path>
-            <path d="M33 46 C35.5 37, 42 30, 47 25" stroke="#f5f0e8" stroke-width="5" stroke-linecap="round" fill="none"></path>
-            <circle cx="33.5" cy="45" r="3" fill="#7ec99a"></circle>
-          </svg>
-          <span class="nav-name">Cleacht<em>adh</em></span>
+  {#if !immersiveLessonRoute && !mobileShellRoute && !practiceSessionRouteActive}
+    <nav class={`dash-nav ${practiceRoute ? 'practice-nav' : ''}`}>
+      <a href={practiceRoute ? '/dashboard/practice' : '/dashboard'} class="nav-brand">
+        <svg width="22" height="22" viewBox="0 0 80 80" fill="none" aria-hidden="true">
+          <path d="M40 7 C19 7, 9 19, 9 34 C9 50, 19 61, 37 62 L30 73 L47 62 C63 60, 71 50, 71 34 C71 19, 61 7, 40 7Z" fill="#1c2b22"></path>
+          <path d="M33 46 C35.5 37, 42 30, 47 25" stroke="#f5f0e8" stroke-width="5" stroke-linecap="round" fill="none"></path>
+          <circle cx="33.5" cy="45" r="3" fill="#7ec99a"></circle>
+        </svg>
+        <span class="nav-name">Cleacht<em>adh</em></span>
       </a>
 
-      <div class="nav-right">
-        <nav aria-label="Dashboard" class="dash-links">
-          {#each navItems as item}
-            <a href={item.href} class:active={isActive(item.href)}>{item.label}</a>
-          {/each}
-        </nav>
+      {#if practiceRoute}
+        <div class="practice-nav-actions">
+          <a href="/dashboard/phrasebook" class="practice-nav-icon" aria-label="Open phrasebook" title="Phrasebook">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" />
+            </svg>
+          </a>
 
-        <details class="nav-profile" role="group">
-          <summary class="nav-avatar nav-avatar-btn" title="Account">
-            {avatarInitials()}
-          </summary>
-          <div class="profile-dropdown" role="menu">
-            <button type="button" class="profile-item danger" role="menuitem" onclick={logout}>
-              Log out
-            </button>
-          </div>
-        </details>
-      </div>
+          <details class="nav-profile practice-profile">
+            <summary class="nav-avatar nav-avatar-btn practice-nav-icon" title="Account">
+              {avatarInitials()}
+            </summary>
+            <div class="profile-dropdown" role="menu">
+              <a href="/dashboard" class="profile-item" role="menuitem" onclick={closePracticeProfileMenu}>
+                Dashboard
+              </a>
+              <button type="button" class="profile-item danger" role="menuitem" onclick={logout}>
+                Log out
+              </button>
+            </div>
+          </details>
+        </div>
+      {:else}
+        <div class="nav-right">
+          <nav aria-label="Dashboard" class="dash-links">
+            {#each navItems as item}
+              <a href={item.href} class:active={isActive(item.href)}>{item.label}</a>
+            {/each}
+          </nav>
+
+          <details class="nav-profile">
+            <summary class="nav-avatar nav-avatar-btn" title="Account">
+              {avatarInitials()}
+            </summary>
+            <div class="profile-dropdown" role="menu">
+              <button type="button" class="profile-item danger" role="menuitem" onclick={logout}>
+                Log out
+              </button>
+            </div>
+          </details>
+        </div>
+      {/if}
     </nav>
   {/if}
 
@@ -180,6 +217,48 @@
     display: flex;
     align-items: center;
     gap: 24px;
+  }
+
+  .practice-nav {
+    padding-right: 20px;
+  }
+
+  .practice-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .practice-nav-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--mis-border);
+    background: rgba(255, 255, 255, 0.88);
+    color: var(--mis-forest);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+
+  .practice-nav-icon:hover {
+    background: #fff;
+    border-color: rgba(45, 122, 80, 0.24);
+    color: var(--mis-green);
+  }
+
+  .practice-profile {
+    display: flex;
+    align-items: center;
+  }
+
+  .practice-profile .nav-avatar {
+    width: 36px;
+    height: 36px;
+    border-width: 1px;
+    font-size: 12px;
   }
 
   .dash-links {
@@ -299,6 +378,10 @@
 
     .dash-links {
       gap: 14px;
+    }
+
+    .practice-nav {
+      padding-right: 16px;
     }
   }
 </style>

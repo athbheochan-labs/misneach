@@ -2,7 +2,7 @@
   import { apiFetch } from '$lib/api/client';
   import { getAuthMe } from '$lib/api/auth-client';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import AppModal from '$lib/components/ui/AppModal.svelte';
   import {
     incrementPracticeProgress,
@@ -13,6 +13,7 @@
     type StudySession,
   } from '$lib/study-session';
   import { incrementJourneyGoalCounter } from '$lib/stores/journey-goals';
+  import { practiceSessionChromeActive } from '$lib/stores/practice-session-chrome';
   import { isLikelyNetworkError, isOnline } from '$lib/mobile/network-status';
 
   type ExerciseType = 'typed_translation' | 'sentence_builder' | 'cloze';
@@ -298,10 +299,9 @@
       ? selectedSentenceTokens.length > 0
       : freeTextAnswer.trim().length > 0
     : false;
-  $: masteredLabel = `${sessionMode === 'flash' ? sessionCorrectCount : completedCount}`;
-  $: leftLabel = `${sessionMode === 'flash' ? Math.max(0, flashcards.length - flashIndex) : remainingCount} left`;
   $: sessionTotalCount = sessionCorrectCount + sessionWrongCount;
   $: currentFlash = flashcards[flashIndex] || null;
+  $: practiceSessionChromeActive.set(sessionMode !== 'idle' && sessionMode !== 'complete');
 
   function parseSessionLimit(raw: string | null) {
     const parsed = Number(raw || SESSION_SIZE);
@@ -863,6 +863,10 @@
       }
     });
   });
+
+  onDestroy(() => {
+    practiceSessionChromeActive.set(false);
+  });
 </script>
 
 <section class="practice-wrap">
@@ -1018,13 +1022,12 @@
   {:else}
     <div class="screen active" id={sessionMode === 'fix_mistakes' ? 'screen-fix' : 'screen-practice'}>
       <div class="session-bar">
-        <button class="session-exit" type="button" onclick={openPause} title="Pause session">
+        <button class="session-exit" type="button" onclick={openPause} title="Pause session" aria-label="Pause session">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
         <div class="session-progress-track"><div class="session-progress-fill" style={`width:${progress}%`}></div></div>
         <div class="session-score">
-          <span class="score-mastered">{masteredLabel}</span>
-          <span class="score-left">{leftLabel}</span>
+          <span class="score-ratio">{sessionCorrectCount} / {sessionTotalCount || totalPlanned}</span>
         </div>
       </div>
 
@@ -1603,58 +1606,60 @@
   .mode-card.primary-mode .mc-arrow { color: rgba(245,240,232,.3); }
 
   .session-bar {
-    height: 56px;
+    height: calc(60px + env(safe-area-inset-top, 0px));
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 20px;
+    padding: env(safe-area-inset-top, 0px) 20px 0;
     background: var(--parchment);
-    border-bottom: 1px solid var(--parchment-dark);
+    border-bottom: 1px solid rgba(28, 43, 34, 0.08);
     position: sticky;
-    top: 58px;
-    z-index: 25;
+    top: 0;
+    z-index: 35;
   }
 
   .session-exit {
-    width: 30px;
-    height: 30px;
-    border: 0;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(28,43,34,.08);
     border-radius: 999px;
-    background: rgba(28,43,34,.08);
+    background: rgba(255,255,255,.82);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    flex-shrink: 0;
   }
+
+  .session-exit:hover { background: #fff; }
 
   .session-progress-track {
     flex: 1;
-    height: 4px;
-    background: var(--parchment-dark);
-    border-radius: 2px;
+    height: 8px;
+    background: rgba(28,43,34,.08);
+    border-radius: 999px;
     overflow: hidden;
   }
 
   .session-progress-fill {
     height: 100%;
-    background: var(--moss);
-    border-radius: 2px;
+    background: linear-gradient(90deg, #7ec99a 0%, #2d7a50 100%);
+    border-radius: 999px;
     transition: width .4s cubic-bezier(.4,0,.2,1);
   }
 
   .session-score {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+    min-width: 72px;
+    text-align: right;
     font-size: 12px;
     font-weight: 700;
     letter-spacing: .06em;
     text-transform: uppercase;
+    color: var(--forest);
   }
 
-  .score-mastered { color: var(--moss); }
-  .score-left { color: var(--muted); }
+  .score-ratio { color: var(--forest); }
 
   .exercise-wrap {
     flex: 1;
@@ -2180,6 +2185,13 @@
     color: var(--muted);
     font-weight: 600;
     cursor: pointer;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+
+  .btn-exit-session:hover {
+    background: rgba(192,57,43,.08);
+    border-color: rgba(192,57,43,.24);
+    color: var(--error);
   }
 
   .modal-actions {
@@ -2219,8 +2231,8 @@
     .mc-icon-wrap { width: 38px; height: 38px; border-radius: 10px; }
     .mc-title { font-size: 15px; }
     .mc-sub { font-size: 11px; }
-    .session-bar { padding: 0 12px; gap: 10px; }
-    .session-score { gap: 10px; font-size: 11px; }
+    .session-bar { padding: env(safe-area-inset-top, 0px) 12px 0; gap: 10px; height: calc(56px + env(safe-area-inset-top, 0px)); }
+    .session-score { min-width: 64px; font-size: 11px; }
     .exercise-wrap { padding: 0 0 24px; }
     .ex-header { margin: 12px 12px 0; padding: 20px 20px 18px; border-radius: 16px; }
     .ex-phrase { font-size: 20px; }
