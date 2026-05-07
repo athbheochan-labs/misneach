@@ -169,6 +169,15 @@
       "_index2.js"
     ]
   },
+  "src/routes/admin/analytics/+page.svelte": {
+    "file": "entries/pages/admin/analytics/_page.svelte.js",
+    "name": "entries/pages/admin/analytics/_page.svelte",
+    "src": "src/routes/admin/analytics/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index2.js"
+    ]
+  },
   "src/routes/admin/courses/+page.svelte": {
     "file": "entries/pages/admin/courses/_page.svelte.js",
     "name": "entries/pages/admin/courses/_page.svelte",
@@ -207,6 +216,16 @@
     "file": "entries/pages/admin/discount-codes/_page.svelte.js",
     "name": "entries/pages/admin/discount-codes/_page.svelte",
     "src": "src/routes/admin/discount-codes/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_attributes.js",
+      "_escaping.js"
+    ]
+  },
+  "src/routes/admin/surveys/+page.svelte": {
+    "file": "entries/pages/admin/surveys/_page.svelte.js",
+    "name": "entries/pages/admin/surveys/_page.svelte",
+    "src": "src/routes/admin/surveys/+page.svelte",
     "isEntry": true,
     "imports": [
       "_attributes.js",

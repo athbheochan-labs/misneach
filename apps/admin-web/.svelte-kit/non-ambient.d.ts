@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/" | "/admin" | "/admin/analytics" | "/admin/courses" | "/admin/courses/[courseSlug]" | "/admin/courses/[courseSlug]/[lessonSlug]" | "/admin/dashboard" | "/admin/discount-codes" | "/api" | "/api/admin" | "/api/admin/[...path]";
+		RouteId(): "/" | "/admin" | "/admin/analytics" | "/admin/courses" | "/admin/courses/[courseSlug]" | "/admin/courses/[courseSlug]/[lessonSlug]" | "/admin/dashboard" | "/admin/discount-codes" | "/admin/surveys" | "/api" | "/api/admin" | "/api/admin/[...path]";
 		RouteParams(): {
 			"/admin/courses/[courseSlug]": { courseSlug: string };
 			"/admin/courses/[courseSlug]/[lessonSlug]": { courseSlug: string; lessonSlug: string };
@@ -42,11 +42,12 @@ declare module "$app/types" {
 			"/admin/courses/[courseSlug]/[lessonSlug]": { courseSlug: string; lessonSlug: string };
 			"/admin/dashboard": Record<string, never>;
 			"/admin/discount-codes": Record<string, never>;
+			"/admin/surveys": Record<string, never>;
 			"/api": { path?: string };
 			"/api/admin": { path?: string };
 			"/api/admin/[...path]": { path: string }
 		};
-		Pathname(): "/" | "/admin/analytics" | "/admin/courses" | `/admin/courses/${string}/${string}` & {} | "/admin/dashboard" | "/admin/discount-codes" | `/api/admin/${string}` & {};
+		Pathname(): "/" | "/admin/analytics" | "/admin/courses" | `/admin/courses/${string}/${string}` & {} | "/admin/dashboard" | "/admin/discount-codes" | "/admin/surveys" | `/api/admin/${string}` & {};
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): string & {};
 	}

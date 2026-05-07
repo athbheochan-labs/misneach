@@ -1,1 +1,0 @@
-import{m as y,n as o,H as u,E as _,o as t,C as g,q as i,r as l,t as n,v as m,w as p}from"./DQOCauAi.js";function C(r,d){let s=null,E=t;var a;if(t){s=m;for(var e=p(document.head);e!==null&&(e.nodeType!==g||e.data!==r);)e=i(e);if(e===null)l(!1);else{var f=i(e);e.remove(),n(f)}}t||(a=document.head.appendChild(y()));try{o(()=>d(a),u|_)}finally{E&&(l(!0),n(s))}}export{C as h};

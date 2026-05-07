@@ -13,6 +13,7 @@ function _page($$renderer, $$props) {
       discountValue: 10,
       currency: "eur",
       isEnabled: true,
+      maxUses: "",
       startsAt: "",
       endsAt: ""
     });
@@ -76,7 +77,7 @@ function _page($$renderer, $$props) {
         $$renderer4.push(`Fixed cents`);
       });
     });
-    $$renderer2.push(`</div> <div class="field"><label for="discountValue">Discount Value</label> <input id="discountValue" type="number" min="0"${attr("value", form.discountValue)}/></div> <div class="field"></div></div> <div class="field-grid cols-3" style="margin-top: 10px;"><div class="field"><label for="startsAt">Starts At (optional)</label> <input id="startsAt" type="datetime-local"${attr("value", form.startsAt)}/></div> <div class="field"><label for="endsAt">Ends At (optional)</label> <input id="endsAt" type="datetime-local"${attr("value", form.endsAt)}/></div> <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-primary"${attr("disabled", saving, true)}>${escape_html("Create code")}</button></div></div></section> <section class="page-card fade-in"><h3 class="section-title">Existing Codes</h3> `);
+    $$renderer2.push(`</div> <div class="field"><label for="discountValue">Discount Value</label> <input id="discountValue" type="number" min="0"${attr("value", form.discountValue)}/></div> <div class="field"><label for="maxUses">Max Uses (optional)</label> <input id="maxUses" type="number" min="1"${attr("value", form.maxUses)} placeholder="Unlimited if blank"/></div></div> <div class="field-grid cols-3" style="margin-top: 10px;"><div class="field"><label for="startsAt">Starts At (optional)</label> <input id="startsAt" type="datetime-local"${attr("value", form.startsAt)}/></div> <div class="field"><label for="endsAt">Ends At (optional)</label> <input id="endsAt" type="datetime-local"${attr("value", form.endsAt)}/></div> <div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn-primary"${attr("disabled", saving, true)}>${escape_html("Create code")}</button></div></div></section> <section class="page-card fade-in"><h3 class="section-title">Existing Codes</h3> `);
     {
       $$renderer2.push("<!--[-->");
       $$renderer2.push(`<p>Loading discount codes...</p>`);

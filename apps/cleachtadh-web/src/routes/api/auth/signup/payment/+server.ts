@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { quoteDiscount } from '$lib/server/discounts';
+import { quoteDiscount, redeemDiscount } from '$lib/server/discounts';
 import { nestFetch } from '$lib/server/api';
 import { getInternalAuthSecret } from '$lib/server/upstreams';
 
@@ -159,6 +159,28 @@ export const POST: RequestHandler = async (event) => {
     const amountCents = quote.totalCents;
 
     if (amountCents === 0) {
+      if (promoCode) {
+        const redeemed = await redeemDiscount({
+          code: promoCode,
+          audience: 'learner',
+          appliesTo: plan,
+          baseCents,
+          currency: 'eur'
+        });
+
+        if (!redeemed.valid) {
+          return json(
+            {
+              error:
+                redeemed.reason === 'usage_cap_reached'
+                  ? 'Discount code usage cap reached'
+                  : 'Discount code could not be redeemed'
+            },
+            { status: redeemed.reason === 'usage_cap_reached' ? 409 : 400 }
+          );
+        }
+      }
+
       await markSignupComplete(event, user.id);
       return json({
         ok: true,
@@ -178,6 +200,28 @@ export const POST: RequestHandler = async (event) => {
     const cancelUrl =
       process.env.SIGNUP_PAYMENT_CANCEL_URL?.trim() ||
       `${event.url.origin}/auth/signup?payment=cancelled`;
+
+    if (promoCode) {
+      const redeemed = await redeemDiscount({
+        code: promoCode,
+        audience: 'learner',
+        appliesTo: plan,
+        baseCents,
+        currency: 'eur'
+      });
+
+      if (!redeemed.valid) {
+        return json(
+          {
+            error:
+              redeemed.reason === 'usage_cap_reached'
+                ? 'Discount code usage cap reached'
+                : 'Discount code could not be redeemed'
+          },
+          { status: redeemed.reason === 'usage_cap_reached' ? 409 : 400 }
+        );
+      }
+    }
 
     const checkoutRes = await postPayment('/payments/checkout-sessions', {
       clientId: user.clientId,

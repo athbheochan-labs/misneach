@@ -18,6 +18,9 @@
 	"/admin/discount-codes": [
 		"src/routes/+layout.server.ts"
 	],
+	"/admin/surveys": [
+		"src/routes/+layout.server.ts"
+	],
 	"/api/admin/[...path]": [
 		"src/routes/api/admin/[...path]/+server.ts"
 	]

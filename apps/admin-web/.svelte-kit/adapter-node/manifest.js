@@ -10,7 +10,7 @@ return {
 	assets: new Set([]),
 	mimeTypes: {},
 	_: {
-		client: {start:"_app/immutable/entry/start.DsgE073C.js",app:"_app/immutable/entry/app.UDwTt6__.js",imports:["_app/immutable/entry/start.DsgE073C.js","_app/immutable/chunks/BanaRhV0.js","_app/immutable/chunks/DQOCauAi.js","_app/immutable/chunks/BLnzv3Cn.js","_app/immutable/chunks/DxYGrXeO.js","_app/immutable/entry/app.UDwTt6__.js","_app/immutable/chunks/DQOCauAi.js","_app/immutable/chunks/BS0r5F2C.js","_app/immutable/chunks/DWl0aRWR.js","_app/immutable/chunks/DxYGrXeO.js","_app/immutable/chunks/BWY7TCjC.js","_app/immutable/chunks/DhhxjDsr.js","_app/immutable/chunks/BBoSBWZm.js","_app/immutable/chunks/BLnzv3Cn.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
+		client: {start:"_app/immutable/entry/start.BxOezRWu.js",app:"_app/immutable/entry/app.B__ExlOd.js",imports:["_app/immutable/entry/start.BxOezRWu.js","_app/immutable/chunks/CgAOMZ2K.js","_app/immutable/chunks/CFwErDml.js","_app/immutable/chunks/D03Jp5QD.js","_app/immutable/chunks/CIDESXl7.js","_app/immutable/entry/app.B__ExlOd.js","_app/immutable/chunks/CFwErDml.js","_app/immutable/chunks/C0qFw6jL.js","_app/immutable/chunks/CV-uo2Ve.js","_app/immutable/chunks/CIDESXl7.js","_app/immutable/chunks/Bc0eKxI-.js","_app/immutable/chunks/BVQxI_WU.js","_app/immutable/chunks/C4WcZA4Q.js","_app/immutable/chunks/D03Jp5QD.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),
@@ -18,7 +18,9 @@ return {
 			__memo(() => import('./nodes/3.js')),
 			__memo(() => import('./nodes/4.js')),
 			__memo(() => import('./nodes/5.js')),
-			__memo(() => import('./nodes/6.js'))
+			__memo(() => import('./nodes/6.js')),
+			__memo(() => import('./nodes/7.js')),
+			__memo(() => import('./nodes/8.js'))
 		],
 		remotes: {
 			
@@ -32,31 +34,45 @@ return {
 				endpoint: null
 			},
 			{
+				id: "/admin/analytics",
+				pattern: /^\/admin\/analytics\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 3 },
+				endpoint: null
+			},
+			{
 				id: "/admin/courses",
 				pattern: /^\/admin\/courses\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 3 },
+				page: { layouts: [0,], errors: [1,], leaf: 4 },
 				endpoint: null
 			},
 			{
 				id: "/admin/courses/[courseSlug]/[lessonSlug]",
 				pattern: /^\/admin\/courses\/([^/]+?)\/([^/]+?)\/?$/,
 				params: [{"name":"courseSlug","optional":false,"rest":false,"chained":false},{"name":"lessonSlug","optional":false,"rest":false,"chained":false}],
-				page: { layouts: [0,], errors: [1,], leaf: 4 },
+				page: { layouts: [0,], errors: [1,], leaf: 5 },
 				endpoint: null
 			},
 			{
 				id: "/admin/dashboard",
 				pattern: /^\/admin\/dashboard\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 5 },
+				page: { layouts: [0,], errors: [1,], leaf: 6 },
 				endpoint: null
 			},
 			{
 				id: "/admin/discount-codes",
 				pattern: /^\/admin\/discount-codes\/?$/,
 				params: [],
-				page: { layouts: [0,], errors: [1,], leaf: 6 },
+				page: { layouts: [0,], errors: [1,], leaf: 7 },
+				endpoint: null
+			},
+			{
+				id: "/admin/surveys",
+				pattern: /^\/admin\/surveys\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 8 },
 				endpoint: null
 			},
 			{

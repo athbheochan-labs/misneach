@@ -12,6 +12,8 @@
     discountValue: number;
     currency: string;
     isEnabled: boolean;
+    maxUses: number | null;
+    currentUses: number;
     startsAt: string | null;
     endsAt: string | null;
     createdAt: string;
@@ -29,6 +31,7 @@
     discountValue: number;
     currency: string;
     isEnabled: boolean;
+    maxUses: string;
     startsAt: string;
     endsAt: string;
   };
@@ -44,6 +47,7 @@
     discountValue: 10,
     currency: 'eur',
     isEnabled: true,
+    maxUses: '',
     startsAt: '',
     endsAt: '',
   });
@@ -86,6 +90,7 @@
       discountValue: code.discountValue,
       currency: code.currency,
       isEnabled: code.isEnabled,
+      maxUses: code.maxUses == null ? '' : String(code.maxUses),
       startsAt: fromIsoToInput(code.startsAt),
       endsAt: fromIsoToInput(code.endsAt),
     };
@@ -131,6 +136,7 @@
         discountValue: Number(form.discountValue),
         currency: form.currency,
         isEnabled: form.isEnabled,
+        maxUses: form.maxUses === '' ? null : Number(form.maxUses),
         startsAt: form.startsAt || null,
         endsAt: form.endsAt || null,
       };
@@ -264,7 +270,10 @@
       <input id="discountValue" type="number" min="0" bind:value={form.discountValue} />
     </div>
 
-    <div class="field"></div>
+    <div class="field">
+      <label for="maxUses">Max Uses (optional)</label>
+      <input id="maxUses" type="number" min="1" bind:value={form.maxUses} placeholder="Unlimited if blank" />
+    </div>
   </div>
 
   <div class="field-grid cols-3" style="margin-top: 10px;">
@@ -303,6 +312,7 @@
             <th>Audience</th>
             <th>Scope</th>
             <th>Discount</th>
+            <th>Usage</th>
             <th>Window</th>
             <th>Updated</th>
             <th>Actions</th>
@@ -329,6 +339,14 @@
                   {code.discountValue}%
                 {:else}
                   {code.discountValue} cents
+                {/if}
+              </td>
+              <td>
+                {#if code.maxUses == null}
+                  <span class="muted">Unlimited</span>
+                {:else}
+                  <div>{Math.max(0, code.maxUses - code.currentUses)} left</div>
+                  <div class="muted" style="font-size:0.78rem;">{code.currentUses} / {code.maxUses} used</div>
                 {/if}
               </td>
               <td>
