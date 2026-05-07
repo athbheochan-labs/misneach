@@ -48,6 +48,12 @@
     fillClass: 'fill-strong' | 'fill-mid' | 'fill-weak';
   };
 
+  type PracticeWidgetChallengePhrase = {
+    phraseId: number;
+    irish: string;
+    english: string;
+  };
+
   type GoalPreviewItem = {
     id: string;
     name: string;
@@ -67,6 +73,10 @@
     goalsPreview: GoalPreviewItem[];
     activeGoalsCount: number;
     duePracticeCount: number;
+    duePracticeEstimatedMinutes: number;
+    niceToHavePracticeCount: number;
+    notYetDuePracticeCount: number;
+    practiceChallengePhrases: PracticeWidgetChallengePhrase[];
     dueFlashcardCount: number;
     streakDays: number;
   };
@@ -95,6 +105,11 @@
   let activeGoalsCount = 0;
   let goalsLoggedIds = new Set<string>();
   let duePracticeCount = 0;
+  let duePracticeEstimatedMinutes = 0;
+  let niceToHavePracticeCount = 0;
+  let notYetDuePracticeCount = 0;
+  let practiceChallengePhrases: PracticeWidgetChallengePhrase[] = [];
+  let practiceChallengeUsedToday = false;
   let dueFlashcardCount = 0;
 
   let streakDays = 0;
@@ -115,6 +130,7 @@
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   const PROFILE_STORAGE_PREFIX = 'dashboard-profile:';
+  const PRACTICE_CHALLENGE_STORAGE_PREFIX = 'dashboard-practice-challenge:';
   const GOALS_RING_RADIUS = 14;
   const GOALS_RING_CIRCUMFERENCE = 2 * Math.PI * GOALS_RING_RADIUS;
 
@@ -257,6 +273,10 @@
       goalsPreview,
       activeGoalsCount,
       duePracticeCount,
+      duePracticeEstimatedMinutes,
+      niceToHavePracticeCount,
+      notYetDuePracticeCount,
+      practiceChallengePhrases,
       dueFlashcardCount,
       streakDays,
     };
@@ -271,6 +291,10 @@
     goalsPreview = Array.isArray(state.goalsPreview) ? state.goalsPreview : [];
     activeGoalsCount = Math.max(0, Number(state.activeGoalsCount || 0));
     duePracticeCount = state.duePracticeCount;
+    duePracticeEstimatedMinutes = Math.max(0, Number(state.duePracticeEstimatedMinutes || 0));
+    niceToHavePracticeCount = Math.max(0, Number(state.niceToHavePracticeCount || 0));
+    notYetDuePracticeCount = Math.max(0, Number(state.notYetDuePracticeCount || 0));
+    practiceChallengePhrases = Array.isArray(state.practiceChallengePhrases) ? state.practiceChallengePhrases : [];
     dueFlashcardCount = state.dueFlashcardCount;
     streakDays = Math.max(0, Number(state.streakDays || 0));
   }
@@ -305,6 +329,40 @@
     return err instanceof Error ? err.message : fallback;
   }
 
+  function todayKey() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function practiceChallengeStorageKey() {
+    return `${PRACTICE_CHALLENGE_STORAGE_PREFIX}${todayKey()}`;
+  }
+
+  function loadPracticeChallengeUsedState() {
+    try {
+      practiceChallengeUsedToday = localStorage.getItem(practiceChallengeStorageKey()) === '1';
+    } catch {
+      practiceChallengeUsedToday = false;
+    }
+  }
+
+  function markPracticeChallengeUsed() {
+    practiceChallengeUsedToday = true;
+    try {
+      localStorage.setItem(practiceChallengeStorageKey(), '1');
+    } catch {
+      // ignore storage failures and keep optimistic UI
+    }
+  }
+
+  function practiceEstimatedLabel() {
+    if (duePracticeEstimatedMinutes <= 0) return 'You are clear for today';
+    return `about ${duePracticeEstimatedMinutes} min`;
+  }
+
   async function loadJourneySection() {
     journeyLoading = true;
     journeyError = '';
@@ -332,9 +390,12 @@
     phraseLoading = true;
     phraseError = '';
     try {
-      const phraseHealthRes = await apiFetch('/api/proxy/practice/phrase-health?limit=5&lookbackDays=30', {
-        cache: 'no-store',
-      });
+      const [phraseHealthRes, warmupRes] = await Promise.all([
+        apiFetch('/api/proxy/practice/phrase-health?limit=5&lookbackDays=30', {
+          cache: 'no-store',
+        }),
+        apiFetch('/api/proxy/practice/warmup?challengeCount=3', { cache: 'no-store' }),
+      ]);
 
       if (!phraseHealthRes.ok) {
         throw new Error('Failed to load phrase health.');
@@ -342,9 +403,6 @@
 
       const payload = await phraseHealthRes.json();
       const rows = Array.isArray(payload?.rows) ? payload.rows : [];
-      duePracticeCount = Number.isFinite(Number(payload?.duePhraseCount))
-        ? Math.max(0, Number(payload.duePhraseCount))
-        : 0;
 
       phraseHealthRows = rows
         .map((row: any) => {
@@ -361,11 +419,40 @@
         })
         .filter(Boolean) as PhraseHealthRow[];
 
+      if (warmupRes.ok) {
+        const warmup = await warmupRes.json();
+        duePracticeCount = Math.max(0, Number(warmup?.dueCount || 0));
+        duePracticeEstimatedMinutes = Math.max(0, Number(warmup?.estimatedMinutes || 0));
+        niceToHavePracticeCount = Math.max(0, Number(warmup?.niceToHaveCount || 0));
+        notYetDuePracticeCount = Math.max(0, Number(warmup?.notYetDueCount || 0));
+        practiceChallengePhrases = Array.isArray(warmup?.challengePhrases)
+          ? warmup.challengePhrases
+              .map((item: any) => ({
+                phraseId: Number(item?.phraseId),
+                irish: String(item?.irish || '').trim(),
+                english: String(item?.english || '').trim(),
+              }))
+              .filter((item: PracticeWidgetChallengePhrase) => Number.isFinite(item.phraseId) && item.irish && item.english)
+          : [];
+      } else {
+        duePracticeCount = Number.isFinite(Number(payload?.duePhraseCount))
+          ? Math.max(0, Number(payload.duePhraseCount))
+          : 0;
+        duePracticeEstimatedMinutes = duePracticeCount > 0 ? Math.max(1, Math.ceil(duePracticeCount / 3)) : 0;
+        niceToHavePracticeCount = 0;
+        notYetDuePracticeCount = 0;
+        practiceChallengePhrases = [];
+      }
+
       saveDashboardCache();
     } catch (err) {
       phraseError = resolveLoadError(err, 'Failed to load phrase health.');
       phraseHealthRows = [];
       duePracticeCount = 0;
+      duePracticeEstimatedMinutes = 0;
+      niceToHavePracticeCount = 0;
+      notYetDuePracticeCount = 0;
+      practiceChallengePhrases = [];
     } finally {
       phraseLoading = false;
     }
@@ -722,6 +809,7 @@
   onMount(() => {
     loadDashboard();
     loadProfileContext();
+    loadPracticeChallengeUsedState();
   });
 
   onDestroy(() => {
@@ -903,10 +991,60 @@
           {#if phraseError}
             <div class="card-error">{phraseError}</div>
           {/if}
-          <div class="practice-nudge">
-            <div class="practice-nudge-text"><strong>{duePracticeCount}</strong> phrases need attention</div>
-            <MisButton href="/dashboard/practice" className="practice-btn" size="sm">Practice now</MisButton>
-          </div>
+          <section class="practice-widget">
+            <div class="practice-widget-top">
+              <div class="practice-widget-top-copy">
+                <div class="practice-widget-label">Due today</div>
+                <div class="practice-widget-count">{duePracticeCount}</div>
+              </div>
+              <div class="practice-widget-meta">{practiceEstimatedLabel()}</div>
+              <MisButton href="/dashboard/practice" className="practice-widget-start" size="sm">Start session</MisButton>
+            </div>
+
+            <div class="practice-widget-secondary">
+              <div class="practice-widget-stat">
+                <div class="practice-widget-stat-value">{niceToHavePracticeCount}</div>
+                <div class="practice-widget-stat-label">Nice to have</div>
+                <div class="practice-widget-stat-sub">Optional today</div>
+              </div>
+              <div class="practice-widget-divider" aria-hidden="true"></div>
+              <div class="practice-widget-stat dimmed">
+                <div class="practice-widget-stat-value">{notYetDuePracticeCount}</div>
+                <div class="practice-widget-stat-label">Not yet due</div>
+                <div class="practice-widget-stat-sub">Coming later</div>
+              </div>
+            </div>
+
+            <div class="practice-widget-output">
+              <div class="practice-widget-output-head">
+                <div class="practice-widget-output-eyebrow">Today's challenge</div>
+                <div class="practice-widget-output-badge">Output</div>
+              </div>
+              <div class="practice-widget-output-copy">Try these in a real conversation today. One use is enough.</div>
+
+              {#if practiceChallengePhrases.length > 0}
+                <div class="practice-widget-chip-list">
+                  {#each practiceChallengePhrases as phrase}
+                    <div class="practice-widget-chip">
+                      <div class="practice-widget-chip-irish">{phrase.irish}</div>
+                      <div class="practice-widget-chip-english">{phrase.english}</div>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <div class="practice-widget-empty">Save a few more phrases and today's challenge will appear here.</div>
+              {/if}
+
+              <button
+                class={`practice-widget-output-btn ${practiceChallengeUsedToday ? 'used' : ''}`}
+                type="button"
+                onclick={markPracticeChallengeUsed}
+                disabled={practiceChallengeUsedToday}
+              >
+                {practiceChallengeUsedToday ? 'Used today' : 'I used these today'}
+              </button>
+            </div>
+          </section>
         </MisSidebarCard>
 
         <section class="goals-card fade-up" aria-label="Goals">
@@ -1824,30 +1962,199 @@
     flex-shrink: 0;
   }
 
-  .practice-nudge {
-    padding: 14px 20px;
-    border-top: 1px solid var(--parchment-dark);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .practice-widget {
+    margin: 18px 20px 0;
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid rgba(232, 224, 208, 0.95);
+    background: #fff;
+  }
+
+  .practice-widget-top {
+    background: var(--forest);
+    padding: 18px 18px 16px;
+    display: grid;
     gap: 10px;
   }
 
-  .practice-nudge-text {
+  .practice-widget-top-copy {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .practice-widget-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(245, 240, 232, 0.54);
+  }
+
+  .practice-widget-count {
+    font-family: 'Fraunces', serif;
+    font-size: 54px;
+    line-height: 0.92;
+    letter-spacing: -0.06em;
+    color: var(--sage);
+  }
+
+  .practice-widget-meta {
     font-size: 12px;
-    color: #aaa;
-    line-height: 1.4;
+    font-weight: 700;
+    color: var(--sage);
   }
 
-  .practice-nudge-text strong {
-    color: var(--ink-light);
+  :global(.practice-widget-start.mis-btn) {
+    width: 100%;
+    justify-content: center;
+    border-radius: 12px;
+    background: var(--sage);
+    color: var(--forest);
+    border: none;
   }
 
-  :global(.practice-btn.mis-btn) {
+  .practice-widget-secondary {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    background: #fff;
+  }
+
+  .practice-widget-divider {
+    background: rgba(232, 224, 208, 0.95);
+  }
+
+  .practice-widget-stat {
+    padding: 14px 16px;
+    display: grid;
+    gap: 2px;
+  }
+
+  .practice-widget-stat.dimmed {
+    opacity: 0.68;
+  }
+
+  .practice-widget-stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--forest);
+    letter-spacing: -0.03em;
+  }
+
+  .practice-widget-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--forest);
+  }
+
+  .practice-widget-stat-sub {
+    font-size: 12px;
+    color: #8b948d;
+  }
+
+  .practice-widget-output {
+    border-top: 1px solid rgba(232, 224, 208, 0.95);
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+    background: linear-gradient(180deg, #fffdf8 0%, #f7f2ea 100%);
+  }
+
+  .practice-widget-output-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .practice-widget-output-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--forest);
+  }
+
+  .practice-widget-output-badge {
+    border-radius: 999px;
+    background: rgba(45, 122, 80, 0.1);
+    color: var(--green);
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .practice-widget-output-copy {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #68716a;
+  }
+
+  .practice-widget-chip-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  .practice-widget-chip {
+    border-radius: 14px;
+    border: 1px solid rgba(28, 43, 34, 0.08);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 10px 12px;
+  }
+
+  .practice-widget-chip-irish {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-style: italic;
+    font-weight: 300;
+    color: var(--forest);
+    margin-bottom: 4px;
+  }
+
+  .practice-widget-chip-english {
+    font-size: 12px;
+    color: #7d857f;
+  }
+
+  .practice-widget-empty {
+    border-radius: 14px;
+    border: 1px dashed rgba(28, 43, 34, 0.16);
+    background: rgba(255, 255, 255, 0.7);
+    color: #7d857f;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 12px;
+  }
+
+  .practice-widget-output-btn {
+    width: 100%;
+    border: 0;
+    border-radius: 12px;
     background: var(--forest);
     color: var(--parchment);
-    padding: 8px 14px;
-    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .1s ease, background .15s ease, color .15s ease, opacity .15s ease;
+  }
+
+  .practice-widget-output-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .practice-widget-output-btn.used,
+  .practice-widget-output-btn:disabled {
+    background: rgba(45, 122, 80, 0.14);
+    color: var(--green);
+    cursor: default;
+    transform: none;
   }
 
   .goals-card {
