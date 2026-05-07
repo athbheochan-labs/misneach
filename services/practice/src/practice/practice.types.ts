@@ -1,6 +1,9 @@
 export const EXERCISE_TYPES = ['typed_translation', 'sentence_builder', 'cloze'] as const;
 export type ExerciseType = (typeof EXERCISE_TYPES)[number];
 
+export const PRACTICE_RATINGS = [1, 2, 3] as const;
+export type PracticeRating = (typeof PRACTICE_RATINGS)[number];
+
 export type PhraseToken = {
   position: number;
   surface: string;

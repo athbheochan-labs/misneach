@@ -47,6 +47,7 @@
 
   let loading = false;
   let submitting = false;
+  let ratingSubmitting = false;
   let sessionMode: 'idle' | 'lesson' | 'fix_mistakes' | 'flash' | 'complete' = 'idle';
 
   let queue: Exercise[] = [];
@@ -69,6 +70,7 @@
   let interactionStateResetTimer: ReturnType<typeof setTimeout> | null = null;
 
   let feedback: {
+    attemptId?: string;
     isCorrect: boolean;
     expectedAnswer: string;
     userAnswer: string;
@@ -725,10 +727,7 @@
   function handleAnswerKeydown(event: KeyboardEvent) {
     if (event.key !== 'Enter' || event.shiftKey) return;
     event.preventDefault();
-    if (feedback) {
-      continueAfterFeedback();
-      return;
-    }
+    if (feedback) return;
     if (canSubmit && !submitting) {
       submitAttempt().catch(() => undefined);
     }
@@ -777,6 +776,7 @@
       const diff = buildDiffHtml(current.expectedAnswer, submittedAnswer);
 
       feedback = {
+        attemptId: payload?.attemptId ? String(payload.attemptId) : undefined,
         isCorrect,
         expectedAnswer: current.expectedAnswer,
         userAnswer: submittedAnswer,
@@ -796,24 +796,6 @@
       }
       if (isCorrect) sessionCorrectCount += 1;
       else sessionWrongCount += 1;
-
-      if (isCorrect) {
-        const key = exerciseMasteryKey(current);
-        if (!masteredKeys.has(key)) {
-          masteredKeys.add(key);
-          completedCount = masteredKeys.size;
-          if (studyMode) {
-            persistStudyPracticeProgress(1);
-            studyProgressPersistedForRun += 1;
-          }
-        }
-
-        if (sessionMode === 'fix_mistakes' || current.source === 'retry') {
-          incrementJourneyGoalCounter('mistakesCorrected', 1);
-        }
-      } else {
-        queue = [...queue, { ...current, source: 'retry' }];
-      }
     } catch (error) {
       console.error(error);
       openInfoModal(
@@ -829,8 +811,59 @@
     }
   }
 
-  function continueAfterFeedback() {
-    nextQuestion();
+  async function submitReview(rating: 1 | 2 | 3) {
+    if (!current || !feedback || ratingSubmitting) return;
+    if (!ensureOnline('save your review rating')) return;
+
+    ratingSubmitting = true;
+    try {
+      const res = await apiFetch('/api/proxy/practice/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attemptId: feedback.attemptId,
+          exerciseType: current.exerciseType,
+          phraseId: current.phraseId,
+          rating,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await readError(res, 'Failed to save review rating'));
+      }
+
+      if (rating === 3) {
+        const key = exerciseMasteryKey(current);
+        if (!masteredKeys.has(key)) {
+          masteredKeys.add(key);
+          completedCount = masteredKeys.size;
+          if (studyMode) {
+            persistStudyPracticeProgress(1);
+            studyProgressPersistedForRun += 1;
+          }
+        }
+
+        if (sessionMode === 'fix_mistakes' || current.source === 'retry') {
+          incrementJourneyGoalCounter('mistakesCorrected', 1);
+        }
+      } else if (rating === 1) {
+        queue = [...queue, { ...current, source: 'retry' }];
+      }
+
+      nextQuestion();
+    } catch (error) {
+      console.error(error);
+      openInfoModal(
+        'Unable to save review',
+        isLikelyNetworkError(error)
+          ? 'Network request failed while saving your rating. Reconnect and try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to save review rating',
+      );
+    } finally {
+      ratingSubmitting = false;
+    }
   }
 
   function openPause() {
@@ -939,7 +972,7 @@
       <div class="warmup-wrap">
         <div class="warmup-eyebrow">Practice session</div>
         <h1 class="warmup-headline">Ready to <em>cleachtadh?</em></h1>
-        <p class="warmup-sub">Your warm-up is based on recent review activity. Start with what is due, then clear nice-to-have phrases if you have the time.</p>
+        <p class="warmup-sub">Your warm-up is based on spaced repetition scheduling. Start with what is due today, then clear the next few upcoming items if you have time.</p>
 
         <section class="due-summary-card">
           <div class="due-summary-top">
@@ -1168,7 +1201,7 @@
                 />
                 <div class="input-hint">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                  {feedback ? 'Press Enter or tap Continue' : 'Press Enter or tap Check to submit'}
+                  {feedback ? 'Choose a review rating to schedule this phrase' : 'Press Enter or tap Check to submit'}
                 </div>
               </div>
             {/if}
@@ -1237,13 +1270,17 @@
                 {submitting ? 'Checking...' : 'Check'}
               </button>
             {:else}
-              <button
-                class={`btn-check ${feedback.isCorrect ? 'correct-btn' : 'error-btn'}`}
-                type="button"
-                onclick={continueAfterFeedback}
-              >
-                Next
-              </button>
+              <div class="rating-actions">
+                <button class="btn-rate btn-rate-forgot" type="button" onclick={() => submitReview(1)} disabled={ratingSubmitting}>
+                  {ratingSubmitting ? 'Saving...' : 'Forgot'}
+                </button>
+                <button class="btn-rate btn-rate-nearly" type="button" onclick={() => submitReview(2)} disabled={ratingSubmitting}>
+                  Nearly
+                </button>
+                <button class="btn-rate btn-rate-gotit" type="button" onclick={() => submitReview(3)} disabled={ratingSubmitting}>
+                  Got it
+                </button>
+              </div>
             {/if}
           </div>
         </div>
@@ -2078,6 +2115,50 @@
   .btn-show:disabled {
     opacity: .45;
     cursor: not-allowed;
+  }
+
+  .rating-actions {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .btn-rate {
+    padding: 15px 12px;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .1s ease, background .15s ease, color .15s ease, opacity .15s ease;
+  }
+
+  .btn-rate:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+
+  .btn-rate:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+
+  .btn-rate-forgot {
+    background: var(--error-bg);
+    color: var(--error);
+    border: 1.5px solid var(--error-border);
+  }
+
+  .btn-rate-nearly {
+    background: #f7f3e8;
+    color: #8a6b2f;
+    border: 1.5px solid #e2c98c;
+  }
+
+  .btn-rate-gotit {
+    background: var(--correct);
+    color: #fff;
   }
 
   .flashcard-wrap {

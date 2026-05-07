@@ -5,6 +5,7 @@ import {
   PracticeHistoryQueryDto,
   PracticeProgressQueryDto,
   ResetProfilesDto,
+  ReviewPracticeItemDto,
   SubmitPracticeAttemptDto,
   PhraseHealthQueryDto,
   PracticeWarmupQueryDto,
@@ -26,6 +27,14 @@ export class PracticeController {
     @Body() body: SubmitPracticeAttemptDto,
   ) {
     return this.practiceService.submitAttempt(clientId, body);
+  }
+
+  @Post('review')
+  reviewItem(
+    @Query('clientId') clientId: string,
+    @Body() body: ReviewPracticeItemDto,
+  ) {
+    return this.practiceService.reviewItem(clientId, body);
   }
 
   @Get('mistakes')

@@ -16,10 +16,17 @@ import {
   PracticeWarmupQueryDto,
   PhraseHealthQueryDto,
   ResetProfilesDto,
+  ReviewPracticeItemDto,
   SubmitPracticeAttemptDto,
 } from './practice.dto';
 import { PracticeAttempt, PracticeProfile } from './practice.entity';
-import { EXERCISE_TYPES, ExerciseType, PhrasebookPhrase, PhraseToken } from './practice.types';
+import {
+  EXERCISE_TYPES,
+  ExerciseType,
+  PhrasebookPhrase,
+  PhraseToken,
+  PracticeRating,
+} from './practice.types';
 
 type BuiltExercise = {
   phraseId: number;
@@ -84,6 +91,12 @@ export class PracticeService {
   private startOfDay(date = new Date()) {
     const value = new Date(date);
     value.setHours(0, 0, 0, 0);
+    return value;
+  }
+
+  private startOfDayPlus(days: number, date = new Date()) {
+    const value = this.startOfDay(date);
+    value.setDate(value.getDate() + days);
     return value;
   }
 
@@ -674,12 +687,6 @@ export class PracticeService {
     };
   }
 
-  private toGrade(score: number): 'again' | 'good' | 'easy' {
-    if (score >= 100) return 'easy';
-    if (score >= 85) return 'good';
-    return 'again';
-  }
-
   private weaknessScore(profile: Pick<PracticeProfile, 'reviewCount' | 'lapseCount' | 'consecutiveCorrect'>): number {
     const reviewCount = Math.max(0, Number(profile.reviewCount || 0));
     const lapseCount = Math.max(0, Number(profile.lapseCount || 0));
@@ -691,57 +698,42 @@ export class PracticeService {
     return this.clamp(raw, 0, 1);
   }
 
-  private computeSchedule(profile: PracticeProfile, grade: 'again' | 'good' | 'easy') {
+  private computeSm2Schedule(profile: PracticeProfile, rating: PracticeRating) {
     const previousEase = profile.easeFactor || 2.5;
-    const previousInterval = profile.intervalDays || 0;
-    const previousStreak = profile.consecutiveCorrect || 0;
+    const previousInterval = Math.max(1, profile.intervalDays || 1);
+    const previousStreak = Math.max(0, profile.consecutiveCorrect || 0);
+    const quality = rating === 1 ? 1 : rating === 2 ? 3 : 5;
 
-    let nextEase = previousEase;
+    let nextEase = previousEase + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    nextEase = this.clamp(nextEase, 1.3, 3.0);
+
     let nextInterval = previousInterval;
     let nextStreak = previousStreak;
     let lapseIncrement = 0;
-    const weakness = this.weaknessScore(profile);
 
-    if (grade === 'again') {
-      nextEase = this.clamp(previousEase - 0.2, 1.3, 3.0);
-      nextInterval = 0;
+    if (rating === 1) {
+      nextInterval = 1;
       nextStreak = 0;
       lapseIncrement = 1;
-    }
-
-    if (grade === 'good') {
-      nextEase = this.clamp(previousEase + 0.05, 1.3, 3.0);
-      if (previousInterval <= 0) {
+    } else if (rating === 2) {
+      nextStreak = previousStreak + 1;
+      if (previousStreak <= 0 || previousInterval <= 1) {
+        nextInterval = 2;
+      } else {
+        nextInterval = Math.max(2, Math.round(previousInterval * Math.max(1.2, nextEase - 0.7)));
+      }
+    } else {
+      nextStreak = previousStreak + 1;
+      if (previousStreak <= 0) {
         nextInterval = 1;
-      } else if (previousInterval === 1) {
-        nextInterval = 3;
+      } else if (previousStreak === 1) {
+        nextInterval = 6;
       } else {
-        nextInterval = Math.round(previousInterval * previousEase);
+        nextInterval = Math.max(2, Math.round(previousInterval * nextEase));
       }
-      nextStreak = previousStreak + 1;
     }
 
-    if (grade === 'easy') {
-      nextEase = this.clamp(previousEase + 0.15, 1.3, 3.0);
-      if (previousInterval <= 0) {
-        nextInterval = 3;
-      } else {
-        nextInterval = Math.round(previousInterval * (previousEase + 0.35));
-      }
-      nextStreak = previousStreak + 1;
-    }
-
-    if (grade === 'good' || grade === 'easy') {
-      // Weak profiles need denser repetition even after a correct attempt.
-      const dampening = 1 - weakness * 0.5;
-      nextInterval = Math.max(1, Math.round(nextInterval * dampening));
-    }
-
-    const againDelayMinutes = weakness > 0.6 ? 3 : 5;
-    const dueAt =
-      grade === 'again'
-        ? new Date(Date.now() + againDelayMinutes * 60 * 1000)
-        : this.nextMidnight(nextInterval);
+    const dueAt = this.startOfDayPlus(nextInterval);
 
     return {
       previousEase,
@@ -776,7 +768,7 @@ export class PracticeService {
             phraseId,
             exerciseType,
             easeFactor: 2.5,
-            intervalDays: 0,
+            intervalDays: 1,
             consecutiveCorrect: 0,
             reviewCount: 0,
             lapseCount: 0,
@@ -853,13 +845,13 @@ export class PracticeService {
     const exerciseTypes = query.exerciseType ? [query.exerciseType] : [...EXERCISE_TYPES];
     await this.ensureProfiles(clientId, [...phraseById.keys()], exerciseTypes);
 
-    const now = new Date();
+    const startOfTomorrow = this.startOfDayPlus(1);
     const limit = Math.max(1, Math.min(100, Number(query.limit || 15)));
 
     const qb = this.profileRepo
       .createQueryBuilder('profile')
       .where('profile.clientId = :clientId', { clientId })
-      .andWhere('profile.dueAt <= :now', { now })
+      .andWhere('profile.dueAt < :startOfTomorrow', { startOfTomorrow })
       .orderBy('profile.dueAt', 'ASC')
       .addOrderBy('profile.id', 'ASC')
       .limit(limit);
@@ -879,7 +871,7 @@ export class PracticeService {
       const fallbackQb = this.profileRepo
         .createQueryBuilder('profile')
         .where('profile.clientId = :clientId', { clientId })
-        .andWhere('profile.dueAt > :now', { now })
+        .andWhere('profile.dueAt >= :startOfTomorrow', { startOfTomorrow })
         .orderBy('profile.dueAt', 'ASC')
         .limit(limit * 3);
 
@@ -892,21 +884,10 @@ export class PracticeService {
       const fallback = await fallbackQb.getMany();
       const prioritizedFallback = fallback
         .filter((profile) => !selectedIds.has(Number(profile.id)))
-        .sort((a, b) => {
-          const weaknessDiff = this.weaknessScore(b) - this.weaknessScore(a);
-          if (weaknessDiff !== 0) return weaknessDiff;
-          return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
-        })
         .slice(0, missing);
 
       profiles = [...profiles, ...prioritizedFallback];
     }
-
-    profiles = profiles.sort((a, b) => {
-      const weaknessDiff = this.weaknessScore(b) - this.weaknessScore(a);
-      if (weaknessDiff !== 0) return weaknessDiff;
-      return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
-    });
 
     let exercises = profiles
       .map((profile) => this.buildQueueItem(phraseById, profile))
@@ -950,7 +931,6 @@ export class PracticeService {
     }
 
     const built = this.buildExercise(phrase, dto.exerciseType);
-    const resolved = this.resolvePhrasePair(phrase);
 
     let gradeResult;
     let userAnswer = dto.userAnswer || null;
@@ -981,7 +961,7 @@ export class PracticeService {
         phraseId: dto.phraseId,
         exerciseType: dto.exerciseType,
         easeFactor: 2.5,
-        intervalDays: 0,
+        intervalDays: 1,
         consecutiveCorrect: 0,
         reviewCount: 0,
         lapseCount: 0,
@@ -990,17 +970,6 @@ export class PracticeService {
       });
       profile = await this.profileRepo.save(profile);
     }
-
-    const schedule = this.computeSchedule(profile, this.toGrade(gradeResult.score));
-
-    profile.easeFactor = schedule.nextEase;
-    profile.intervalDays = schedule.nextInterval;
-    profile.consecutiveCorrect = schedule.nextStreak;
-    profile.reviewCount = (profile.reviewCount || 0) + 1;
-    profile.lapseCount = (profile.lapseCount || 0) + schedule.lapseIncrement;
-    profile.lastReviewedAt = new Date();
-    profile.dueAt = schedule.dueAt;
-    profile = await this.profileRepo.save(profile);
 
     const attempt = this.attemptRepo.create({
       clientId,
@@ -1022,6 +991,84 @@ export class PracticeService {
 
     const savedAttempt = await this.attemptRepo.save(attempt);
 
+    return {
+      attemptId: savedAttempt.id,
+      requiresRating: true,
+      isCorrect: gradeResult.isCorrect,
+      score: gradeResult.score,
+      normalizedExpected: gradeResult.normalizedExpected,
+    };
+  }
+
+  async reviewItem(clientId: string, dto: ReviewPracticeItemDto) {
+    const phrases = await this.getPhrases(clientId);
+    const phrase = phrases.find((item) => item.id === dto.phraseId);
+    if (!phrase) {
+      throw new NotFoundException(`Phrase ${dto.phraseId} not found for client`);
+    }
+
+    const resolved = this.resolvePhrasePair(phrase);
+
+    let profile = await this.profileRepo.findOne({
+      where: {
+        clientId,
+        phraseId: dto.phraseId,
+        exerciseType: dto.exerciseType,
+      },
+    });
+
+    if (!profile) {
+      profile = this.profileRepo.create({
+        clientId,
+        phraseId: dto.phraseId,
+        exerciseType: dto.exerciseType,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        consecutiveCorrect: 0,
+        reviewCount: 0,
+        lapseCount: 0,
+        lastReviewedAt: null,
+        dueAt: new Date(),
+      });
+      profile = await this.profileRepo.save(profile);
+    }
+
+    let attempt: PracticeAttempt | null = null;
+    if (dto.attemptId) {
+      attempt = await this.attemptRepo.findOne({
+        where: {
+          id: dto.attemptId,
+          clientId,
+          phraseId: dto.phraseId,
+          exerciseType: dto.exerciseType,
+        },
+      });
+      if (!attempt) {
+        throw new NotFoundException(`Attempt ${dto.attemptId} not found for review`);
+      }
+    }
+
+    const schedule = this.computeSm2Schedule(profile, dto.rating);
+    const reviewedAt = new Date();
+
+    profile.easeFactor = schedule.nextEase;
+    profile.intervalDays = schedule.nextInterval;
+    profile.consecutiveCorrect = schedule.nextStreak;
+    profile.reviewCount = (profile.reviewCount || 0) + 1;
+    profile.lapseCount = (profile.lapseCount || 0) + schedule.lapseIncrement;
+    profile.lastReviewedAt = reviewedAt;
+    profile.dueAt = schedule.dueAt;
+    profile = await this.profileRepo.save(profile);
+
+    if (attempt) {
+      attempt.metadataJson = {
+        ...(attempt.metadataJson || {}),
+        reviewRating: dto.rating,
+        reviewedAt: reviewedAt.toISOString(),
+      };
+      await this.attemptRepo.save(attempt);
+    }
+
     try {
       const lexiconText = resolved?.irish || this.cleanText(phrase.text);
       const lexiconTranslation = resolved?.english || this.cleanText(phrase.translation || '');
@@ -1034,7 +1081,7 @@ export class PracticeService {
           notes: phrase.notes?.trim() || undefined,
         },
         interaction: {
-          type: gradeResult.isCorrect ? 'practice_correct' : 'practice_incorrect',
+          type: dto.rating === 3 ? 'practice_correct' : 'practice_incorrect',
           timestamp: Date.now(),
         },
       });
@@ -1047,10 +1094,7 @@ export class PracticeService {
     }
 
     return {
-      attemptId: savedAttempt.id,
-      isCorrect: gradeResult.isCorrect,
-      score: gradeResult.score,
-      normalizedExpected: gradeResult.normalizedExpected,
+      attemptId: attempt?.id || null,
       nextDueAt: profile.dueAt,
       profileStats: {
         easeFactor: profile.easeFactor,
@@ -1160,10 +1204,12 @@ export class PracticeService {
     const totalAttempts = attempts.length;
     const totalCorrect = attempts.filter((attempt) => attempt.isCorrect).length;
 
+    const phrases = await this.getPhrases(clientId);
+    await this.ensureProfiles(clientId, phrases.map((phrase) => phrase.id), [...EXERCISE_TYPES]);
     const dueCount = await this.profileRepo
       .createQueryBuilder('profile')
       .where('profile.clientId = :clientId', { clientId })
-      .andWhere('profile.dueAt <= :now', { now: new Date() })
+      .andWhere('profile.dueAt < :startOfTomorrow', { startOfTomorrow: this.startOfDayPlus(1) })
       .getCount();
 
     return {
@@ -1185,8 +1231,9 @@ export class PracticeService {
     const challengeCount = Math.max(1, Math.min(10, Number(query.challengeCount || 3)));
     const now = new Date();
 
-    const [phrases, profiles, incorrectAttemptsRaw] = await Promise.all([
-      this.getPhrases(clientId),
+    const phrases = await this.getPhrases(clientId);
+    await this.ensureProfiles(clientId, phrases.map((phrase) => phrase.id), [...EXERCISE_TYPES]);
+    const [profiles, incorrectAttemptsRaw] = await Promise.all([
       this.profileRepo.find({
         where: { clientId },
         order: { dueAt: 'ASC' },
@@ -1203,54 +1250,71 @@ export class PracticeService {
     ]);
 
     const resolvedPhrases = this.resolveWarmupPhrases(phrases);
-    const lastReviewedByPhrase = new Map<number, Date | null>();
-
-    for (const profile of profiles) {
-      const existing = lastReviewedByPhrase.get(profile.phraseId);
-      const candidate = profile.lastReviewedAt ? new Date(profile.lastReviewedAt) : null;
-      if (!candidate) {
-        if (!lastReviewedByPhrase.has(profile.phraseId)) {
-          lastReviewedByPhrase.set(profile.phraseId, null);
-        }
-        continue;
-      }
-      if (!existing || candidate.getTime() > existing.getTime()) {
-        lastReviewedByPhrase.set(profile.phraseId, candidate);
-      }
-    }
-
+    const phraseScheduleByPhrase = new Map<
+      number,
+      { nextDueAt: Date | null; lastReviewedAt: Date | null; dueCount: number; niceToHaveCount: number }
+    >();
+    const dueCutoff = this.startOfDayPlus(1, now);
+    const niceToHaveCutoff = this.startOfDayPlus(4, now);
     let dueCount = 0;
     let niceToHaveCount = 0;
     let notYetDueCount = 0;
 
+    for (const profile of profiles) {
+      const existing = phraseScheduleByPhrase.get(profile.phraseId) || {
+        nextDueAt: null,
+        lastReviewedAt: null,
+        dueCount: 0,
+        niceToHaveCount: 0,
+      };
+      const dueAt = profile.dueAt ? new Date(profile.dueAt) : null;
+      const candidate = profile.lastReviewedAt ? new Date(profile.lastReviewedAt) : null;
+      if (!existing.lastReviewedAt || (candidate && candidate.getTime() > existing.lastReviewedAt.getTime())) {
+        existing.lastReviewedAt = candidate;
+      }
+      if (!existing.nextDueAt || (dueAt && dueAt.getTime() < existing.nextDueAt.getTime())) {
+        existing.nextDueAt = dueAt;
+      }
+      if (!dueAt || dueAt.getTime() < dueCutoff.getTime()) {
+        dueCount += 1;
+        existing.dueCount += 1;
+      } else if (dueAt.getTime() < niceToHaveCutoff.getTime()) {
+        niceToHaveCount += 1;
+        existing.niceToHaveCount += 1;
+      } else {
+        notYetDueCount += 1;
+      }
+      phraseScheduleByPhrase.set(profile.phraseId, existing);
+    }
+
     const challengeCandidates = resolvedPhrases
       .map((phrase) => {
-        const lastReviewedAt = lastReviewedByPhrase.get(phrase.phraseId) ?? null;
-        const ageDays = this.daysSince(lastReviewedAt, now);
+        const schedule = phraseScheduleByPhrase.get(phrase.phraseId) || {
+          nextDueAt: null,
+          lastReviewedAt: null,
+          dueCount: 0,
+          niceToHaveCount: 0,
+        };
         let bucket: 'due' | 'nice_to_have' | 'not_yet_due' = 'not_yet_due';
 
-        if (!Number.isFinite(ageDays) || ageDays >= 3) {
+        if (schedule.dueCount > 0) {
           bucket = 'due';
-          dueCount += 1;
-        } else if (ageDays >= 1) {
+        } else if (schedule.niceToHaveCount > 0) {
           bucket = 'nice_to_have';
-          niceToHaveCount += 1;
-        } else {
-          notYetDueCount += 1;
         }
 
         return {
           ...phrase,
           bucket,
-          lastReviewedAt,
-          ageDays,
+          nextDueAt: schedule.nextDueAt,
+          lastReviewedAt: schedule.lastReviewedAt,
         };
       })
       .sort((a, b) => {
         const bucketRank = { due: 0, nice_to_have: 1, not_yet_due: 2 } as const;
         if (bucketRank[a.bucket] !== bucketRank[b.bucket]) return bucketRank[a.bucket] - bucketRank[b.bucket];
-        const aTime = a.lastReviewedAt ? a.lastReviewedAt.getTime() : 0;
-        const bTime = b.lastReviewedAt ? b.lastReviewedAt.getTime() : 0;
+        const aTime = a.nextDueAt ? a.nextDueAt.getTime() : Number.MAX_SAFE_INTEGER;
+        const bTime = b.nextDueAt ? b.nextDueAt.getTime() : Number.MAX_SAFE_INTEGER;
         if (aTime !== bTime) return aTime - bTime;
         return a.phraseId - b.phraseId;
       });
@@ -1279,6 +1343,7 @@ export class PracticeService {
     const since = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
 
     const phrases = await this.getPhrases(clientId);
+    await this.ensureProfiles(clientId, phrases.map((phrase) => phrase.id), [...EXERCISE_TYPES]);
     const resolvedPhrases = phrases
       .map((phrase) => {
         const pair = this.resolvePhrasePair(phrase);
@@ -1307,7 +1372,7 @@ export class PracticeService {
       .select('profile.phraseId', 'phraseId')
       .addSelect('COUNT(*)', 'dueExercises')
       .where('profile.clientId = :clientId', { clientId })
-      .andWhere('profile.dueAt <= :now', { now })
+      .andWhere('profile.dueAt < :startOfTomorrow', { startOfTomorrow: this.startOfDayPlus(1, now) })
       .groupBy('profile.phraseId')
       .getRawMany();
 
