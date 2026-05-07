@@ -13,6 +13,7 @@ import {
   PracticeMistakesQueryDto,
   PracticeHistoryQueryDto,
   PracticeProgressQueryDto,
+  PracticeWarmupQueryDto,
   PhraseHealthQueryDto,
   ResetProfilesDto,
   SubmitPracticeAttemptDto,
@@ -50,6 +51,12 @@ type ResolvedPhrasePair = {
   irish: string;
 };
 
+type WarmupResolvedPhrase = {
+  phraseId: number;
+  irish: string;
+  english: string;
+};
+
 @Injectable()
 export class PracticeService {
   private readonly logger = new Logger(PracticeService.name);
@@ -72,6 +79,22 @@ export class PracticeService {
 
   private clamp(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
+  }
+
+  private startOfDay(date = new Date()) {
+    const value = new Date(date);
+    value.setHours(0, 0, 0, 0);
+    return value;
+  }
+
+  private daysSince(date: Date | null | undefined, now = new Date()) {
+    if (!date) return Number.POSITIVE_INFINITY;
+    return Math.floor((this.startOfDay(now).getTime() - this.startOfDay(date).getTime()) / (24 * 60 * 60 * 1000));
+  }
+
+  private estimateWarmupMinutes(dueCount: number) {
+    if (dueCount <= 0) return 0;
+    return Math.max(1, Math.ceil(dueCount * 0.75));
   }
 
   private async parseResponse(res: Response) {
@@ -167,6 +190,20 @@ export class PracticeService {
         typeof phrase?.translation === 'string' &&
         phrase.translation.trim().length > 0,
     );
+  }
+
+  private resolveWarmupPhrases(phrases: PhrasebookPhrase[]): WarmupResolvedPhrase[] {
+    return phrases
+      .map((phrase) => {
+        const pair = this.resolvePhrasePair(phrase);
+        if (!pair) return null;
+        return {
+          phraseId: phrase.id,
+          irish: pair.irish,
+          english: pair.english,
+        };
+      })
+      .filter(Boolean) as WarmupResolvedPhrase[];
   }
 
   private sortedTokens(phrase: PhrasebookPhrase): string[] {
@@ -1141,6 +1178,97 @@ export class PracticeService {
           return [type, { ...stats, accuracy }];
         }),
       ),
+    };
+  }
+
+  async getWarmup(clientId: string, query: PracticeWarmupQueryDto) {
+    const challengeCount = Math.max(1, Math.min(10, Number(query.challengeCount || 3)));
+    const now = new Date();
+
+    const [phrases, profiles, incorrectAttemptsRaw] = await Promise.all([
+      this.getPhrases(clientId),
+      this.profileRepo.find({
+        where: { clientId },
+        order: { dueAt: 'ASC' },
+      }),
+      this.attemptRepo
+        .createQueryBuilder('attempt')
+        .select('COUNT(DISTINCT attempt.phraseId)', 'mistakePhraseCount')
+        .where('attempt.clientId = :clientId', { clientId })
+        .andWhere('attempt.isCorrect = 0')
+        .andWhere('attempt.createdAt >= :since', {
+          since: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
+        })
+        .getRawOne(),
+    ]);
+
+    const resolvedPhrases = this.resolveWarmupPhrases(phrases);
+    const lastReviewedByPhrase = new Map<number, Date | null>();
+
+    for (const profile of profiles) {
+      const existing = lastReviewedByPhrase.get(profile.phraseId);
+      const candidate = profile.lastReviewedAt ? new Date(profile.lastReviewedAt) : null;
+      if (!candidate) {
+        if (!lastReviewedByPhrase.has(profile.phraseId)) {
+          lastReviewedByPhrase.set(profile.phraseId, null);
+        }
+        continue;
+      }
+      if (!existing || candidate.getTime() > existing.getTime()) {
+        lastReviewedByPhrase.set(profile.phraseId, candidate);
+      }
+    }
+
+    let dueCount = 0;
+    let niceToHaveCount = 0;
+    let notYetDueCount = 0;
+
+    const challengeCandidates = resolvedPhrases
+      .map((phrase) => {
+        const lastReviewedAt = lastReviewedByPhrase.get(phrase.phraseId) ?? null;
+        const ageDays = this.daysSince(lastReviewedAt, now);
+        let bucket: 'due' | 'nice_to_have' | 'not_yet_due' = 'not_yet_due';
+
+        if (!Number.isFinite(ageDays) || ageDays >= 3) {
+          bucket = 'due';
+          dueCount += 1;
+        } else if (ageDays >= 1) {
+          bucket = 'nice_to_have';
+          niceToHaveCount += 1;
+        } else {
+          notYetDueCount += 1;
+        }
+
+        return {
+          ...phrase,
+          bucket,
+          lastReviewedAt,
+          ageDays,
+        };
+      })
+      .sort((a, b) => {
+        const bucketRank = { due: 0, nice_to_have: 1, not_yet_due: 2 } as const;
+        if (bucketRank[a.bucket] !== bucketRank[b.bucket]) return bucketRank[a.bucket] - bucketRank[b.bucket];
+        const aTime = a.lastReviewedAt ? a.lastReviewedAt.getTime() : 0;
+        const bTime = b.lastReviewedAt ? b.lastReviewedAt.getTime() : 0;
+        if (aTime !== bTime) return aTime - bTime;
+        return a.phraseId - b.phraseId;
+      });
+
+    const challengePhrases = challengeCandidates.slice(0, challengeCount).map((phrase) => ({
+      phraseId: phrase.phraseId,
+      irish: phrase.irish,
+      english: phrase.english,
+      bucket: phrase.bucket,
+    }));
+
+    return {
+      dueCount,
+      estimatedMinutes: this.estimateWarmupMinutes(dueCount),
+      niceToHaveCount,
+      notYetDueCount,
+      mistakesToFixCount: Math.max(0, Number(incorrectAttemptsRaw?.mistakePhraseCount || 0)),
+      challengePhrases,
     };
   }
 

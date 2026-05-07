@@ -37,6 +37,13 @@
     source: 'main' | 'retry';
   };
 
+  type WarmupChallengePhrase = {
+    phraseId: number;
+    irish: string;
+    english: string;
+    bucket: 'due' | 'nice_to_have' | 'not_yet_due';
+  };
+
   let loading = false;
   let submitting = false;
   let sessionMode: 'idle' | 'lesson' | 'fix_mistakes' | 'flash' | 'complete' = 'idle';
@@ -80,7 +87,14 @@
   let infoModalMessage = '';
   let showNoDueChoiceModal = false;
   let warmupDueToday = 0;
+  let warmupEstimatedMinutes = 0;
+  let warmupNiceToHaveCount = 0;
+  let warmupNotYetDueCount = 0;
   let warmupMistakesToFix = 0;
+  let warmupFlashcardsDue = 0;
+  let warmupChallengePhrases: WarmupChallengePhrase[] = [];
+  let warmupChallengeUsedToday = false;
+  let warmupStatsLoaded = false;
   let flashcards: FlashDueCard[] = [];
   let flashIndex = 0;
   let flashFlipped = false;
@@ -224,6 +238,46 @@
     return pending.size;
   }
 
+  function todayKey() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function warmupChallengeStorageKey() {
+    return `practice-warmup-used:${todayKey()}`;
+  }
+
+  function loadWarmupChallengeUsedState() {
+    try {
+      warmupChallengeUsedToday = window.localStorage.getItem(warmupChallengeStorageKey()) === '1';
+    } catch {
+      warmupChallengeUsedToday = false;
+    }
+  }
+
+  function markWarmupChallengeUsed() {
+    warmupChallengeUsedToday = true;
+    try {
+      window.localStorage.setItem(warmupChallengeStorageKey(), '1');
+    } catch {
+      // keep UI optimistic if storage is unavailable
+    }
+  }
+
+  function estimatedWarmupLabel() {
+    if (warmupEstimatedMinutes <= 0) return 'You are clear for today';
+    return `about ${warmupEstimatedMinutes} min`;
+  }
+
+  function challengeBucketLabel(bucket: WarmupChallengePhrase['bucket']) {
+    if (bucket === 'due') return 'Due now';
+    if (bucket === 'nice_to_have') return 'Nice to have';
+    return 'Fresh';
+  }
+
   $: current = queue[index] || null;
   $: selectedSentenceTokens = sentenceChoices
     .filter((token) => token.selectedAt != null)
@@ -297,24 +351,40 @@
 
   async function refreshWarmupStats() {
     try {
-      const [progressRes, mistakesRes] = await Promise.all([
-        apiFetch('/api/proxy/practice/progress', { cache: 'no-store' }),
-        apiFetch('/api/proxy/practice/mistakes?limit=100', { cache: 'no-store' }),
+      const [warmupRes, flashRes] = await Promise.all([
+        apiFetch('/api/proxy/practice/warmup?challengeCount=3', { cache: 'no-store' }),
+        apiFetch('/api/proxy/flashcards/study/due?limit=100', { cache: 'no-store' }),
       ]);
 
-      if (progressRes.ok) {
-        const payload = await progressRes.json();
-        const dueCount = Number(payload?.dueCount);
-        if (Number.isFinite(dueCount)) {
-          warmupDueToday = Math.max(0, Math.round(dueCount));
-        }
+      if (warmupRes.ok) {
+        const payload = await warmupRes.json();
+        warmupDueToday = Math.max(0, Number(payload?.dueCount || 0));
+        warmupEstimatedMinutes = Math.max(0, Number(payload?.estimatedMinutes || 0));
+        warmupNiceToHaveCount = Math.max(0, Number(payload?.niceToHaveCount || 0));
+        warmupNotYetDueCount = Math.max(0, Number(payload?.notYetDueCount || 0));
+        warmupMistakesToFix = Math.max(0, Number(payload?.mistakesToFixCount || 0));
+        warmupChallengePhrases = Array.isArray(payload?.challengePhrases)
+          ? payload.challengePhrases
+              .map((item: any) => ({
+                phraseId: Number(item?.phraseId),
+                irish: String(item?.irish || ''),
+                english: String(item?.english || ''),
+                bucket:
+                  item?.bucket === 'due' || item?.bucket === 'nice_to_have' || item?.bucket === 'not_yet_due'
+                    ? item.bucket
+                    : 'not_yet_due'
+              }))
+              .filter((item: WarmupChallengePhrase) => Number.isFinite(item.phraseId) && item.irish && item.english)
+          : [];
       }
 
-      if (mistakesRes.ok) {
-        const payload = await mistakesRes.json();
-        const items = Array.isArray(payload?.items) ? payload.items : [];
-        warmupMistakesToFix = items.length;
+      if (flashRes.ok) {
+        const payload = await flashRes.json();
+        warmupFlashcardsDue = Array.isArray(payload) ? payload.length : 0;
       }
+
+      warmupStatsLoaded = true;
+      loadWarmupChallengeUsedState();
     } catch {
       // Keep UI usable even if warm-up stats fail to load.
     }
@@ -431,7 +501,7 @@
     loading = true;
     try {
       if (!skipNoDueDecision) {
-        const dueCount = await fetchDueCount();
+        const dueCount = warmupStatsLoaded ? warmupDueToday : await fetchDueCount();
         if (dueCount === 0) {
           showNoDueChoiceModal = true;
           return;
@@ -489,6 +559,10 @@
   function continueWithPhrasebook() {
     showNoDueChoiceModal = false;
     goto('/dashboard/phrasebook');
+  }
+
+  function startWriteAboutYourDay() {
+    goto('/dashboard/translations').catch(() => undefined);
   }
 
   async function startFlashcardReview() {
@@ -813,19 +887,58 @@
       <div class="warmup-wrap">
         <div class="warmup-eyebrow">Practice session</div>
         <h1 class="warmup-headline">Ready to <em>cleachtadh?</em></h1>
-        <p class="warmup-sub">{warmupDueToday} phrases are due for review today. Pick a mode or jump straight in.</p>
+        <p class="warmup-sub">Your warm-up is based on recent review activity. Start with what is due, then clear nice-to-have phrases if you have the time.</p>
 
-        <div class="due-strip">
-          <div class="due-pill primary">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            {warmupDueToday} due today
+        <section class="due-summary-card">
+          <div class="due-summary-top">
+            <div>
+              <div class="due-summary-label">Due now</div>
+              <div class="due-summary-count">{warmupDueToday}</div>
+            </div>
+            <div class="due-summary-time">{estimatedWarmupLabel()}</div>
           </div>
-          <div class="due-pill secondary">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
-            {warmupMistakesToFix} mistakes to fix
+          <div class="due-summary-row">
+            <div class="due-summary-mini">
+              <span class="due-summary-mini-label">Nice to have</span>
+              <span class="due-summary-mini-value">{warmupNiceToHaveCount}</span>
+            </div>
+            <div class="due-summary-mini">
+              <span class="due-summary-mini-label">Not yet due</span>
+              <span class="due-summary-mini-value">{warmupNotYetDueCount}</span>
+            </div>
           </div>
-          <div class="due-pill dim">{sessionLimit} phrase session</div>
-        </div>
+        </section>
+
+        <section class="output-challenge-card">
+          <div class="output-challenge-head">
+            <div>
+              <div class="output-challenge-label">Output challenge</div>
+              <h2 class="output-challenge-title">Try these 3 phrases in a real conversation today</h2>
+            </div>
+            <button
+              class={`output-challenge-btn ${warmupChallengeUsedToday ? 'used' : ''}`}
+              type="button"
+              onclick={markWarmupChallengeUsed}
+              disabled={warmupChallengeUsedToday}
+            >
+              {warmupChallengeUsedToday ? 'Used today' : 'I used these today'}
+            </button>
+          </div>
+
+          {#if warmupChallengePhrases.length > 0}
+            <div class="output-challenge-list">
+              {#each warmupChallengePhrases as phrase}
+                <div class="output-challenge-item">
+                  <div class="output-challenge-bucket">{challengeBucketLabel(phrase.bucket)}</div>
+                  <div class="output-challenge-irish">{phrase.irish}</div>
+                  <div class="output-challenge-english">{phrase.english}</div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <p class="output-challenge-empty">Add a few more phrases to your phrasebook and this challenge will fill in automatically.</p>
+          {/if}
+        </section>
 
         <div class="mode-list">
           <button class="mode-card primary-mode" type="button" onclick={startLesson} disabled={loading}>
@@ -850,7 +963,7 @@
               <div class="mc-title">Fix <em>mistakes</em></div>
               <div class="mc-sub">Retry phrases you got wrong recently</div>
             </div>
-            <div class="mc-badge amber">{warmupMistakesToFix} to fix</div>
+            <div class="mc-badge amber">{warmupMistakesToFix} due</div>
             <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
           </button>
 
@@ -863,7 +976,20 @@
               <div class="mc-title">Flashcard <em>review</em></div>
               <div class="mc-sub">Open your due flashcards</div>
             </div>
-            <div class="mc-badge none">{warmupDueToday} due</div>
+            <div class="mc-badge none">{warmupFlashcardsDue} due</div>
+            <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
+          </button>
+
+          <button class="mode-card" type="button" onclick={startWriteAboutYourDay}>
+            <div class="mc-icon-wrap note">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--forest)" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            </div>
+            <div class="mc-text">
+              <div class="mc-eyebrow">Active recall</div>
+              <div class="mc-title">Write about <em>your day</em></div>
+              <div class="mc-sub">Use today’s challenge phrases in a short journal entry</div>
+            </div>
+            <div class="mc-badge soft">{warmupChallengePhrases.length} prompts</div>
             <div class="mc-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="m9 18 6-6-6-6"/></svg></div>
           </button>
         </div>
@@ -1206,30 +1332,204 @@
   .warmup-sub {
     font-size: 14px;
     color: #777;
-    margin-bottom: 36px;
+    margin-bottom: 28px;
     line-height: 1.6;
   }
 
-  .due-strip {
+  .due-summary-card {
+    background: var(--forest);
+    color: var(--parchment);
+    border-radius: 24px;
+    padding: 24px 24px 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 20px 50px rgba(28,43,34,.18);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .due-summary-card::after {
+    content: '';
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    right: -56px;
+    top: -72px;
+    border-radius: 50%;
+    background: rgba(126,201,154,.12);
+  }
+
+  .due-summary-top {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .due-summary-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,.52);
+    margin-bottom: 10px;
+  }
+
+  .due-summary-count {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(46px, 8vw, 72px);
+    line-height: .95;
+    letter-spacing: -.05em;
+    color: var(--sage);
+  }
+
+  .due-summary-time {
+    padding: 10px 12px;
+    border-radius: 999px;
+    background: rgba(126,201,154,.12);
+    color: var(--sage);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+
+  .due-summary-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
-    margin-bottom: 36px;
-    flex-wrap: wrap;
+    margin-top: 18px;
+    position: relative;
+    z-index: 1;
   }
 
-  .due-pill {
+  .due-summary-mini {
+    border-radius: 16px;
+    padding: 14px 16px;
+    background: rgba(245,240,232,.08);
     display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 8px 14px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
+    flex-direction: column;
+    gap: 4px;
   }
 
-  .due-pill.primary { background: var(--forest); color: var(--parchment); }
-  .due-pill.secondary { background: white; color: var(--forest); border: 1px solid var(--parchment-dark); }
-  .due-pill.dim { background: var(--parchment-dark); color: var(--muted); }
+  .due-summary-mini-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,.5);
+  }
+
+  .due-summary-mini-value {
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    line-height: 1;
+    color: var(--parchment);
+  }
+
+  .output-challenge-card {
+    background: linear-gradient(180deg, #fffdf8 0%, #f6f0e6 100%);
+    border: 1.5px solid var(--parchment-dark);
+    border-radius: 24px;
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+
+  .output-challenge-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .output-challenge-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--moss);
+    margin-bottom: 8px;
+  }
+
+  .output-challenge-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(22px, 3.3vw, 28px);
+    line-height: 1.15;
+    letter-spacing: -.02em;
+    color: var(--forest);
+  }
+
+  .output-challenge-btn {
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 14px;
+    background: var(--forest);
+    color: var(--parchment);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform .1s ease, opacity .15s ease, background .15s ease;
+  }
+
+  .output-challenge-btn:hover { transform: translateY(-1px); }
+  .output-challenge-btn.used,
+  .output-challenge-btn:disabled {
+    background: rgba(45,122,80,.14);
+    color: var(--moss);
+    cursor: default;
+    transform: none;
+  }
+
+  .output-challenge-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .output-challenge-item {
+    background: white;
+    border-radius: 18px;
+    border: 1px solid rgba(28,43,34,.08);
+    padding: 14px 14px 16px;
+    min-height: 140px;
+  }
+
+  .output-challenge-bucket {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: rgba(45,122,80,.08);
+    color: var(--moss);
+    padding: 5px 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .output-challenge-irish {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--forest);
+    margin-bottom: 8px;
+  }
+
+  .output-challenge-english {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  .output-challenge-empty {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+  }
 
   .mode-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 32px; }
 
@@ -1271,6 +1571,7 @@
   .mc-icon-wrap.dark { background: rgba(126,201,154,.15); }
   .mc-icon-wrap.light { background: rgba(45,122,80,.08); }
   .mc-icon-wrap.dim { background: var(--parchment-dark); }
+  .mc-icon-wrap.note { background: rgba(28,43,34,.06); }
   .mode-card.primary-mode .mc-icon-wrap { background: rgba(126,201,154,.15); }
 
   .mc-text { flex: 1; }
@@ -1295,6 +1596,7 @@
   .mc-badge { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 10px; flex-shrink: 0; }
   .mc-badge.amber { background: rgba(200,120,40,.1); color: #c07828; }
   .mc-badge.none { background: var(--parchment-dark); color: #bbb; }
+  .mc-badge.soft { background: rgba(28,43,34,.06); color: var(--forest); }
   .mode-card.primary-mode .mc-badge { background: rgba(126,201,154,.2); color: var(--sage); }
   .mc-arrow { color: #ccc; flex-shrink: 0; }
   .mode-card:hover .mc-arrow { color: var(--muted); }
@@ -1904,8 +2206,14 @@
     .warmup-wrap { padding: 28px 16px 80px; }
     .warmup-headline { font-size: 28px; }
     .warmup-sub { font-size: 13px; margin-bottom: 28px; }
-    .due-strip { gap: 8px; margin-bottom: 28px; }
-    .due-pill { font-size: 12px; padding: 7px 12px; }
+    .due-summary-card { padding: 20px 18px 16px; border-radius: 20px; margin-bottom: 14px; }
+    .due-summary-top { flex-direction: column; gap: 10px; }
+    .due-summary-time { align-self: flex-start; }
+    .due-summary-row { grid-template-columns: 1fr; gap: 8px; }
+    .output-challenge-card { padding: 18px; border-radius: 20px; margin-bottom: 18px; }
+    .output-challenge-head { flex-direction: column; }
+    .output-challenge-btn { width: 100%; justify-content: center; }
+    .output-challenge-list { grid-template-columns: 1fr; }
     .mode-list { gap: 8px; }
     .mode-card { padding: 14px 16px; gap: 12px; border-radius: 14px; }
     .mc-icon-wrap { width: 38px; height: 38px; border-radius: 10px; }
