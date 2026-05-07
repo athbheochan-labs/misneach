@@ -43,6 +43,15 @@ export class PracticeController {
     return this.practiceService.get('/practice/progress', clientId, query);
   }
 
+  @Get('warmup')
+  async getWarmup(
+    @Req() req: AuthenticatedRequest,
+    @Query() query: Record<string, string | undefined>,
+  ) {
+    const clientId = await this.authService.getClientIdFromSession(req);
+    return this.practiceService.get('/practice/warmup', clientId, query);
+  }
+
   @Get('phrase-health')
   async getPhraseHealth(
     @Req() req: AuthenticatedRequest,

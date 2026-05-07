@@ -125,6 +125,19 @@ export class PhraseHealthQueryDto {
   lookbackDays?: number;
 }
 
+export class PracticeWarmupQueryDto {
+  @IsOptional()
+  @IsString()
+  clientId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  challengeCount?: number;
+}
+
 export class ResetProfilesDto {
   @IsOptional()
   @Type(() => Number)
