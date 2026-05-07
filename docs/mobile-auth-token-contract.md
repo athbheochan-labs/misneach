@@ -17,10 +17,10 @@ This contract introduces four primary endpoints:
 
 ## Deprecation Statement
 
-Cookie-only session dependency is deprecated for mobile clients.
+Cookie-only session dependency is deprecated.
 
-- Existing cookie/session endpoints may continue for web compatibility.
 - Mobile clients must authenticate via bearer access token + refresh token flow.
+- `cleachtadh-web` and `misneach-web` now use the shared backend-owned token/magic-link contract.
 - New mobile features should assume token auth, not cookie auth.
 
 ## Authentication Model
@@ -166,6 +166,5 @@ Unauthorized (`401`):
 
 ## Compatibility and Migration
 
-- Web cookie flow remains supported during transition.
 - Mobile clients should not call cookie/session-only flows.
-- Backend implementation should expose both flows until mobile migration is complete, then reduce cookie dependence for non-browser contexts.
+- Web and mobile clients should converge on the shared token contract.

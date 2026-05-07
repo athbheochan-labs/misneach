@@ -7,7 +7,7 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 - No direct app-to-app imports were found between `misneach-web` and `cleachtadh-web`.
 - `cleachtadh-web` is mostly aligned with the target architecture: it talks to shared backend services through the `client` gateway or app-local proxy routes.
 - `misneach-web` now uses the same backend-owned token auth flow as `cleachtadh-web` for magic-link issuance and verification.
-- Shared backend services are viable for both products, but auth and a few product-specific routes still need cleanup before the split can be considered fully contract-safe.
+- Shared backend services are viable for both products, but a few product-specific routes still need cleanup before the split can be considered fully contract-safe.
 
 ## Contract Matrix
 
@@ -25,7 +25,6 @@ This note verifies how `misneach-web` and `cleachtadh-web` currently share backe
 | `waitlist` | `misneach-web` | app-local proxy to `client` | Good | Product-specific but contract is clean. |
 | `business` / onboarding / payment bootstrap | `cleachtadh-web` | via `client` proxy + app-local payment endpoint | Leaking | This looks Misneach-owned but still lives in Cleachtadh routes. |
 | Auth token issuance / refresh / verification | both apps | backend `client` auth endpoints | Good | Both products now use the same token bundle contract. |
-| Legacy cookie session verification | `cleachtadh-web` only | app-local JWT verification in optional session mode | Mixed | Legacy fallback still exists in Cleachtadh, but Misneach no longer duplicates it. |
 
 ## Cleachtadh-Web Findings
 

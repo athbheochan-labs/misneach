@@ -28,7 +28,3 @@ export function resolveApiBaseUrls(): string[] {
 export function getInternalAuthSecret(): string {
   return String(env.INTERNAL_AUTH_SECRET || '').trim();
 }
-
-export function getAuthMode(): string {
-  return String(env.AUTH_MODE || 'token').trim().toLowerCase();
-}
