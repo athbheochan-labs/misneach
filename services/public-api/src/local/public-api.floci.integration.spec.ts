@@ -188,8 +188,18 @@ maybeDescribe('Public API Floci integration', () => {
       new CreateTableCommand({
         TableName,
         BillingMode: 'PAY_PER_REQUEST',
-        AttributeDefinitions: [{ AttributeName: 'key', AttributeType: 'S' }],
+        AttributeDefinitions: [
+          { AttributeName: 'key', AttributeType: 'S' },
+          { AttributeName: 'legacyMariaDbId', AttributeType: 'S' },
+        ],
         KeySchema: [{ AttributeName: 'key', KeyType: 'HASH' }],
+        GlobalSecondaryIndexes: [
+          {
+            IndexName: 'legacyMariaDbIdIndex',
+            KeySchema: [{ AttributeName: 'legacyMariaDbId', KeyType: 'HASH' }],
+            Projection: { ProjectionType: 'ALL' },
+          },
+        ],
       }),
     );
   }

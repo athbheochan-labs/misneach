@@ -53,6 +53,7 @@ Relevant workflows:
 
 `misneach-web` also adds:
 
+- `PUBLIC_API_URL`: server-side upstream for serverless public waitlist and survey flows
 - `WAITLIST_API_URL`: optional primary upstream for public waitlist submissions
 - `WAITLIST_API_URLS`: optional comma-separated waitlist upstream fallbacks
 - `SURVEYS_API_URL`: optional primary upstream for public survey submissions and lookups
@@ -71,8 +72,7 @@ Recommended values by environment:
 - production:
   - `PUBLIC_API_BASE_URL=https://api.<your-domain>`
   - `API_INTERNAL_URL=https://api.<your-domain>`
-  - `WAITLIST_API_URL=https://<public-api-id>.execute-api.<region>.amazonaws.com`
-  - `SURVEYS_API_URL=https://<public-api-id>.execute-api.<region>.amazonaws.com`
+  - `PUBLIC_API_URL=https://<public-api-id>.execute-api.<region>.amazonaws.com`
 
 See: [Environment Files README](../deploy/env/README.md)
 
@@ -167,6 +167,47 @@ npm run floci:test:public-api
 ```
 
 The Floci path uses dummy AWS credentials and the local endpoint `http://localhost:4566`, so it does not require real AWS credentials.
+
+### Public Flow Cutover
+
+Use this runbook when moving Misneach public waitlist and survey traffic from the EC2-backed services to API Gateway/Lambda/DynamoDB:
+
+1. Deploy `decyphr-prod-public-api` and copy the `PublicApiUrl` output.
+2. Dry-run the MariaDB data migration:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb --workspace public-api
+```
+
+3. Write the migration after the counts look right:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb:write --workspace public-api
+```
+
+4. Set `PUBLIC_API_URL` for `misneach-web` to the `PublicApiUrl` value, then redeploy the web app.
+5. Smoke-test the deployed public API:
+
+```bash
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api -- --write
+```
+
+6. Stop the EC2-backed services when full application features are idle.
+
+In full app mode, the compose stack and MariaDB-backed services run normally and `API_INTERNAL_URL` handles authenticated/full-product traffic. In public-only mode, Amplify keeps serving `misneach-web`; public waitlist and survey routes continue through the SvelteKit proxies to `PUBLIC_API_URL`, while authenticated or non-public API routes are unavailable until the EC2 stack is started again.
 
 ## Deployment Runbook
 

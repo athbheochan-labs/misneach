@@ -24,6 +24,7 @@ type SurveyTemplateRecord = SurveyTemplateDefinition & {
   id: string;
   key: string;
   legacyId: string | null;
+  legacyMariaDbId?: string | null;
   description: string | null;
   isActive: boolean;
 };
@@ -123,7 +124,7 @@ export class SurveysRepository {
       }),
     );
 
-    const template = response.Item as SurveyTemplateRecord | undefined;
+    const template = (response.Item as SurveyTemplateRecord | undefined) || await this.findTemplateByLegacyMariaDbId(normalized);
     if (!template || !template.isActive) {
       throw new HttpError(404, `Unknown survey template: ${templateId}`);
     }
@@ -132,6 +133,7 @@ export class SurveysRepository {
       id: template.id,
       key: template.key,
       legacyId: template.legacyId ?? null,
+      legacyMariaDbId: template.legacyMariaDbId ?? null,
       title: template.title,
       audience: template.audience,
       description: template.description ?? null,
@@ -309,6 +311,21 @@ export class SurveysRepository {
     const campaign = response.Items?.[0] as SurveyCampaignRecord | undefined;
     if (!campaign) throw new HttpError(404, 'Campaign token is invalid');
     return campaign;
+  }
+
+  private async findTemplateByLegacyMariaDbId(id: string): Promise<SurveyTemplateRecord | undefined> {
+    const response = await this.client.send(
+      new QueryCommand({
+        TableName: this.tables.templatesTableName,
+        IndexName: 'legacyMariaDbIdIndex',
+        KeyConditionExpression: 'legacyMariaDbId = :id',
+        ExpressionAttributeValues: {
+          ':id': id,
+        },
+        Limit: 1,
+      }),
+    );
+    return response.Items?.[0] as SurveyTemplateRecord | undefined;
   }
 
   private async queryResponsesByTemplate(templateKey: string): Promise<SurveyResponseRecord[]> {

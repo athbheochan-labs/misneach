@@ -23,6 +23,7 @@
 
   type CampaignPayload = {
     campaign: {
+      id: string;
       businessName: string;
       town: string | null;
       createdAt: string;

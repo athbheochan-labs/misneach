@@ -73,7 +73,7 @@ AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 ```
 
-The deploy workflow writes the `PublicApiUrl` stack output to the GitHub Actions step summary. Use that value for `WAITLIST_API_URL` and `SURVEYS_API_URL` in `misneach-web`.
+The deploy workflow writes the `PublicApiUrl` stack output to the GitHub Actions step summary. Use that value for `PUBLIC_API_URL` in `misneach-web`.
 
 ## Rollback
 
@@ -135,9 +135,45 @@ The local stack includes HTTP API Gateway routes, Lambda handlers, and DynamoDB 
 
 ## Public API Outputs
 
-The stack outputs `PublicApiUrl`. Set `misneach-web` server-side `WAITLIST_API_URL` and `SURVEYS_API_URL` to that value to route the existing proxies to Lambda:
+The stack outputs `PublicApiUrl`. Set `misneach-web` server-side `PUBLIC_API_URL` to that value to route the existing waitlist and survey proxies to Lambda:
 
 ```txt
-WAITLIST_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
-SURVEYS_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
 ```
+
+`WAITLIST_API_URL` and `SURVEYS_API_URL` remain supported as flow-specific overrides.
+
+Run a deployed smoke test:
+
+```bash
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api -- --write
+```
+
+## Legacy Data Migration
+
+After deploying the stack, migrate existing MariaDB public-flow data from the EC2-backed services:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb --workspace public-api
+```
+
+When the dry-run counts look right, write to DynamoDB:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb:write --workspace public-api
+```
+
+The migration is idempotent: it preserves existing DynamoDB rows and keeps old MariaDB survey template primary IDs searchable through `legacyMariaDbIdIndex`.

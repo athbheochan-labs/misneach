@@ -6,6 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "migrate:mariadb": "node -r ts-node/register src/migrations/mariadb-to-dynamodb.ts",
+    "migrate:mariadb:write": "node -r ts-node/register src/migrations/mariadb-to-dynamodb.ts --write",
     "start:local": "node -r ts-node/register src/local/start.ts",
     "test": "jest --config jest.config.cjs",
     "test:integration": "RUN_FLOCI_INTEGRATION=1 jest --config jest.config.cjs --runTestsByPath src/local/public-api.floci.integration.spec.ts"
@@ -13,7 +15,8 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.758.0",
     "@aws-sdk/lib-dynamodb": "^3.758.0",
-    "@misneach/public-flows": "file:../../packages/public-flows"
+    "@misneach/public-flows": "file:../../packages/public-flows",
+    "mysql2": "^3.11.5"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.147",

@@ -34,3 +34,4 @@ Use this contract for web apps unless a product-specific proxy needs extra servi
 - `PUBLIC_API_BASE_URL`: browser-facing API base URL
 - `API_INTERNAL_URL`: primary server-side upstream for proxy/server requests
 - `API_INTERNAL_URLS`: optional comma-separated fallback upstreams
+- `PUBLIC_API_URL`: server-side upstream for Misneach serverless public waitlist and survey flows
