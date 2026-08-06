@@ -1,5 +1,5 @@
 import { json, type RequestEvent } from '@sveltejs/kit';
-import { resolveApiBaseUrls } from '$lib/server/upstreams';
+import { resolveSurveyBaseUrls } from '$lib/server/upstreams';
 
 async function readBody(request: Request, method: string) {
   if (method === 'GET' || method === 'HEAD') {
@@ -29,7 +29,7 @@ export async function forwardSurveyRequest(event: RequestEvent, pathSuffix: stri
   const requestBody = await readBody(event.request, method);
   let lastError: unknown;
 
-  for (const baseUrl of resolveApiBaseUrls()) {
+  for (const baseUrl of resolveSurveyBaseUrls()) {
     const upstream = `${baseUrl}/surveys${pathSuffix}${event.url.search}`;
     try {
       const response = await event.fetch(upstream, {

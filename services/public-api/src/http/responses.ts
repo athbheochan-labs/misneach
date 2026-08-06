@@ -21,3 +21,13 @@ export function parseJsonBody(body: string | null | undefined, isBase64Encoded =
   const raw = isBase64Encoded ? Buffer.from(body, 'base64').toString('utf8') : body;
   return JSON.parse(raw);
 }
+
+export class HttpError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'HttpError';
+  }
+}
