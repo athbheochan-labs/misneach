@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { normalizeWaitlistJoin } from '@misneach/public-flows';
 import { Repository } from 'typeorm';
 import { JoinWaitlistDto } from './waitlist.dto';
 import { WaitlistEntry } from './waitlist.entity';
@@ -12,11 +13,10 @@ export class WaitlistService {
   ) {}
 
   async join(dto: JoinWaitlistDto) {
-    const email = dto.email.trim().toLowerCase();
-    const interest = dto.interest;
+    const payload = normalizeWaitlistJoin(dto);
 
     const existing = await this.repo.findOne({
-      where: { email, interest },
+      where: { email: payload.email, interest: payload.interest },
     });
 
     if (existing) {
@@ -28,10 +28,10 @@ export class WaitlistService {
     }
 
     const entry = this.repo.create({
-      email,
-      interest,
-      name: dto.name?.trim() || null,
-      source: dto.source?.trim() || null,
+      email: payload.email,
+      interest: payload.interest,
+      name: payload.name || null,
+      source: payload.source || null,
     });
 
     const saved = await this.repo.save(entry);

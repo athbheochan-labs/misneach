@@ -10,6 +10,7 @@
     "start:prod": "node dist/main"
   },
   "dependencies": {
+    "@misneach/public-flows": "^0.0.1",
     "@nestjs/common": "^11.1.14",
     "@nestjs/config": "^4.0.1",
     "@nestjs/core": "^11.1.14",

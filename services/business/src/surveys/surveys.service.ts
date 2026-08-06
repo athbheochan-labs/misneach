@@ -1,4 +1,17 @@
 import {
+  aggregateSurveyResponses,
+  buildSurveyCampaignEmailText,
+  buildSurveyCampaignLinks,
+  buildSurveyQrUrl,
+  normalizeSurveyQuestions,
+  PublicFlowValidationError,
+  renderSurveyCampaignEmailHtml,
+  validateSurveyAnswers,
+  type SurveyCampaignLinks,
+  type SurveyQuestionDefinition,
+  type SurveyTemplateDefinition,
+} from '@misneach/public-flows';
+import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
@@ -20,8 +33,6 @@ import { SurveyTemplateEntity } from './survey-template.entity';
 import {
   defaultTemplateKey,
   SURVEY_TEMPLATES,
-  type SurveyQuestionDefinition,
-  type SurveyTemplateDefinition,
 } from './surveys.templates';
 
 type SurveyTemplateRecord = SurveyTemplateDefinition & {
@@ -50,52 +61,25 @@ export class SurveysService implements OnModuleInit {
   }
 
   private surveyBaseUrl() {
-    return (process.env.SURVEY_PUBLIC_BASE_URL || process.env.WEB_PUBLIC_URL || 'http://localhost:5173')
-      .trim()
-      .replace(/\/$/, '');
+    return process.env.SURVEY_PUBLIC_BASE_URL || process.env.WEB_PUBLIC_URL || 'http://localhost:5173';
   }
 
   private qrUrl(rawUrl: string, format: 'png' | 'svg' = 'png') {
-    const text = encodeURIComponent(rawUrl);
-    return `https://quickchart.io/qr?size=640&margin=2&format=${format}&text=${text}`;
+    return buildSurveyQrUrl(rawUrl, format);
   }
 
   private buildCampaignLinks(campaignId: string, manageToken: string) {
-    const base = this.surveyBaseUrl();
-    return {
-      staffSurveyUrl: `${base}/survey/staff/appetite?c=${encodeURIComponent(campaignId)}`,
-      customersSurveyUrl: `${base}/survey/customers/appetite?c=${encodeURIComponent(campaignId)}`,
-      manageUrl: `${base}/survey/manage?t=${encodeURIComponent(manageToken)}`,
-    };
-  }
-
-  private renderCampaignEmailHtml(
-    businessName: string,
-    links: { staffSurveyUrl: string; customersSurveyUrl: string; manageUrl: string },
-  ) {
-    const safeBusinessName = businessName
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;');
-
-    return `
-      <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1a1a18;">
-        <h2 style="margin: 0 0 12px;">Your Misneach appetite survey links</h2>
-        <p style="margin: 0 0 10px;">Business: <strong>${safeBusinessName}</strong></p>
-        <p style="margin: 0 0 6px;"><strong>Staff survey:</strong> <a href="${links.staffSurveyUrl}">${links.staffSurveyUrl}</a></p>
-        <p style="margin: 0 0 6px;"><strong>Customer survey:</strong> <a href="${links.customersSurveyUrl}">${links.customersSurveyUrl}</a></p>
-        <p style="margin: 0 0 12px;"><strong>Manage results:</strong> <a href="${links.manageUrl}">${links.manageUrl}</a></p>
-        <p style="margin: 0;">You can return to your results anytime with the manage link.</p>
-      </div>
-    `;
+    return buildSurveyCampaignLinks({
+      baseUrl: this.surveyBaseUrl(),
+      campaignId,
+      manageToken,
+    });
   }
 
   private async sendCampaignLinksEmail(
     email: string,
     businessName: string,
-    links: { staffSurveyUrl: string; customersSurveyUrl: string; manageUrl: string },
+    links: SurveyCampaignLinks,
   ) {
     const deliveryMode = process.env.EMAIL_DELIVERY || 'log';
     const resendKey = process.env.RESEND_API_KEY;
@@ -116,14 +100,8 @@ export class SurveysService implements OnModuleInit {
       from,
       to: email,
       subject: `Your Misneach appetite survey links for ${businessName}`,
-      html: this.renderCampaignEmailHtml(businessName, links),
-      text: [
-        `Business: ${businessName}`,
-        '',
-        `Staff survey: ${links.staffSurveyUrl}`,
-        `Customer survey: ${links.customersSurveyUrl}`,
-        `Manage results: ${links.manageUrl}`,
-      ].join('\n'),
+      html: renderSurveyCampaignEmailHtml(businessName, links),
+      text: buildSurveyCampaignEmailText(businessName, links),
     };
 
     const response = await fetch('https://api.resend.com/emails', {
@@ -143,44 +121,14 @@ export class SurveysService implements OnModuleInit {
   }
 
   private normalizeQuestions(raw: unknown): SurveyQuestionDefinition[] {
-    if (!Array.isArray(raw) || raw.length === 0) {
-      throw new BadRequestException('questions must be a non-empty array');
+    try {
+      return normalizeSurveyQuestions(raw);
+    } catch (error) {
+      if (error instanceof PublicFlowValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
     }
-
-    return raw.map((entry, index) => {
-      if (!entry || typeof entry !== 'object') {
-        throw new BadRequestException(`Invalid question at index ${index}`);
-      }
-
-      const question = entry as Record<string, unknown>;
-      const id = String(question.id || '').trim();
-      const label = String(question.label || '').trim();
-      const type = String(question.type || '').trim();
-      const required = Boolean(question.required);
-
-      if (!id || !label || !['radio', 'checkbox', 'text'].includes(type)) {
-        throw new BadRequestException(`Invalid question at index ${index}`);
-      }
-
-      const options = Array.isArray(question.options)
-        ? question.options.map((option) => String(option)).filter((option) => option.trim().length > 0)
-        : undefined;
-
-      if ((type === 'radio' || type === 'checkbox') && (!options || options.length < 2)) {
-        throw new BadRequestException(`Question ${id} requires at least two options`);
-      }
-
-      const maxLength = question.maxLength == null ? undefined : Number(question.maxLength);
-
-      return {
-        id,
-        label,
-        type: type as SurveyQuestionDefinition['type'],
-        required,
-        options,
-        maxLength: Number.isFinite(maxLength as number) ? (maxLength as number) : undefined,
-      };
-    });
   }
 
   private toRecord(entity: SurveyTemplateEntity): SurveyTemplateRecord {
@@ -223,42 +171,13 @@ export class SurveysService implements OnModuleInit {
   }
 
   private validateAnswers(template: SurveyTemplateRecord, answers: Record<string, unknown>) {
-    for (const question of template.questions) {
-      const value = answers[question.id];
-
-      if (question.required && (value === undefined || value === null || value === '')) {
-        throw new BadRequestException(`Missing required answer for ${question.id}`);
+    try {
+      validateSurveyAnswers(template.questions, answers);
+    } catch (error) {
+      if (error instanceof PublicFlowValidationError) {
+        throw new BadRequestException(error.message);
       }
-
-      if (!question.required && (value === undefined || value === null || value === '')) {
-        continue;
-      }
-
-      if (question.type === 'radio') {
-        if (typeof value !== 'string' || !question.options?.includes(value)) {
-          throw new BadRequestException(`Invalid answer for ${question.id}`);
-        }
-      }
-
-      if (question.type === 'checkbox') {
-        if (!Array.isArray(value) || value.length === 0) {
-          throw new BadRequestException(`Invalid answer for ${question.id}`);
-        }
-        const invalid = value.some((entry) => typeof entry !== 'string' || !question.options?.includes(entry));
-        if (invalid) {
-          throw new BadRequestException(`Invalid answer for ${question.id}`);
-        }
-      }
-
-      if (question.type === 'text') {
-        if (typeof value !== 'string') {
-          throw new BadRequestException(`Invalid answer for ${question.id}`);
-        }
-        const maxLength = question.maxLength || 1000;
-        if (value.length > maxLength) {
-          throw new BadRequestException(`Answer too long for ${question.id}`);
-        }
-      }
+      throw error;
     }
   }
 
@@ -268,54 +187,13 @@ export class SurveysService implements OnModuleInit {
       : { templateKey: template.key };
     const responses = await this.responseRepo.find({ where });
 
-    const byQuestion: Record<string, { totalAnswers: number; optionCounts: Record<string, number> }> = {};
-    for (const question of template.questions) {
-      const optionCounts: Record<string, number> = {};
-      for (const option of question.options || []) {
-        optionCounts[option] = 0;
-      }
-
-      byQuestion[question.id] = {
-        totalAnswers: 0,
-        optionCounts,
-      };
-    }
-
-    for (const response of responses) {
-      for (const question of template.questions) {
-        const value = response.answers?.[question.id];
-        if (value === undefined || value === null || value === '') continue;
-
-        if (question.type === 'radio' && typeof value === 'string') {
-          byQuestion[question.id].totalAnswers += 1;
-          if (byQuestion[question.id].optionCounts[value] !== undefined) {
-            byQuestion[question.id].optionCounts[value] += 1;
-          }
-        }
-
-        if (question.type === 'checkbox' && Array.isArray(value)) {
-          byQuestion[question.id].totalAnswers += 1;
-          for (const entry of value) {
-            if (typeof entry !== 'string') continue;
-            if (byQuestion[question.id].optionCounts[entry] !== undefined) {
-              byQuestion[question.id].optionCounts[entry] += 1;
-            }
-          }
-        }
-
-        if (question.type === 'text' && typeof value === 'string') {
-          byQuestion[question.id].totalAnswers += 1;
-        }
-      }
-    }
-
-    return {
-      templateId: template.key,
+    return aggregateSurveyResponses({
+      templateKey: template.key,
       title: template.title,
       audience: template.audience,
-      responseCount: responses.length,
-      questions: byQuestion,
-    };
+      questions: template.questions,
+      responses,
+    });
   }
 
   private async buildInsightSnapshot() {
