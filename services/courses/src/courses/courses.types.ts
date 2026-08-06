@@ -69,7 +69,7 @@ export type LessonCorePhrase = {
   text: string;
   translation?: string;
   pronunciation?: string;
-  hint: string;
+  hint?: string;
   deepExplanation?: string;
   tokens: LessonPhraseToken[];
   alternates?: string[];

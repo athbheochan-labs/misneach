@@ -462,27 +462,60 @@ function phraseTokens(text: string, translation?: string, pronunciation?: string
   }));
 }
 
-function phraseHint(speaker: string | undefined, text: string, translation?: string): string {
-  const line = text.trim();
-  const who = String(speaker || '').toLowerCase().includes('barista') ? 'barista' : 'customer';
-  if (line.endsWith('?')) {
-    return `Use this when you ${who === 'barista' ? 'ask the customer a question.' : 'answer a question.'}`;
+function stripInlineMarkup(value: string) {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[`*_]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function phraseSignature(text: string) {
+  return tokenize(text).filter((token) => token.length > 2 || isLikelyIrishToken(token));
+}
+
+function paragraphReferencesPhrase(paragraph: string, phrase: string, translation?: string) {
+  const cleanParagraph = stripInlineMarkup(paragraph).toLowerCase();
+  const cleanPhrase = stripInlineMarkup(phrase).toLowerCase();
+  const cleanTranslation = stripInlineMarkup(translation || '').toLowerCase();
+
+  if (cleanPhrase && cleanParagraph.includes(cleanPhrase)) return true;
+  if (cleanTranslation && cleanTranslation.length > 5 && cleanParagraph.includes(cleanTranslation)) return true;
+
+  const tokens = phraseSignature(phrase);
+  if (tokens.length === 0) return false;
+
+  const matches = tokens.filter((token) => cleanParagraph.includes(token));
+  if (tokens.length <= 2) return matches.length === tokens.length;
+  return matches.length >= Math.min(3, tokens.length);
+}
+
+function authoredExplanationForTurn(blocks: LessonBlock[], blockIndex: number, text: string, translation?: string) {
+  const candidates: string[] = [];
+
+  for (let idx = blockIndex + 1; idx < blocks.length; idx += 1) {
+    const block = blocks[idx];
+    if (block.type === 'dialogue' || block.type === 'heading') break;
+
+    if (block.type === 'paragraph' && block.text) {
+      candidates.push(block.text);
+    } else if (block.type === 'list') {
+      candidates.push(...(block.items || []));
+    }
   }
-  if (translation && translation.length <= 24) {
-    return `Core response used in this exchange.`;
-  }
-  return `Core line used naturally in this exchange.`;
+
+  const match = candidates.find((candidate) => paragraphReferencesPhrase(candidate, text, translation));
+  return match ? stripInlineMarkup(match) : undefined;
 }
 
 export function buildPedagogyView(lesson: LessonContent): LessonPedagogyView {
   const notes = extractionNotes(lesson.blocks);
   const supportNotes = notes.filter((note) => note.tier === 'support');
   const deepNotes = notes.filter((note) => note.tier === 'deep');
-
-  const firstDeep = deepNotes[0]?.text;
   const coreFlow: LessonCorePhrase[] = [];
 
-  for (const block of lesson.blocks) {
+  for (let blockIndex = 0; blockIndex < lesson.blocks.length; blockIndex += 1) {
+    const block = lesson.blocks[blockIndex];
     if (block.type !== 'dialogue') continue;
     for (let idx = 0; idx < (block.turns || []).length; idx += 1) {
       const turn = block.turns?.[idx];
@@ -490,6 +523,7 @@ export function buildPedagogyView(lesson: LessonContent): LessonPedagogyView {
       const translation = turn.translation?.trim() || undefined;
       const pronunciation = turn.pronunciation?.trim() || undefined;
       const speaker = turn.speaker?.trim() || 'Speaker';
+      const explanation = authoredExplanationForTurn(lesson.blocks, blockIndex, turn.text, translation);
 
       coreFlow.push({
         phraseId: `${lesson.lessonSlug}:${block.id}:${idx + 1}`,
@@ -498,8 +532,7 @@ export function buildPedagogyView(lesson: LessonContent): LessonPedagogyView {
         text: turn.text,
         translation,
         pronunciation,
-        hint: phraseHint(speaker, turn.text, translation),
-        deepExplanation: firstDeep,
+        deepExplanation: explanation,
         tokens: phraseTokens(turn.text, translation, pronunciation),
         retrievalPrompt: translation
           ? {

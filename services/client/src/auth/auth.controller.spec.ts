@@ -28,8 +28,20 @@ describe('AuthController', () => {
             getUserFromAccessToken: jest.fn(),
             getUserFromSession: jest.fn(),
             verifyMagicLink: jest.fn(),
-            ensureDefaultLanguageSettings: jest.fn(),
             verifyMagicLinkToken: jest.fn(),
+            toPublicUser: jest.fn((user: User) => ({
+              id: user.id,
+              email: user.email,
+              clientId: user.clientId,
+              role: user.role,
+              signupComplete: user.hasCompletedSignup,
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl,
+              dailyReminderEnabled: user.dailyReminderEnabled,
+              dailyReminderTime: user.dailyReminderTime,
+              createdAt: user.createdAt,
+            })),
+            updateProfile: jest.fn(),
           },
         },
       ],
@@ -42,9 +54,9 @@ describe('AuthController', () => {
   it('returns pending_verification on login initiation', async () => {
     const res = mockResponse();
 
-    await controller.login({ email: 'test@example.com' }, res);
+    await controller.login({ email: 'test@example.com' }, { headers: {} } as any, res);
 
-    expect(authService.handleMagicLink).toHaveBeenCalledWith('test@example.com');
+    expect(authService.handleMagicLink).toHaveBeenCalledWith('test@example.com', undefined);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,7 +82,7 @@ describe('AuthController', () => {
       },
     } as any);
 
-    await controller.login({ email: 'test@example.com', token: 'abc' }, res);
+    await controller.login({ email: 'test@example.com', token: 'abc' }, { headers: {} } as any, res);
 
     expect(authService.issueTokenPairFromMagicLink).toHaveBeenCalledWith('test@example.com', 'abc');
     expect(res.status).toHaveBeenCalledWith(200);

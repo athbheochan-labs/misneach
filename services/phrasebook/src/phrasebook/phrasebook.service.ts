@@ -409,9 +409,7 @@ export class PhrasebookService {
         ownSources: this.ownSources,
       });
     } else if (filter === 'course') {
-      qb.andWhere('LOWER(phrase.source) NOT IN (:...ownSources)', {
-        ownSources: this.ownSources,
-      });
+      qb.andWhere('LOWER(phrase.source) = :courseSource', { courseSource: 'course' });
     } else if (filter === 'unannotated') {
       qb.andWhere(
         `COALESCE(NULLIF(TRIM(phrase.pronunciation), ''), NULL) IS NULL

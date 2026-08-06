@@ -748,39 +748,31 @@ export class PracticeService {
 
   private async ensureProfiles(clientId: string, phraseIds: number[], exerciseTypes: ExerciseType[]) {
     if (phraseIds.length === 0 || exerciseTypes.length === 0) return;
-
-    const existing = await this.profileRepo.find({
-      where: exerciseTypes.flatMap((exerciseType) =>
-        phraseIds.map((phraseId) => ({ clientId, phraseId, exerciseType })),
-      ),
-    });
-
-    const existingKey = new Set(
-      existing.map((profile) => `${profile.clientId}:${profile.phraseId}:${profile.exerciseType}`),
+    const dueAt = new Date();
+    const values = exerciseTypes.flatMap((exerciseType) =>
+      phraseIds.map((phraseId) => ({
+        clientId,
+        phraseId,
+        exerciseType,
+        easeFactor: 2.5,
+        intervalDays: 1,
+        consecutiveCorrect: 0,
+        reviewCount: 0,
+        lapseCount: 0,
+        lastReviewedAt: null,
+        dueAt,
+      })),
     );
 
-    const toCreate = exerciseTypes.flatMap((exerciseType) =>
-      phraseIds
-        .filter((phraseId) => !existingKey.has(`${clientId}:${phraseId}:${exerciseType}`))
-        .map((phraseId) =>
-          this.profileRepo.create({
-            clientId,
-            phraseId,
-            exerciseType,
-            easeFactor: 2.5,
-            intervalDays: 1,
-            consecutiveCorrect: 0,
-            reviewCount: 0,
-            lapseCount: 0,
-            lastReviewedAt: null,
-            dueAt: new Date(),
-          }),
-        ),
-    );
+    if (values.length === 0) return;
 
-    if (toCreate.length > 0) {
-      await this.profileRepo.save(toCreate);
-    }
+    await this.profileRepo
+      .createQueryBuilder()
+      .insert()
+      .into(PracticeProfile)
+      .values(values)
+      .orIgnore()
+      .execute();
   }
 
   private buildQueueItem(

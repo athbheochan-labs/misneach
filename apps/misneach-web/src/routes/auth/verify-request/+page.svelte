@@ -54,7 +54,7 @@
       issuedAtEpochSec: Math.floor(Date.now() / 1000),
     });
 
-    await goto('/business');
+    await goto('/dashboard');
   }
 
   onMount(() => {

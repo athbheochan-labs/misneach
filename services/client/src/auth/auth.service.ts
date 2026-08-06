@@ -16,7 +16,6 @@ import { join } from 'path';
 import { Resend } from 'resend';
 import { Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
-import { SettingsService } from 'src/settings/settings.service';
 import { MagicLink } from './entities/MagicLink';
 import { User } from './entities/User';
 import { AuthenticatedRequest } from './types/request';
@@ -88,9 +87,23 @@ export class AuthService {
     private readonly magicLinkRepo: Repository<MagicLink>,
 
     private readonly config: ConfigService,
-    private readonly settingsService: SettingsService,
   ) {
     this.resend = new Resend(this.config.get<string>('RESEND_API_KEY'));
+  }
+
+  toPublicUser(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      clientId: user.clientId,
+      role: user.role,
+      signupComplete: user.hasCompletedSignup,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      dailyReminderEnabled: user.dailyReminderEnabled,
+      dailyReminderTime: user.dailyReminderTime,
+      createdAt: user.createdAt,
+    };
   }
 
   private getTokenSecret(): string {
@@ -181,13 +194,7 @@ export class AuthService {
       accessToken: this.signJwt(accessPayload),
       refreshToken: this.signJwt(refreshPayload),
       expiresInSec: this.accessTokenTtlSec,
-      user: {
-        id: user.id,
-        email: user.email,
-        clientId: user.clientId,
-        role: user.role,
-        signupComplete: user.hasCompletedSignup,
-      },
+      user: this.toPublicUser(user),
     };
   }
 
@@ -213,10 +220,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['languageSettings'],
-    });
+    const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       this.logger.warn(`refresh_rejected cause=user_not_found userId=${userId}`);
       throw new UnauthorizedException('User not found');
@@ -243,10 +247,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['languageSettings'],
-    });
+    const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       this.logger.warn(`access_rejected cause=user_not_found userId=${userId}`);
       throw new UnauthorizedException('User not found');
@@ -284,17 +285,6 @@ export class AuthService {
       email: this.getHeader(req, 'x-user-email'),
       role,
     };
-  }
-
-  async ensureDefaultLanguageSettings(user: User): Promise<void> {
-    const settings = await this.settingsService.getUserLanguageSettings(user.id);
-    if (settings.length > 0) return;
-    await this.settingsService.createUserLanguageSetting(
-      user,
-      'en',
-      'ga',
-      'normal',
-    );
   }
 
   private normalizeAppUrl(value: string): string {
@@ -371,9 +361,7 @@ export class AuthService {
       `magic_link_generated userId=${user.id} clientId=${user.clientId} appUrl=${appUrl} deliveryMode=${this.config.get<string>('EMAIL_DELIVERY', 'send')}`,
     );
 
-    const userLang = user.languageSettings?.[0]?.firstLanguage || 'en';
-    const translationFactory = translations[userLang] || translations.en;
-    const selectedTranslations = translationFactory(brand);
+    const selectedTranslations = translations.en(brand);
 
     const emailTemplatePath = join(__dirname, '..', '..', 'public', 'email', 'magic-link.html');
     let emailHtml = await readFile(emailTemplatePath, 'utf-8');
@@ -444,16 +432,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid token');
     }
 
-    const user = await this.userRepo.findOne({
-      where: { email },
-      relations: ['languageSettings'],
-    });
+    const user = await this.userRepo.findOne({ where: { email } });
     if (!user?.clientId) {
       this.logger.error(`magic_link_verify_failed email=${email} cause=missing_client_id`);
       throw new InternalServerErrorException('Client ID missing');
     }
 
-    await this.ensureDefaultLanguageSettings(user);
     this.logger.log(
       `magic_link_verify_succeeded userId=${user.id} clientId=${user.clientId} signupComplete=${user.hasCompletedSignup}`,
     );
@@ -481,10 +465,7 @@ export class AuthService {
       throw new BadRequestException('Email is required');
     }
 
-    let user = await this.userRepo.findOne({
-      where: { email: normalized },
-      relations: ['languageSettings'],
-    });
+    let user = await this.userRepo.findOne({ where: { email: normalized } });
 
     if (!user) {
       user = this.userRepo.create({
@@ -494,26 +475,49 @@ export class AuthService {
         hasCompletedSignup: false,
       });
       await this.userRepo.save(user);
-      user = await this.userRepo.findOne({
-        where: { id: user.id },
-        relations: ['languageSettings'],
-      });
+      user = await this.userRepo.findOne({ where: { id: user.id } });
     } else if (!user.clientId) {
       user.clientId = uuidv4();
       await this.userRepo.save(user);
-      user = await this.userRepo.findOne({
-        where: { id: user.id },
-        relations: ['languageSettings'],
-      });
+      user = await this.userRepo.findOne({ where: { id: user.id } });
     }
 
     if (!user) {
       throw new InternalServerErrorException('Unable to resolve user');
     }
 
-    await this.ensureDefaultLanguageSettings(user);
-
     return user;
+  }
+
+  async updateProfile(
+    user: User,
+    body: {
+      displayName?: unknown;
+      avatarUrl?: unknown;
+      dailyReminderEnabled?: unknown;
+      dailyReminderTime?: unknown;
+    },
+  ): Promise<User> {
+    if (Object.prototype.hasOwnProperty.call(body, 'displayName')) {
+      const value = String(body.displayName ?? '').trim();
+      user.displayName = value ? value.slice(0, 120) : null;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'avatarUrl')) {
+      const value = String(body.avatarUrl ?? '').trim();
+      user.avatarUrl = value ? value.slice(0, 512) : null;
+    }
+
+    if (typeof body.dailyReminderEnabled === 'boolean') {
+      user.dailyReminderEnabled = body.dailyReminderEnabled;
+    }
+
+    if (typeof body.dailyReminderTime === 'string') {
+      const value = body.dailyReminderTime.trim();
+      if (/^\d{2}:\d{2}$/.test(value)) user.dailyReminderTime = value;
+    }
+
+    return this.userRepo.save(user);
   }
 
   async markSignupCompleteByUserId(userId: number): Promise<User> {
@@ -521,10 +525,7 @@ export class AuthService {
       throw new BadRequestException('Invalid user ID');
     }
 
-    const user = await this.userRepo.findOne({
-      where: { id: userId },
-      relations: ['languageSettings'],
-    });
+    const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -538,7 +539,7 @@ export class AuthService {
   }
 
   async findUserByClientId(clientId: string): Promise<User | null> {
-    return this.userRepo.findOne({ where: { clientId }, relations: ['languageSettings'], });
+    return this.userRepo.findOne({ where: { clientId } });
   }
 
   async getClientIdFromSession(req: AuthenticatedRequest): Promise<string> {
@@ -554,17 +555,11 @@ export class AuthService {
   async getUserFromSession(req: AuthenticatedRequest): Promise<User> {
     const headerAuth = this.resolveHeaderAuth(req);
     if (headerAuth?.userId) {
-      const fromHeader = await this.userRepo.findOne({
-        where: { id: headerAuth.userId },
-        relations: ['languageSettings'],
-      });
+      const fromHeader = await this.userRepo.findOne({ where: { id: headerAuth.userId } });
       if (fromHeader) return fromHeader;
     }
     if (headerAuth?.clientId) {
-      const fromHeader = await this.userRepo.findOne({
-        where: { clientId: headerAuth.clientId },
-        relations: ['languageSettings'],
-      });
+      const fromHeader = await this.userRepo.findOne({ where: { clientId: headerAuth.clientId } });
       if (fromHeader) return fromHeader;
     }
 
@@ -586,10 +581,7 @@ export class AuthService {
       throw new UnauthorizedException('User not authenticated');
     }
 
-    const fromSession = await this.userRepo.findOne({
-      where: { id: sessionUser.id },
-      relations: ['languageSettings'],
-    });
+    const fromSession = await this.userRepo.findOne({ where: { id: sessionUser.id } });
 
     if (!fromSession) {
       this.logger.warn(`session_resolve_failed cause=session_user_not_found userId=${sessionUser.id}`);

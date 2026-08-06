@@ -1,0 +1,59 @@
+import { json, type RequestEvent } from '@sveltejs/kit';
+import { resolveApiBaseUrls } from '$lib/server/upstreams';
+
+async function readBody(request: Request, method: string) {
+  if (method === 'GET' || method === 'HEAD') return undefined;
+  return request.arrayBuffer();
+}
+
+export async function forwardClientApiRequest(
+  event: RequestEvent,
+  upstreamPrefix: string,
+  pathSuffix: string,
+  method: string,
+) {
+  const headers = new Headers(event.request.headers);
+
+  for (const header of [
+    'host',
+    'connection',
+    'keep-alive',
+    'proxy-authenticate',
+    'proxy-authorization',
+    'te',
+    'trailer',
+    'transfer-encoding',
+    'upgrade',
+  ]) {
+    headers.delete(header);
+  }
+
+  const requestBody = await readBody(event.request, method);
+  let lastError: unknown;
+
+  for (const baseUrl of resolveApiBaseUrls()) {
+    const upstream = `${baseUrl}${upstreamPrefix}${pathSuffix}${event.url.search}`;
+    try {
+      const response = await event.fetch(upstream, {
+        method,
+        headers,
+        body: requestBody,
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        return json(await response.json(), { status: response.status });
+      }
+
+      return new Response(await response.text(), {
+        status: response.status,
+        headers: { 'content-type': contentType || 'text/plain' },
+      });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  const message = lastError instanceof Error ? lastError.message : 'API proxy failed';
+  return json({ error: message }, { status: 502 });
+}

@@ -19,6 +19,20 @@
     emailError = '';
   }
 
+  function errorToText(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') {
+      const maybeMessage = (value as { message?: unknown }).message;
+      if (typeof maybeMessage === 'string') return maybeMessage;
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return 'The sign-in service returned an unreadable error.';
+      }
+    }
+    return 'The sign-in link did not go out. Please try again.';
+  }
+
   async function sendLink(event?: SubmitEvent) {
     event?.preventDefault();
     clearError();
@@ -34,7 +48,7 @@
       const res = await requestMagicLink(nextEmail);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        errorDetail = data?.error || 'The sign-in link did not go out. Please try again.';
+        errorDetail = errorToText(data?.error || data?.message || data);
         state = 'error';
         return;
       }

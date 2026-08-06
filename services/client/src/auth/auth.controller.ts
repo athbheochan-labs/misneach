@@ -190,8 +190,6 @@ export class AuthController {
 
       this.logger.log(`Session established for user=${user.id}`);
 
-      await this.authService.ensureDefaultLanguageSettings(user);
-
       return res.redirect('/dashboard');
     } catch (err) {
       this.logger.error(
@@ -225,15 +223,7 @@ export class AuthController {
       body.token,
       body.email,
     );
-    return {
-        user: {
-          id: user.id,
-          email: user.email,
-          clientId: user.clientId,
-          role: user.role,
-          signupComplete: user.hasCompletedSignup,
-        },
-      };
+    return { user: this.authService.toPublicUser(user) };
   }
 
   @Post('internal/resolve-email')
@@ -244,15 +234,7 @@ export class AuthController {
     this.assertInternalRequest(req);
 
     const user = await this.authService.ensureUserByEmail(String(body?.email || ''));
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        clientId: user.clientId,
-        role: user.role,
-        signupComplete: user.hasCompletedSignup,
-      },
-    };
+    return { user: this.authService.toPublicUser(user) };
   }
 
   @Post('internal/mark-signup-complete')
@@ -265,13 +247,7 @@ export class AuthController {
     const user = await this.authService.markSignupCompleteByUserId(Number(body?.userId || 0));
     return {
       ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        clientId: user.clientId,
-        role: user.role,
-        signupComplete: user.hasCompletedSignup,
-      },
+      user: this.authService.toPublicUser(user),
     };
   }
 
@@ -287,13 +263,7 @@ export class AuthController {
         const user = await this.authService.getUserFromAccessToken(token);
         return {
           loggedIn: true,
-          user: {
-            id: user.id,
-            clientId: user.clientId,
-            email: user.email,
-            role: user.role,
-            signupComplete: user.hasCompletedSignup,
-          },
+          user: this.authService.toPublicUser(user),
         };
       } catch {
         this.logger.warn('auth_me_unauthenticated mode=bearer');
@@ -305,18 +275,30 @@ export class AuthController {
       const user = await this.authService.getUserFromSession(req);
       return {
         loggedIn: true,
-        user: {
-          id: user.id,
-          clientId: user.clientId,
-          email: user.email,
-          role: user.role,
-            signupComplete: user.hasCompletedSignup,
-          },
-        };
-      } catch {
-        this.logger.warn('auth_me_unauthenticated mode=session');
-        return { loggedIn: false, user: null };
-      }
+        user: this.authService.toPublicUser(user),
+      };
+    } catch {
+      this.logger.warn('auth_me_unauthenticated mode=session');
+      return { loggedIn: false, user: null };
+    }
+  }
+
+  @Post('me/profile')
+  async updateMeProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: {
+      displayName?: unknown;
+      avatarUrl?: unknown;
+      dailyReminderEnabled?: unknown;
+      dailyReminderTime?: unknown;
+    },
+  ) {
+    const user = await this.authService.getUserFromSession(req);
+    const updated = await this.authService.updateProfile(user, body);
+    return {
+      ok: true,
+      user: this.authService.toPublicUser(updated),
+    };
   }
 
   /**
