@@ -53,6 +53,8 @@ Relevant workflows:
 
 `misneach-web` also adds:
 
+- `WAITLIST_API_URL`: optional primary upstream for public waitlist submissions
+- `WAITLIST_API_URLS`: optional comma-separated waitlist upstream fallbacks
 - `BUSINESS_INTERNAL_URL`: primary direct upstream for the business service
 - `BUSINESS_INTERNAL_URLS`: optional comma-separated business-service fallbacks
 
@@ -67,12 +69,13 @@ Recommended values by environment:
 - production:
   - `PUBLIC_API_BASE_URL=https://api.<your-domain>`
   - `API_INTERNAL_URL=https://api.<your-domain>`
+  - `WAITLIST_API_URL=https://<public-api-id>.execute-api.<region>.amazonaws.com`
 
 See: [Environment Files README](../deploy/env/README.md)
 
 ## AWS CDK Public API Infrastructure
 
-The `@decyphr/aws-infra` workspace contains the CDK app for serverless public Misneach flows. The initial stack is intentionally scaffold-only and does not change runtime behavior.
+The `@decyphr/aws-infra` workspace contains the CDK app for serverless public Misneach flows. It currently provisions the public waitlist Lambda, API Gateway HTTP API, and DynamoDB table.
 
 Stack naming convention:
 
