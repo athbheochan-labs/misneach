@@ -1,6 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Unique, UpdateDateColumn } from 'typeorm';
-
-export type WaitlistInterest = 'business_pack' | 'individual_course_access';
+import type { WaitlistInterest } from '@misneach/public-flows';
 
 @Entity('waitlist_entries')
 @Unique(['email', 'interest'])

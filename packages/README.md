@@ -1,12 +1,12 @@
 # Shared Packages
 
-Scaffolded workspace packages for code shared between `misneach-web` and `cleachtadh-web`.
+Workspace packages for code shared between apps, services, and serverless runtimes.
 
 Current packages:
 - `@misneach/ui`
 - `@misneach/auth`
 - `@misneach/analytics`
 - `@misneach/email`
+- `@misneach/public-flows`
 
-This scaffold intentionally does not move runtime code yet. The next extraction steps should add
-workspace dependencies to consuming apps only when shared modules are actually moved here.
+Keep shared packages framework-agnostic unless a package is explicitly tied to a runtime or UI layer.

@@ -6,10 +6,12 @@ COPY tsconfig.base.json ./
 COPY apps ./apps
 COPY services ./services
 COPY libs ./libs
+COPY packages ./packages
 
 RUN npm ci
 
 RUN npm run build --workspace @decyphr/messaging \
+    && npm run build --workspace @misneach/public-flows \
     && npm run build --workspace translation-connector \
     && npm run build --workspace lexicon \
     && npm run build --workspace phrasebook \
@@ -35,6 +37,9 @@ COPY --from=build /usr/src/app/node_modules ./node_modules
 
 COPY --from=build /usr/src/app/libs/messaging/package.json ./libs/messaging/package.json
 COPY --from=build /usr/src/app/libs/messaging/dist ./libs/messaging/dist
+
+COPY --from=build /usr/src/app/packages/public-flows/package.json ./packages/public-flows/package.json
+COPY --from=build /usr/src/app/packages/public-flows/dist ./packages/public-flows/dist
 
 COPY --from=build /usr/src/app/services/translation/translation-connector/package.json ./services/translation/translation-connector/package.json
 COPY --from=build /usr/src/app/services/translation/translation-connector/dist ./services/translation/translation-connector/dist
