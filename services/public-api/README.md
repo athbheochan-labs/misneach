@@ -27,11 +27,27 @@ The response shape matches the existing service:
 
 ## Local Floci Integration
 
-Run a Floci/local AWS endpoint that exposes DynamoDB, then set `AWS_ENDPOINT_URL` or `FLOCI_AWS_ENDPOINT_URL` before running:
+Start Floci, then run the API-path integration suite:
 
 ```bash
-AWS_ENDPOINT_URL=http://localhost:4566 npm run test:integration --workspace public-api
+npm run floci:start
+npm run floci:test:public-api
 ```
+
+The integration tests create isolated local DynamoDB tables, start a local HTTP adapter over the Lambda handlers, and exercise the public routes with `fetch()`.
+
+To run the public API HTTP adapter manually:
+
+```bash
+WAITLIST_TABLE_NAME=decyphr-local-waitlist \
+SURVEY_TEMPLATES_TABLE_NAME=decyphr-local-survey-templates \
+SURVEY_CAMPAIGNS_TABLE_NAME=decyphr-local-survey-campaigns \
+SURVEY_RESPONSES_TABLE_NAME=decyphr-local-survey-responses \
+AWS_ENDPOINT_URL=http://localhost:4566 \
+npm run start:local --workspace public-api
+```
+
+The adapter starts at port `5174` by default and tries the next ports if that one is already in use. Override the starting port with `PUBLIC_API_LOCAL_PORT`.
 
 ## Surveys
 

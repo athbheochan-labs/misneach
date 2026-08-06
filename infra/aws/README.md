@@ -10,7 +10,7 @@ AWS CDK workspace for Decyphr infrastructure. The initial stack establishes the 
 
 ## Environment
 
-The current serverless stack targets production only.
+The real AWS serverless stack targets production. Local Floci deployments use the `local` environment name through the Floci scripts.
 
 The stack name convention is:
 
@@ -18,11 +18,13 @@ The stack name convention is:
 decyphr-prod-public-api
 ```
 
-The CDK app defaults to `prod`. A different environment can be added later with CDK context or `DECYPHR_ENV`, but the supported deployment path for now is production:
+The CDK app defaults to `prod` for real AWS deployments:
 
 ```bash
 npm run synth --workspace @decyphr/aws-infra
 ```
+
+Local Floci resources use names like `decyphr-local-public-api`, `decyphr-local-waitlist`, and `decyphr-local-survey-responses`.
 
 ## Commands
 
@@ -44,13 +46,47 @@ Preview changes:
 npm run diff --workspace @decyphr/aws-infra
 ```
 
-Deploy:
+Deploy to AWS:
 
 ```bash
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
-Survey resources and broader Floci deployment automation will be added in later tickets.
+## Local Floci
+
+Start local AWS services:
+
+```bash
+npm run floci:start
+```
+
+Synthesize against local settings:
+
+```bash
+npm run floci:cdk:synth
+```
+
+Bootstrap the local CDK toolkit stack once:
+
+```bash
+npm run floci:cdk:bootstrap
+```
+
+This command is safe to rerun locally. If Floci already has CDK bootstrap resources, the script treats that as a no-op.
+
+Deploy the public API stack to Floci:
+
+```bash
+npm run floci:cdk:deploy
+```
+
+Run API-path integration tests against Floci DynamoDB:
+
+```bash
+npm run floci:test:public-api
+```
+
+The local stack includes HTTP API Gateway routes, Lambda handlers, and DynamoDB tables for waitlist and survey flows. Lambda functions in the local stack receive `AWS_ENDPOINT_URL`/`FLOCI_AWS_ENDPOINT_URL` so they use emulated DynamoDB.
 
 ## Public API Outputs
 
