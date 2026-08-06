@@ -9,6 +9,7 @@ dist/
 cdk.out/
 **/cdk.out/
 *.tsbuildinfo
+floci/data/
 
 # Environment files
 .env
