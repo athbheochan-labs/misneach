@@ -52,6 +52,51 @@ Deploy to AWS:
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
+Deploy and write CDK outputs to a file:
+
+```bash
+npm run deploy --workspace @decyphr/aws-infra -- --require-approval never --outputs-file ../../cdk-public-api-outputs.json
+```
+
+## CI Deployment
+
+Public API infrastructure has separate validation and deployment workflows:
+
+- `.github/workflows/public-api-pr.yml` runs on pull requests and validates install, public-flow tests, public API Lambda tests/build, and CDK synth.
+- `.github/workflows/public-api-deploy.yml` runs on pushes to `main` and deploys `decyphr-prod-public-api`.
+
+Required repository/environment secrets:
+
+```txt
+AWS_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+
+The deploy workflow writes the `PublicApiUrl` stack output to the GitHub Actions step summary. Use that value for `WAITLIST_API_URL` and `SURVEYS_API_URL` in `misneach-web`.
+
+## Rollback
+
+To roll back a bad public API deploy, revert the PR that changed the stack or Lambda code and merge that revert to `main`; the deploy workflow will redeploy the previous desired state.
+
+Manual rollback to a known-good commit is also possible:
+
+```bash
+git checkout <known-good-sha>
+npm ci
+npm run deploy --workspace @decyphr/aws-infra -- --require-approval never
+```
+
+If a deployment fails, inspect the CloudFormation events:
+
+```bash
+aws cloudformation describe-stack-events \
+  --stack-name decyphr-prod-public-api \
+  --region <region> \
+  --max-items 25 \
+  --output table
+```
+
 ## Local Floci
 
 Start local AWS services:
