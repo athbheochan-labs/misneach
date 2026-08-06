@@ -6,6 +6,8 @@ nlp/app/consumers/__pycache__/
 # Build artifacts
 dist/
 **/dist/
+cdk.out/
+**/cdk.out/
 *.tsbuildinfo
 
 # Environment files

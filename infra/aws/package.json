@@ -1,0 +1,28 @@
+{
+  "name": "@decyphr/aws-infra",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AWS CDK infrastructure for Decyphr and Misneach public flows.",
+  "type": "commonjs",
+  "bin": {
+    "decyphr-aws-infra": "bin/decyphr-public.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "bootstrap": "cdk bootstrap"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.204.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "aws-cdk": "^2.1029.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}

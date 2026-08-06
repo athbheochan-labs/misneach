@@ -7,6 +7,7 @@ This project deploys as a multi-service system with containerized backend worklo
 - Local/dev uses [`docker-compose.yml`](../docker-compose.yml).
 - Staging/prod use [`docker-compose.prod.yml`](../docker-compose.prod.yml).
 - Production compose expects env files in `/opt/misneach/env` by default, override with `ENV_DIR`.
+- Serverless public API infrastructure is defined in [`infra/aws`](../infra/aws) for the production public API stack.
 
 ## Build and Image Flow
 
@@ -68,6 +69,34 @@ Recommended values by environment:
   - `API_INTERNAL_URL=https://api.<your-domain>`
 
 See: [Environment Files README](../deploy/env/README.md)
+
+## AWS CDK Public API Infrastructure
+
+The `@decyphr/aws-infra` workspace contains the CDK app for serverless public Misneach flows. The initial stack is intentionally scaffold-only and does not change runtime behavior.
+
+Stack naming convention:
+
+```txt
+decyphr-prod-public-api
+```
+
+Bootstrap an account/region once:
+
+```bash
+npm run bootstrap --workspace @decyphr/aws-infra -- aws://<account-id>/<region>
+```
+
+Synthesize the stack:
+
+```bash
+npm run synth --workspace @decyphr/aws-infra
+```
+
+Deploy the stack:
+
+```bash
+npm run deploy --workspace @decyphr/aws-infra
+```
 
 ## Deployment Runbook
 
