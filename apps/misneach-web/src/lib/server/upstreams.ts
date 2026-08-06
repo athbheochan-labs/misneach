@@ -36,6 +36,17 @@ export function resolveWaitlistBaseUrls(): string[] {
   return [...new Set(candidates)];
 }
 
+export function resolveSurveyBaseUrls(): string[] {
+  const primary = normalizeUrl(String(env.SURVEYS_API_URL || '').trim());
+  const configuredList = splitList(env.SURVEYS_API_URLS);
+  const candidates = [
+    primary,
+    ...configuredList,
+    ...resolveApiBaseUrls(),
+  ].filter(Boolean);
+  return [...new Set(candidates)];
+}
+
 export function resolveBusinessBaseUrls(): string[] {
   const primary = normalizeUrl(String(env.BUSINESS_INTERNAL_URL || '').trim());
   const configuredList = splitList(env.BUSINESS_INTERNAL_URLS);

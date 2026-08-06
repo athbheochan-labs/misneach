@@ -32,3 +32,17 @@ Run a Floci/local AWS endpoint that exposes DynamoDB, then set `AWS_ENDPOINT_URL
 ```bash
 AWS_ENDPOINT_URL=http://localhost:4566 npm run test:integration --workspace public-api
 ```
+
+## Surveys
+
+The surveys Lambda preserves the public response shapes from the existing `business` service for:
+
+- `GET /surveys/templates/public/appetite`
+- `GET /surveys/templates/:templateId`
+- `GET /surveys/templates/:templateId/aggregate`
+- `POST /surveys/campaigns`
+- `GET /surveys/campaigns/by-token/:token`
+- `GET /surveys/campaigns/:campaignId/public`
+- `POST /surveys/responses/:templateId`
+
+Set `SURVEYS_API_URL` in `misneach-web` to the CDK `PublicApiUrl` output to route the existing `/api/surveys/*` proxy to Lambda.

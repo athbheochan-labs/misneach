@@ -29,6 +29,60 @@ export class PublicApiStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const surveyTemplatesTable = new dynamodb.Table(this, 'SurveyTemplatesTable', {
+      tableName: `decyphr-${props.environmentName}-survey-templates`,
+      partitionKey: {
+        name: 'key',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const surveyCampaignsTable = new dynamodb.Table(this, 'SurveyCampaignsTable', {
+      tableName: `decyphr-${props.environmentName}-survey-campaigns`,
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+    surveyCampaignsTable.addGlobalSecondaryIndex({
+      indexName: 'manageTokenIndex',
+      partitionKey: {
+        name: 'manageToken',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    const surveyResponsesTable = new dynamodb.Table(this, 'SurveyResponsesTable', {
+      tableName: `decyphr-${props.environmentName}-survey-responses`,
+      partitionKey: {
+        name: 'id',
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+    surveyResponsesTable.addGlobalSecondaryIndex({
+      indexName: 'templateKeyIndex',
+      partitionKey: {
+        name: 'templateKey',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    surveyResponsesTable.addGlobalSecondaryIndex({
+      indexName: 'templateCampaignKeyIndex',
+      partitionKey: {
+        name: 'templateCampaignKey',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     const waitlistJoinHandler = new nodejs.NodejsFunction(this, 'WaitlistJoinHandler', {
       functionName: `decyphr-${props.environmentName}-waitlist-join`,
       entry: path.join(__dirname, '../../../services/public-api/src/waitlist/handler.ts'),
@@ -46,19 +100,81 @@ export class PublicApiStack extends cdk.Stack {
     });
     waitlistTable.grantReadWriteData(waitlistJoinHandler);
 
+    const surveysHandler = new nodejs.NodejsFunction(this, 'SurveysHandler', {
+      functionName: `decyphr-${props.environmentName}-surveys`,
+      entry: path.join(__dirname, '../../../services/public-api/src/surveys/handler.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_22_X,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(15),
+      environment: {
+        SURVEY_TEMPLATES_TABLE_NAME: surveyTemplatesTable.tableName,
+        SURVEY_CAMPAIGNS_TABLE_NAME: surveyCampaignsTable.tableName,
+        SURVEY_RESPONSES_TABLE_NAME: surveyResponsesTable.tableName,
+      },
+      bundling: {
+        minify: true,
+        sourceMap: true,
+      },
+    });
+    surveyTemplatesTable.grantReadWriteData(surveysHandler);
+    surveyCampaignsTable.grantReadWriteData(surveysHandler);
+    surveyResponsesTable.grantReadWriteData(surveysHandler);
+
     const httpApi = new apigatewayv2.HttpApi(this, 'PublicHttpApi', {
       apiName: `decyphr-${props.environmentName}-public-api`,
       corsPreflight: {
         allowHeaders: ['content-type'],
-        allowMethods: [apigatewayv2.CorsHttpMethod.OPTIONS, apigatewayv2.CorsHttpMethod.POST],
+        allowMethods: [
+          apigatewayv2.CorsHttpMethod.GET,
+          apigatewayv2.CorsHttpMethod.OPTIONS,
+          apigatewayv2.CorsHttpMethod.POST,
+        ],
         allowOrigins: ['*'],
       },
     });
+
+    const surveysIntegration = new integrations.HttpLambdaIntegration('SurveysIntegration', surveysHandler);
 
     httpApi.addRoutes({
       path: '/waitlist/join',
       methods: [apigatewayv2.HttpMethod.POST],
       integration: new integrations.HttpLambdaIntegration('WaitlistJoinIntegration', waitlistJoinHandler),
+    });
+    httpApi.addRoutes({
+      path: '/surveys/templates/public/appetite',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/templates/{templateId}',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/templates/{templateId}/aggregate',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/campaigns',
+      methods: [apigatewayv2.HttpMethod.POST],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/campaigns/by-token/{token}',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/campaigns/{campaignId}/public',
+      methods: [apigatewayv2.HttpMethod.GET],
+      integration: surveysIntegration,
+    });
+    httpApi.addRoutes({
+      path: '/surveys/responses/{templateId}',
+      methods: [apigatewayv2.HttpMethod.POST],
+      integration: surveysIntegration,
     });
 
     new cdk.CfnOutput(this, 'EnvironmentName', {
@@ -74,6 +190,21 @@ export class PublicApiStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'WaitlistTableName', {
       value: waitlistTable.tableName,
       description: 'DynamoDB table backing public waitlist joins.',
+    });
+
+    new cdk.CfnOutput(this, 'SurveyTemplatesTableName', {
+      value: surveyTemplatesTable.tableName,
+      description: 'DynamoDB table backing public survey templates.',
+    });
+
+    new cdk.CfnOutput(this, 'SurveyCampaignsTableName', {
+      value: surveyCampaignsTable.tableName,
+      description: 'DynamoDB table backing public survey campaigns.',
+    });
+
+    new cdk.CfnOutput(this, 'SurveyResponsesTableName', {
+      value: surveyResponsesTable.tableName,
+      description: 'DynamoDB table backing public survey responses.',
     });
   }
 }
