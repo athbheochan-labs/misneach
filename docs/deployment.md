@@ -104,6 +104,53 @@ Deploy the stack:
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
+### Public API CI/CD
+
+Public API infrastructure deploys through dedicated GitHub Actions workflows:
+
+- `Public API PR` runs on pull requests that touch `infra/aws`, `services/public-api`, `packages/public-flows`, workspace metadata, or the workflow files. It installs dependencies, runs public-flow tests, runs public API Lambda tests/build, and runs CDK synth.
+- `Public API Deploy` runs on pushes to `main` for the same paths and can also be run manually with `workflow_dispatch`. It repeats the validation steps, deploys `decyphr-prod-public-api`, and writes the `PublicApiUrl` output to the workflow summary.
+
+Required GitHub repository or `production` environment secrets:
+
+```txt
+AWS_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+
+Manual production deploy:
+
+```bash
+npm ci
+npm run synth --workspace @decyphr/aws-infra
+npm run deploy --workspace @decyphr/aws-infra -- --require-approval never --outputs-file ../../cdk-public-api-outputs.json
+```
+
+Rollback:
+
+1. Revert the PR or commit that introduced the bad stack/Lambda change.
+2. Merge the revert to `main`.
+3. Confirm `Public API Deploy` completes and reports the expected `PublicApiUrl`.
+
+Manual rollback to a known-good commit:
+
+```bash
+git checkout <known-good-sha>
+npm ci
+npm run deploy --workspace @decyphr/aws-infra -- --require-approval never
+```
+
+Failed deploy diagnostics:
+
+```bash
+aws cloudformation describe-stack-events \
+  --stack-name decyphr-prod-public-api \
+  --region <region> \
+  --max-items 25 \
+  --output table
+```
+
 Run the same public API infrastructure locally with Floci:
 
 ```bash

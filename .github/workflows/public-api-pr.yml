@@ -1,0 +1,46 @@
+name: Public API PR
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/public-api-pr.yml'
+      - '.github/workflows/public-api-deploy.yml'
+      - 'infra/aws/**'
+      - 'packages/public-flows/**'
+      - 'services/public-api/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  validate:
+    name: Test and synth
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test shared public-flow logic
+        run: npm run test --workspace @misneach/public-flows
+
+      - name: Test public API Lambdas
+        run: npm run test --workspace public-api
+
+      - name: Build public API Lambdas
+        run: npm run build --workspace public-api
+
+      - name: CDK synth
+        run: npm run synth --workspace @decyphr/aws-infra
