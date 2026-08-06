@@ -14,6 +14,15 @@ export interface PublicApiStackProps extends cdk.StackProps {
 export class PublicApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: PublicApiStackProps) {
     super(scope, id, props);
+    const isLocal = props.environmentName === 'local';
+    const localAwsEndpoint = process.env.FLOCI_LAMBDA_AWS_ENDPOINT_URL || 'http://floci:4566';
+    const localAwsEnvironment: Record<string, string> = isLocal
+        ? {
+            AWS_ENDPOINT_URL: localAwsEndpoint,
+            FLOCI_AWS_ENDPOINT_URL: localAwsEndpoint,
+          }
+      : {};
+    const tableRemovalPolicy = isLocal ? cdk.RemovalPolicy.DESTROY : cdk.RemovalPolicy.RETAIN;
 
     cdk.Tags.of(this).add('Application', 'decyphr');
     cdk.Tags.of(this).add('Service', 'public-api');
@@ -26,7 +35,7 @@ export class PublicApiStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: tableRemovalPolicy,
     });
 
     const surveyTemplatesTable = new dynamodb.Table(this, 'SurveyTemplatesTable', {
@@ -36,7 +45,7 @@ export class PublicApiStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: tableRemovalPolicy,
     });
 
     const surveyCampaignsTable = new dynamodb.Table(this, 'SurveyCampaignsTable', {
@@ -46,7 +55,7 @@ export class PublicApiStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: tableRemovalPolicy,
     });
     surveyCampaignsTable.addGlobalSecondaryIndex({
       indexName: 'manageTokenIndex',
@@ -64,7 +73,7 @@ export class PublicApiStack extends cdk.Stack {
         type: dynamodb.AttributeType.STRING,
       },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: tableRemovalPolicy,
     });
     surveyResponsesTable.addGlobalSecondaryIndex({
       indexName: 'templateKeyIndex',
@@ -92,6 +101,7 @@ export class PublicApiStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
       environment: {
         WAITLIST_TABLE_NAME: waitlistTable.tableName,
+        ...localAwsEnvironment,
       },
       bundling: {
         minify: true,
@@ -111,6 +121,7 @@ export class PublicApiStack extends cdk.Stack {
         SURVEY_TEMPLATES_TABLE_NAME: surveyTemplatesTable.tableName,
         SURVEY_CAMPAIGNS_TABLE_NAME: surveyCampaignsTable.tableName,
         SURVEY_RESPONSES_TABLE_NAME: surveyResponsesTable.tableName,
+        ...localAwsEnvironment,
       },
       bundling: {
         minify: true,

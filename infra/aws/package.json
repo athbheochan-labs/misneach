@@ -14,7 +14,10 @@
     "synth": "npm run precdk && cdk synth",
     "diff": "npm run precdk && cdk diff",
     "deploy": "npm run precdk && cdk deploy",
-    "bootstrap": "cdk bootstrap"
+    "bootstrap": "cdk bootstrap",
+    "floci:bootstrap": "node ../../scripts/floci/cdk.mjs bootstrap aws://000000000000/eu-west-1",
+    "floci:synth": "node ../../scripts/floci/cdk.mjs synth",
+    "floci:deploy": "node ../../scripts/floci/cdk.mjs deploy --require-approval never"
   },
   "dependencies": {
     "aws-cdk-lib": "^2.204.0",

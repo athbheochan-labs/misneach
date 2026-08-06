@@ -104,6 +104,23 @@ Deploy the stack:
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
+Run the same public API infrastructure locally with Floci:
+
+```bash
+npm run floci:start
+npm run floci:cdk:bootstrap
+npm run floci:cdk:synth
+npm run floci:cdk:deploy
+```
+
+Run Lambda/API-path integration tests against local DynamoDB:
+
+```bash
+npm run floci:test:public-api
+```
+
+The Floci path uses dummy AWS credentials and the local endpoint `http://localhost:4566`, so it does not require real AWS credentials.
+
 ## Deployment Runbook
 
 1. Open or update Issue(s) and assign release metadata.

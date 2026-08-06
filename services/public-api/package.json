@@ -6,8 +6,9 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "start:local": "node -r ts-node/register src/local/start.ts",
     "test": "jest --config jest.config.cjs",
-    "test:integration": "RUN_FLOCI_INTEGRATION=1 jest --config jest.config.cjs --runTestsByPath src/waitlist/waitlist.integration.spec.ts"
+    "test:integration": "RUN_FLOCI_INTEGRATION=1 jest --config jest.config.cjs --runTestsByPath src/local/public-api.floci.integration.spec.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.758.0",
@@ -20,6 +21,7 @@
     "@types/node": "^22.13.1",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.6",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }
 }
