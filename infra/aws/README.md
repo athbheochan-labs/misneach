@@ -50,4 +50,12 @@ Deploy:
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
-Future tickets will add Lambda, API Gateway, DynamoDB, and local Floci deployment support to this workspace.
+Survey resources and broader Floci deployment automation will be added in later tickets.
+
+## Public API Outputs
+
+The stack outputs `PublicApiUrl`. Set `misneach-web` server-side `WAITLIST_API_URL` to that value to route the existing `/api/waitlist` proxy to Lambda:
+
+```txt
+WAITLIST_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
+```

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { resolveApiBaseUrls } from '$lib/server/upstreams';
+import { resolveWaitlistBaseUrls } from '$lib/server/upstreams';
 
 export const POST: RequestHandler = async ({ request, fetch, url }) => {
   const body = await request.json().catch(() => null);
@@ -26,7 +26,7 @@ export const POST: RequestHandler = async ({ request, fetch, url }) => {
   };
 
   let lastError: unknown;
-  for (const baseUrl of resolveApiBaseUrls()) {
+  for (const baseUrl of resolveWaitlistBaseUrls()) {
     try {
       const response = await fetch(`${baseUrl}/waitlist/join`, {
         method: 'POST',
