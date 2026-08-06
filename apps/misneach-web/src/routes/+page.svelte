@@ -57,6 +57,7 @@
     </details>
     <a href="/for-businesses" class="nav-link" on:click={trackHomepageBusinessCta}>For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
+    <a href="/me" class="nav-link nav-me">Me</a>
     <a href="/auth/login" class="nav-cta">Sign in</a>
   </div>
 </nav>
@@ -1221,7 +1222,7 @@ footer {
 
 @media (max-width: 760px) {
   nav { padding: 0 20px; }
-  .nav-links .nav-link { display: none; }
+  .nav-links .nav-link:not(.nav-me) { display: none; }
   .split { grid-template-columns: 1fr; gap: 40px; }
   .network-cards { grid-template-columns: 1fr; }
   footer { flex-direction: column; align-items: flex-start; }

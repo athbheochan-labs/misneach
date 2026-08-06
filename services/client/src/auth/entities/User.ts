@@ -11,7 +11,7 @@ import { MagicLink } from './MagicLink';
 /**
  * The User entity represents a user of the application.
  * Each user has a unique email and client ID, along with metadata such as creation date.
- * A user can have multiple language learning settings and multiple magic login links.
+ * A user can have profile metadata and multiple magic login links.
  */
 @Entity()
 export class User {
@@ -32,6 +32,18 @@ export class User {
    */
   @Column({ unique: true })
   clientId!: string;
+
+  @Column({ nullable: true })
+  displayName!: string | null;
+
+  @Column({ nullable: true })
+  avatarUrl!: string | null;
+
+  @Column({ type: 'boolean', default: true })
+  dailyReminderEnabled!: boolean;
+
+  @Column({ default: '09:00' })
+  dailyReminderTime!: string;
 
   /**
    * Role for access control.
@@ -57,8 +69,8 @@ export class User {
   createdAt!: Date;
 
   /**
-   * List of language learning settings associated with the user.
-   * Each setting contains the user's preferences for a particular language pair.
+   * Legacy learning-language settings retained for older lexicon and translation flows.
+   * New Misneach account screens do not expose language or dialect preferences.
    */
   @OneToMany('LanguageSetting', 'user')
   languageSettings!: LanguageSetting[];

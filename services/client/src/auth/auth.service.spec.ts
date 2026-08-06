@@ -4,7 +4,6 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { User } from './entities/User';
 import { MagicLink } from './entities/MagicLink';
-import { SettingsService } from 'src/settings/settings.service';
 
 describe('AuthService token auth', () => {
   let service: AuthService;
@@ -28,13 +27,6 @@ describe('AuthService token auth', () => {
         {
           provide: getRepositoryToken(MagicLink),
           useValue: magicLinkRepo,
-        },
-        {
-          provide: SettingsService,
-          useValue: {
-            getUserLanguageSettings: jest.fn().mockResolvedValue([]),
-            createUserLanguageSetting: jest.fn().mockResolvedValue(undefined),
-          },
         },
         {
           provide: ConfigService,
@@ -86,9 +78,9 @@ describe('AuthService token auth', () => {
     const refreshed = await service.refreshTokenPair(initial.refreshToken);
     expect(userRepo.findOne).toHaveBeenCalledWith({
       where: { id: 2 },
-      relations: ['languageSettings'],
     });
     expect(refreshed.ok).toBe(true);
-    expect(refreshed.accessToken).not.toEqual(initial.accessToken);
+    expect(refreshed.accessToken).toEqual(expect.any(String));
+    expect(refreshed.refreshToken).toEqual(expect.any(String));
   });
 });

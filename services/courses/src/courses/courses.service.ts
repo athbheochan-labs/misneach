@@ -564,6 +564,55 @@ export class CoursesService implements OnModuleInit {
     return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
+  private utcDayKey(value: Date | string | null | undefined): string | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString().slice(0, 10);
+  }
+
+  private addUtcDays(value: Date, days: number): Date {
+    const next = new Date(value);
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+  }
+
+  private computeActivityStreak(progressRows: CourseProgress[]) {
+    const activityDays = new Set<string>();
+
+    for (const row of progressRows) {
+      for (const value of [row.lastSeenAt, row.completedAt, row.startedAt]) {
+        const key = this.utcDayKey(value);
+        if (key) activityDays.add(key);
+      }
+    }
+
+    const today = new Date();
+    const todayKey = this.utcDayKey(today)!;
+    const yesterday = this.addUtcDays(today, -1);
+    const yesterdayKey = this.utcDayKey(yesterday)!;
+
+    let cursor: Date | null = null;
+    if (activityDays.has(todayKey)) {
+      cursor = today;
+    } else if (activityDays.has(yesterdayKey)) {
+      cursor = yesterday;
+    }
+
+    let currentDays = 0;
+    while (cursor) {
+      const key = this.utcDayKey(cursor)!;
+      if (!activityDays.has(key)) break;
+      currentDays += 1;
+      cursor = this.addUtcDays(cursor, -1);
+    }
+
+    return {
+      currentDays,
+      lastActivityDate: Array.from(activityDays).sort().at(-1) ?? null,
+    };
+  }
+
   private shouldPreferProgressRow(candidate: CourseProgress, current: CourseProgress): boolean {
     const candidateStatus = this.progressStatusScore(candidate.status);
     const currentStatus = this.progressStatusScore(current.status);
@@ -1569,6 +1618,7 @@ export class CoursesService implements OnModuleInit {
   async getCatalog(clientId: string, previewToken?: string) {
     const manifest = await this.manifestForRead(previewToken);
     const progressRows = await this.progressRepo.find({ where: { clientId } });
+    const activityStreak = this.computeActivityStreak(progressRows);
     const progressByLessonKey = new Map<string, CourseProgress>();
 
     for (const row of progressRows) {
@@ -1639,6 +1689,7 @@ export class CoursesService implements OnModuleInit {
     return {
       generatedAt: manifest.generatedAt,
       contentVersion: manifest.contentVersion,
+      activityStreak,
       courses,
     };
   }

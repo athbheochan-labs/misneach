@@ -104,7 +104,7 @@
   }
 
   function setQuizAnswer(screenId: string, index: number, correct: boolean) {
-    if (quizState[screenId]) return;
+    if (quizState[screenId]?.correct) return;
     quizState = {
       ...quizState,
       [screenId]: {
@@ -326,10 +326,10 @@
             <div class="quiz-sub">{screen.sub}</div>
             <div class="quiz-options">
               {#each screen.options as option, optionIdx}
-                {@const answered = Boolean(quizState[screen.id])}
+                {@const answeredCorrect = Boolean(quizState[screen.id]?.correct)}
                 {@const selected = quizState[screen.id]?.selectedIndex === optionIdx}
-                {@const className = selected ? (option.correct ? 'q-opt correct' : 'q-opt wrong') : (answered && option.correct ? 'q-opt correct' : 'q-opt')}
-                <button type="button" class={className} disabled={answered} on:click={() => setQuizAnswer(screen.id, optionIdx, option.correct)}>
+                {@const className = selected ? (option.correct ? 'q-opt correct' : 'q-opt wrong') : (answeredCorrect && option.correct ? 'q-opt correct' : 'q-opt')}
+                <button type="button" class={className} disabled={answeredCorrect} on:click={() => setQuizAnswer(screen.id, optionIdx, option.correct)}>
                   <div class="q-letter">{option.label}</div>
                   <div>
                     <div class="q-text">{option.text}</div>
@@ -345,7 +345,7 @@
               {#if quizState[screen.id].correct}
                 <div class="feedback-box good show"><strong>Maith thú.</strong> Correct answer.</div>
               {:else}
-                <div class="feedback-box bad show"><strong>Not quite.</strong> Pick the strongest Irish option.</div>
+                <div class="feedback-box bad show"><strong>Not quite.</strong> Try another answer.</div>
               {/if}
             {/if}
           {/if}
