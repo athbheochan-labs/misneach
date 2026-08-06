@@ -26,7 +26,7 @@ export function resolveApiBaseUrls(): string[] {
 }
 
 export function resolveWaitlistBaseUrls(): string[] {
-  const primary = normalizeUrl(String(env.WAITLIST_API_URL || '').trim());
+  const primary = normalizeUrl(String(env.WAITLIST_API_URL || env.PUBLIC_API_URL || '').trim());
   const configuredList = splitList(env.WAITLIST_API_URLS);
   const candidates = [
     primary,
@@ -37,7 +37,7 @@ export function resolveWaitlistBaseUrls(): string[] {
 }
 
 export function resolveSurveyBaseUrls(): string[] {
-  const primary = normalizeUrl(String(env.SURVEYS_API_URL || '').trim());
+  const primary = normalizeUrl(String(env.SURVEYS_API_URL || env.PUBLIC_API_URL || '').trim());
   const configuredList = splitList(env.SURVEYS_API_URLS);
   const candidates = [
     primary,

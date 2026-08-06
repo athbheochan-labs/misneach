@@ -62,3 +62,53 @@ The surveys Lambda preserves the public response shapes from the existing `busin
 - `POST /surveys/responses/:templateId`
 
 Set `SURVEYS_API_URL` in `misneach-web` to the CDK `PublicApiUrl` output to route the existing `/api/surveys/*` proxy to Lambda.
+
+## Misneach Web Cutover
+
+Set `PUBLIC_API_URL` in `misneach-web` to the CDK `PublicApiUrl` output to route both public waitlist and survey proxies to Lambda:
+
+```txt
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com
+```
+
+`WAITLIST_API_URL` and `SURVEYS_API_URL` remain available as narrower overrides if either flow needs to move independently.
+
+Smoke-test the deployed public API without writing data:
+
+```bash
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api
+```
+
+Run a write-path smoke during cutover:
+
+```bash
+PUBLIC_API_URL=https://<api-id>.execute-api.<region>.amazonaws.com npm run smoke:public-api -- --write
+```
+
+## Legacy Data Migration
+
+The MariaDB to DynamoDB migration is dry-run by default and maps existing waitlist entries, survey templates, campaigns, and responses to the serverless table shapes:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb --workspace public-api
+```
+
+Write to DynamoDB after reviewing the dry-run counts:
+
+```bash
+DB_HOST=<mariadb-host> \
+DB_PORT=3306 \
+DB_USER=<user> \
+DB_PASSWORD=<password> \
+DB_NAME=<database> \
+AWS_REGION=<region> \
+npm run migrate:mariadb:write --workspace public-api
+```
+
+The write migration uses conditional puts, so existing DynamoDB rows are left in place on reruns. Override target table names with `WAITLIST_TABLE_NAME`, `SURVEY_TEMPLATES_TABLE_NAME`, `SURVEY_CAMPAIGNS_TABLE_NAME`, and `SURVEY_RESPONSES_TABLE_NAME` when needed.

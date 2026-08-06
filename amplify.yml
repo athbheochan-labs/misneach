@@ -17,6 +17,7 @@ applications:
             - printf 'INTERNAL_AUTH_SECRET=%s\n' "${INTERNAL_AUTH_SECRET:-}" >> apps/misneach-web/.env.production
             - printf 'DISCOUNT_SERVICE_URL=%s\n' "${DISCOUNT_SERVICE_URL:-}" >> apps/misneach-web/.env.production
             - printf 'DISCOUNT_SERVICE_URLS=%s\n' "${DISCOUNT_SERVICE_URLS:-}" >> apps/misneach-web/.env.production
+            - printf 'PUBLIC_API_URL=%s\n' "${PUBLIC_API_URL:-}" >> apps/misneach-web/.env.production
             - printf 'WAITLIST_API_URL=%s\n' "${WAITLIST_API_URL:-}" >> apps/misneach-web/.env.production
             - printf 'WAITLIST_API_URLS=%s\n' "${WAITLIST_API_URLS:-}" >> apps/misneach-web/.env.production
             - printf 'SURVEYS_API_URL=%s\n' "${SURVEYS_API_URL:-}" >> apps/misneach-web/.env.production

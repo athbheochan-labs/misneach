@@ -47,6 +47,14 @@ export class PublicApiStack extends cdk.Stack {
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: tableRemovalPolicy,
     });
+    surveyTemplatesTable.addGlobalSecondaryIndex({
+      indexName: 'legacyMariaDbIdIndex',
+      partitionKey: {
+        name: 'legacyMariaDbId',
+        type: dynamodb.AttributeType.STRING,
+      },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
 
     const surveyCampaignsTable = new dynamodb.Table(this, 'SurveyCampaignsTable', {
       tableName: `decyphr-${props.environmentName}-survey-campaigns`,

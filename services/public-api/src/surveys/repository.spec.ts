@@ -28,6 +28,7 @@ class InMemoryDynamo {
       const items = [...table.values()].filter((item) => {
         if (input.IndexName === 'manageTokenIndex') return item.manageToken === values[':token'];
         if (input.IndexName === 'templateKeyIndex') return item.templateKey === values[':templateKey'];
+        if (input.IndexName === 'legacyMariaDbIdIndex') return item.legacyMariaDbId === values[':id'];
         if (input.IndexName === 'templateCampaignKeyIndex') {
           return item.templateCampaignKey === values[':templateCampaignKey'];
         }
@@ -90,6 +91,43 @@ describe('SurveysRepository', () => {
 
     expect(result.template.key).toBe('customers-appetite');
     expect(result.template.legacyId).toBe('customers-cafe-v1');
+  });
+
+  it('resolves migrated MariaDB template primary ids', async () => {
+    const { repo, dynamo } = createRepo();
+    dynamo.tables.set(
+      'survey-templates',
+      new Map([
+        [
+          'migrated-template',
+          {
+            id: 'migrated-template',
+            key: 'migrated-template',
+            legacyId: 'old-template-key',
+            legacyMariaDbId: '91546b36-0e1c-4f51-8869-8a0cc9422efe',
+            title: 'Migrated template',
+            audience: 'staff',
+            questions: [
+              {
+                id: 'q1',
+                label: 'Question 1',
+                type: 'radio',
+                required: true,
+                options: ['Yes', 'No'],
+              },
+            ],
+            isActive: true,
+            createdAt: '2026-08-06T12:00:00.000Z',
+            updatedAt: '2026-08-06T12:00:00.000Z',
+          },
+        ],
+      ]),
+    );
+
+    const result = await repo.getTemplate('91546b36-0e1c-4f51-8869-8a0cc9422efe');
+
+    expect(result.template.key).toBe('migrated-template');
+    expect(result.template.legacyMariaDbId).toBe('91546b36-0e1c-4f51-8869-8a0cc9422efe');
   });
 
   it('creates campaigns, looks them up publicly and by manage token', async () => {

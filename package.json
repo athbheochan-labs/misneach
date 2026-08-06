@@ -20,6 +20,7 @@
     "floci:cdk:deploy": "node scripts/floci/cdk.mjs deploy --require-approval never",
     "floci:public-api": "npm run start:local --workspace public-api",
     "floci:test:public-api": "RUN_FLOCI_INTEGRATION=1 AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://localhost:4566} FLOCI_AWS_ENDPOINT_URL=${FLOCI_AWS_ENDPOINT_URL:-http://localhost:4566} AWS_REGION=${AWS_REGION:-eu-west-1} AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test} npm run test:integration --workspace public-api",
+    "smoke:public-api": "node scripts/smoke/public-api.mjs",
     "sync:courses": "node scripts/sync-courses.mjs"
   },
   "devDependencies": {
