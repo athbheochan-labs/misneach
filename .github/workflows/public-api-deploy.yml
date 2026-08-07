@@ -104,3 +104,7 @@ jobs:
             --max-items 25 \
             --query 'StackEvents[].{Time:Timestamp,Status:ResourceStatus,Type:ResourceType,LogicalId:LogicalResourceId,Reason:ResourceStatusReason}' \
             --output table
+          if [ "$?" -ne 0 ]; then
+            echo "CloudFormation event lookup failed. Check that the deploy IAM user can call cloudformation:DescribeStackEvents."
+          fi
+          exit 0
