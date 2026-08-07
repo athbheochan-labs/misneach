@@ -5,11 +5,17 @@
   "license": "UNLICENSED",
   "type": "commonjs",
   "scripts": {
+    "prebuild": "npm run build --workspace @misneach/public-flows",
     "build": "tsc -p tsconfig.json",
+    "premigrate:mariadb": "npm run build --workspace @misneach/public-flows",
     "migrate:mariadb": "node -r ts-node/register src/migrations/mariadb-to-dynamodb.ts",
+    "premigrate:mariadb:write": "npm run build --workspace @misneach/public-flows",
     "migrate:mariadb:write": "node -r ts-node/register src/migrations/mariadb-to-dynamodb.ts --write",
+    "prestart:local": "npm run build --workspace @misneach/public-flows",
     "start:local": "node -r ts-node/register src/local/start.ts",
+    "pretest": "npm run build --workspace @misneach/public-flows",
     "test": "jest --config jest.config.cjs",
+    "pretest:integration": "npm run build --workspace @misneach/public-flows",
     "test:integration": "RUN_FLOCI_INTEGRATION=1 jest --config jest.config.cjs --runTestsByPath src/local/public-api.floci.integration.spec.ts"
   },
   "dependencies": {
