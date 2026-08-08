@@ -161,15 +161,30 @@ jobs:
              sudo install -m 0644 /tmp/misneach-deploy/nginx.client-api.conf '$PROD_DEPLOY_PATH/deploy/proxy/nginx.client-api.conf'
              rm -rf /tmp/misneach-deploy"
 
+      - name: Free Docker disk before pulling images
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "set -euo pipefail
+             echo 'Disk before Docker cleanup:'
+             df -h /
+             docker system df || true
+             docker container prune -f
+             docker image prune -af
+             docker builder prune -af
+             echo 'Disk after Docker cleanup:'
+             df -h /
+             docker system df || true"
+
       - name: Pull and restart production compose services
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "set -euo pipefail
              cd '$PROD_DEPLOY_PATH'
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml pull
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps"
+             COMPOSE_PARALLEL_LIMIT=1 DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml pull
+             COMPOSE_PARALLEL_LIMIT=1 DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
+             COMPOSE_PARALLEL_LIMIT=1 DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps"
 
       - name: Production health checks
         run: |
