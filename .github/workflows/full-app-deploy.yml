@@ -66,10 +66,6 @@ jobs:
           PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
           PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
-          AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           test -n "$DOCKERHUB_USERNAME"
@@ -77,10 +73,6 @@ jobs:
           test -n "$PROD_SSH_HOST"
           test -n "$PROD_SSH_USER"
           test -n "$PROD_SSH_KEY"
-          test -n "$AMPLIFY_WEB_APP_ID"
-          test -n "$AWS_REGION"
-          test -n "$AWS_ACCESS_KEY_ID"
-          test -n "$AWS_SECRET_ACCESS_KEY"
 
       - name: Install dependencies
         run: npm ci
@@ -119,6 +111,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify published image tags
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+          images=(
+            translator
+            lexicon
+            phrasebook
+            flashcards
+            focus
+            practice
+            courses
+            challenges
+            payment
+            discounts
+            business
+            waitlist
+            client
+            nlp
+            cleachtadh-web
+            admin-web
+          )
+
+          for image in "${images[@]}"; do
+            docker manifest inspect "$IMAGE_NAMESPACE/misneach-$image:$IMAGE_TAG" >/dev/null
+          done
 
       - name: Configure SSH
         env:
@@ -213,29 +236,15 @@ jobs:
             echo "- Compose path: \`$PROD_DEPLOY_PATH\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  deploy-misneach-web:
-    name: Deploy Misneach web to Amplify
-    needs: validate
-    uses: ./.github/workflows/web-amplify-deploy.yml
-    with:
-      branch: main
-    secrets:
-      AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
   deployment-summary:
     name: Deployment summary
     needs:
       - publish-images
       - deploy-compose
-      - deploy-misneach-web
     if: always()
     runs-on: ubuntu-latest
     env:
       IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
-      MISNEACH_WEB_URL: ${{ needs.deploy-misneach-web.outputs.deploy_url }}
       CLEACHTADH_WEB_URL: ${{ vars.CLEACHTADH_WEB_URL }}
       ADMIN_WEB_URL: ${{ vars.ADMIN_WEB_URL }}
     steps:
@@ -251,18 +260,17 @@ jobs:
             echo "- Backend images: \`misneach-{translator,lexicon,phrasebook,flashcards,focus,practice,courses,challenges,payment,discounts,business,waitlist,client,nlp}:$GITHUB_SHA\`"
             echo "- Cleachtadh image: \`misneach-cleachtadh-web:$GITHUB_SHA\`"
             echo "- Admin image: \`misneach-admin-web:$GITHUB_SHA\`"
-            echo "- Misneach web: ${MISNEACH_WEB_URL:-not reported}"
+            echo "- Misneach web: Amplify deploy temporarily disabled; deploy manually from Amplify"
             echo "- Cleachtadh web: ${CLEACHTADH_WEB_URL:-set CLEACHTADH_WEB_URL repo variable}"
             echo "- Admin web: ${ADMIN_WEB_URL:-set ADMIN_WEB_URL repo variable}"
             echo ""
             echo "Results:"
             echo "- Image publish: \`${{ needs.publish-images.result }}\`"
             echo "- Compose deploy: \`${{ needs.deploy-compose.result }}\`"
-            echo "- Misneach web deploy: \`${{ needs.deploy-misneach-web.result }}\`"
+            echo "- Misneach web deploy: \`skipped\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${{ needs.publish-images.result }}" != "success" ] ||
-             [ "${{ needs.deploy-compose.result }}" != "success" ] ||
-             [ "${{ needs.deploy-misneach-web.result }}" != "success" ]; then
+             [ "${{ needs.deploy-compose.result }}" != "success" ]; then
             exit 1
           fi

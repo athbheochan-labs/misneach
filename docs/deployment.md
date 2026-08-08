@@ -22,8 +22,9 @@ Production application deployment has one automatic `main` path:
    - `misneach-cleachtadh-web:<sha>` and `latest`
    - `misneach-admin-web:<sha>` and `latest`
 4. It SSHes to the production host, uploads the production compose/proxy files, pulls images, and runs `docker compose up -d`.
-5. It deploys `misneach-web` to Amplify through `web-amplify-deploy.yml`.
-6. It writes a summary with image tags, frontend URLs, and deployment results.
+5. It writes a summary with image tags, frontend URLs, and deployment results.
+
+`misneach-web` Amplify deployment is temporarily kept out of the automatic full-app path while the Amplify app IAM role/build configuration is repaired. Deploy it manually from Amplify or with `web-amplify-deploy.yml` after that is fixed.
 
 Relevant workflows:
 
@@ -51,10 +52,6 @@ PROD_SSH_KEY
 PROD_SSH_PORT              # optional; defaults to 22
 PROD_DEPLOY_PATH           # optional; defaults to /opt/misneach
 PROD_ENV_FILE              # optional; defaults to /opt/misneach/.env
-AMPLIFY_WEB_APP_ID
-AWS_REGION
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
 ```
 
 Optional repository variables used only in summaries:
