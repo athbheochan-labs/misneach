@@ -1,31 +1,20 @@
 name: Backend Images (Docker Hub)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/backend-images-dockerhub.yml'
-      - 'apps/cleachtadh-web/**'
-      - 'docker/Dockerfile.backend'
-      - 'docker-compose.yml'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig.base.json'
-      - 'libs/**'
-      - 'services/client/**'
-      - 'services/translation/translation-connector/**'
-      - 'services/lexicon/**'
-      - 'services/phrasebook/**'
-      - 'services/flashcards/**'
-      - 'services/focus/**'
-      - 'services/practice/**'
-      - 'services/courses/**'
-      - 'services/challenges/**'
-      - 'services/payment/**'
-      - 'services/discounts/**'
-      - 'services/business/**'
-      - 'services/waitlist/**'
-      - 'services/nlp/**'
+  workflow_call:
+    inputs:
+      service:
+        description: Service image to build
+        required: false
+        type: string
+        default: all
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+      DOCKERHUB_ORG:
+        required: false
   workflow_dispatch:
     inputs:
       service:
@@ -48,6 +37,7 @@ on:
           - waitlist
           - client
           - cleachtadh-web
+          - admin-web
           - nlp
 
 jobs:
@@ -56,6 +46,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       cleachtadh_web: ${{ steps.filter.outputs.cleachtadh_web }}
+      admin_web: ${{ steps.filter.outputs.admin_web }}
       nlp: ${{ steps.filter.outputs.nlp }}
     steps:
       - name: Checkout
@@ -92,13 +83,25 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'tsconfig.base.json'
+            admin_web:
+              - 'apps/admin-web/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.base.json'
             nlp:
               - 'services/nlp/**'
 
   publish-shared-backend:
     needs: detect
     if: |
-      github.event_name == 'workflow_dispatch' || needs.detect.outputs.backend == 'true'
+      (github.event_name == 'workflow_dispatch' &&
+        github.event.inputs.service != 'nlp' &&
+        github.event.inputs.service != 'cleachtadh-web' &&
+        github.event.inputs.service != 'admin-web') ||
+      (github.event_name == 'workflow_call' &&
+        inputs.service != 'nlp' &&
+        inputs.service != 'cleachtadh-web' &&
+        inputs.service != 'admin-web')
     runs-on: ubuntu-latest
     env:
       IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
@@ -131,8 +134,13 @@ jobs:
       - publish-shared-backend
     if: |
       (github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.service != 'nlp') ||
-      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.backend == 'true')
+        github.event.inputs.service != 'nlp' &&
+        github.event.inputs.service != 'cleachtadh-web' &&
+        github.event.inputs.service != 'admin-web') ||
+      (github.event_name == 'workflow_call' &&
+        inputs.service != 'nlp' &&
+        inputs.service != 'cleachtadh-web' &&
+        inputs.service != 'admin-web')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -162,16 +170,18 @@ jobs:
 
       - name: Pull shared runtime image
         if: |
-          github.event_name != 'workflow_dispatch' ||
-          github.event.inputs.service == 'all' ||
-          github.event.inputs.service == matrix.service
+          (github.event_name == 'workflow_dispatch' &&
+            (github.event.inputs.service == 'all' || github.event.inputs.service == matrix.service)) ||
+          (github.event_name == 'workflow_call' &&
+            (inputs.service == 'all' || inputs.service == matrix.service))
         run: docker pull ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }}
 
       - name: Tag and push service image
         if: |
-          github.event_name != 'workflow_dispatch' ||
-          github.event.inputs.service == 'all' ||
-          github.event.inputs.service == matrix.service
+          (github.event_name == 'workflow_dispatch' &&
+            (github.event.inputs.service == 'all' || github.event.inputs.service == matrix.service)) ||
+          (github.event_name == 'workflow_call' &&
+            (inputs.service == 'all' || inputs.service == matrix.service))
         run: |
           docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:${{ github.sha }}
           docker tag ${{ env.IMAGE_NAMESPACE }}/misneach-backend-runtime:${{ github.sha }} ${{ env.IMAGE_NAMESPACE }}/misneach-${{ matrix.service }}:latest
@@ -182,7 +192,8 @@ jobs:
     needs: detect
     if: |
       (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'nlp')) ||
-      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.nlp == 'true')
+      (github.event_name == 'workflow_call' && (inputs.service == 'all' || inputs.service == 'nlp')) ||
+      (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' && needs.detect.outputs.nlp == 'true')
     runs-on: ubuntu-latest
     env:
       IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
@@ -212,7 +223,8 @@ jobs:
     needs: detect
     if: |
       (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'cleachtadh-web')) ||
-      (github.event_name != 'workflow_dispatch' && needs.detect.outputs.cleachtadh_web == 'true')
+      (github.event_name == 'workflow_call' && (inputs.service == 'all' || inputs.service == 'cleachtadh-web')) ||
+      (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' && needs.detect.outputs.cleachtadh_web == 'true')
     runs-on: ubuntu-latest
     env:
       IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
@@ -238,3 +250,35 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAMESPACE }}/misneach-cleachtadh-web:${{ github.sha }}
             ${{ env.IMAGE_NAMESPACE }}/misneach-cleachtadh-web:latest
+
+  publish-admin-web:
+    needs: detect
+    if: |
+      (github.event_name == 'workflow_dispatch' && (github.event.inputs.service == 'all' || github.event.inputs.service == 'admin-web')) ||
+      (github.event_name == 'workflow_call' && (inputs.service == 'all' || inputs.service == 'admin-web')) ||
+      (github.event_name != 'workflow_dispatch' && github.event_name != 'workflow_call' && needs.detect.outputs.admin_web == 'true')
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push admin-web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/admin-web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAMESPACE }}/misneach-admin-web:${{ github.sha }}
+            ${{ env.IMAGE_NAMESPACE }}/misneach-admin-web:latest
