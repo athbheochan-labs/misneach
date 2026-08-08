@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { launchConfig } from '$lib/launch-config';
+
   type Phrase = {
     irish: string;
     english: string;
@@ -82,7 +84,9 @@
     </details>
     <a href="/for-businesses" class="nav-link">For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
-    <a href="/auth/login" class="nav-cta">Sign in</a>
+    <a href={launchConfig.accountLinksEnabled ? '/auth/login' : launchConfig.waitlistHref} class="nav-cta">
+      {launchConfig.accountLinksEnabled ? 'Sign in' : launchConfig.waitlistLabel}
+    </a>
   </div>
 </nav>
 

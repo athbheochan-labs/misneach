@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { MisButton, MisToggle } from '@decyphr/misneach-ui';
   import { trackEvent } from '$lib/analytics';
+  import { launchConfig } from '$lib/launch-config';
 
   let isAnnual = false;
   let isSwitching = false;
@@ -92,7 +93,9 @@
     </details>
     <a href="/for-businesses" class="nav-link" on:click={trackBusinessKitSelected}>For businesses</a>
     <a href="/pricing" class="nav-link active">Pricing</a>
-    <a href="/auth/login" class="nav-cta">Sign in</a>
+    <a href={launchConfig.accountLinksEnabled ? '/auth/login' : launchConfig.waitlistHref} class="nav-cta">
+      {launchConfig.accountLinksEnabled ? 'Sign in' : launchConfig.waitlistLabel}
+    </a>
   </div>
 </nav>
 
@@ -264,7 +267,9 @@
     <a href="/how-it-works" class="footer-link">How it works</a>
     <a href="/for-businesses" class="footer-link" on:click={trackBusinessKitSelected}>For businesses</a>
     <a href="/pricing" class="footer-link">Pricing</a>
-    <a href="/auth/login" class="footer-link">Sign in</a>
+    <a href={launchConfig.accountLinksEnabled ? '/auth/login' : launchConfig.waitlistHref} class="footer-link">
+      {launchConfig.accountLinksEnabled ? 'Sign in' : launchConfig.waitlistLabel}
+    </a>
   </div>
 </footer>
 

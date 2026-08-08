@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { trackEvent } from '$lib/analytics';
+  import { launchConfig } from '$lib/launch-config';
 
   function trackHomepageTasterCta() {
     trackEvent('Homepage: Taster CTA clicked');
@@ -57,8 +58,12 @@
     </details>
     <a href="/for-businesses" class="nav-link" on:click={trackHomepageBusinessCta}>For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
-    <a href="/me" class="nav-link nav-me">Me</a>
-    <a href="/auth/login" class="nav-cta">Sign in</a>
+    {#if launchConfig.accountLinksEnabled}
+      <a href="/me" class="nav-link nav-me">Me</a>
+      <a href="/auth/login" class="nav-cta">Sign in</a>
+    {:else}
+      <a href={launchConfig.waitlistHref} class="nav-cta">{launchConfig.waitlistLabel}</a>
+    {/if}
   </div>
 </nav>
 
@@ -257,7 +262,11 @@
     <a href="/how-it-works" class="footer-link">How it works</a>
     <a href="/for-businesses" class="footer-link" on:click={trackHomepageBusinessCta}>For businesses</a>
     <a href="/pricing" class="footer-link">Pricing</a>
-    <a href="/auth/login" class="footer-link">Sign in</a>
+    {#if launchConfig.accountLinksEnabled}
+      <a href="/auth/login" class="footer-link">Sign in</a>
+    {:else}
+      <a href={launchConfig.waitlistHref} class="footer-link">{launchConfig.waitlistLabel}</a>
+    {/if}
   </div>
 </footer>
 
