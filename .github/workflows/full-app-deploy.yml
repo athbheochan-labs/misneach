@@ -168,17 +168,52 @@ jobs:
             "set -euo pipefail
              cd '$PROD_DEPLOY_PATH'
              DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml pull
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml up -d --remove-orphans
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml up -d --remove-orphans --wait --wait-timeout 180
              DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps"
 
       - name: Production health checks
         run: |
           set -euo pipefail
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
-            "set -euo pipefail
-             cd '$PROD_DEPLOY_PATH'
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml exec -T api-proxy wget -q -O /dev/null http://127.0.0.1/healthz
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml exec -T client node -e \"fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+            "PROD_DEPLOY_PATH='$PROD_DEPLOY_PATH' PROD_ENV_FILE='$PROD_ENV_FILE' DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$PROD_DEPLOY_PATH"
+
+          compose() {
+            docker compose --env-file "$PROD_ENV_FILE" -f docker-compose.prod.yml "$@"
+          }
+
+          check_api_proxy() {
+            compose exec -T api-proxy wget -q -O /dev/null http://127.0.0.1/healthz
+          }
+
+          check_client() {
+            compose exec -T client node -e "fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch((error)=>{ console.error(error); process.exit(1); })"
+          }
+
+          wait_for_check() {
+            local name="$1"
+            local command_name="$2"
+
+            for attempt in $(seq 1 30); do
+              if "$command_name"; then
+                echo "Health check passed: $name"
+                return 0
+              fi
+
+              echo "Health check pending: $name ($attempt/30)"
+              sleep 10
+            done
+
+            echo "Health check failed: $name"
+            compose ps
+            compose logs --tail=160 "$name" || true
+            return 1
+          }
+
+          wait_for_check api-proxy check_api_proxy
+          wait_for_check client check_client
+          REMOTE
 
       - name: Compose diagnostics on failure
         if: failure() && steps.configure-ssh.outcome == 'success'
