@@ -10,16 +10,6 @@ on:
       - 'libs/**'
       - 'package.json'
       - 'package-lock.json'
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/frontend-builds.yml'
-      - 'apps/misneach-web/**'
-      - 'apps/cleachtadh-web/**'
-      - 'apps/admin-web/**'
-      - 'libs/**'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 env:

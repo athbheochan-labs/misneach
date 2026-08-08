@@ -11,29 +11,66 @@ This project deploys as a multi-service system with containerized backend worklo
 
 ## Build and Image Flow
 
-GitHub Actions routes deployment behavior from PR labels:
+Production application deployment has one automatic `main` path:
 
-1. PR merge to `main` triggers `Deploy Router`.
-2. Router inspects merged PR labels:
-   - `deploy:backend` or `deploy:both` dispatches backend image publishing.
-   - `deploy:frontend` or `deploy:both` emits frontend deploy event.
-   - `env:prod` sets production target, otherwise staging.
-3. `Backend Images (Docker Hub)` builds/pushes:
+1. Merge to `main` triggers `Full Application Deploy`.
+2. The workflow validates required secrets and builds `misneach-web`, `cleachtadh-web`, and `admin-web`.
+3. It calls `Backend Images (Docker Hub)` to build and push:
    - Shared runtime image: `misneach-backend-runtime:<sha>`
    - Service tags: `misneach-<service>:<sha>` and `latest`
-   - NLP image independently from `services/nlp/`
-4. Frontend builds run from `frontend-builds.yml` for `misneach-web`, `cleachtadh-web`, and `admin-web`.
-5. `misneach-web` production deploy is triggered to Amplify by `web-amplify-deploy.yml`.
-6. `cleachtadh-web` and `admin-web` continue with container runtime deployment.
+   - `misneach-nlp:<sha>` and `latest`
+   - `misneach-cleachtadh-web:<sha>` and `latest`
+   - `misneach-admin-web:<sha>` and `latest`
+4. It SSHes to the production host, checks out the merge commit, pulls images, and runs `docker compose up -d`.
+5. It deploys `misneach-web` to Amplify through `web-amplify-deploy.yml`.
+6. It writes a summary with image tags, frontend URLs, and deployment results.
 
 Relevant workflows:
 
+- [full-app-deploy.yml](../.github/workflows/full-app-deploy.yml)
 - [deploy-router.yml](../.github/workflows/deploy-router.yml)
 - [backend-images-dockerhub.yml](../.github/workflows/backend-images-dockerhub.yml)
 - [frontend-builds.yml](../.github/workflows/frontend-builds.yml)
 - [web-amplify-deploy.yml](../.github/workflows/web-amplify-deploy.yml)
 - [Frontend Amplify Runbook](./frontend-amplify.md)
 - [Auth Runbook](./auth-runbook.md)
+
+`Deploy Router` is retained as a manual legacy helper. `Frontend Builds` remains PR/manual validation. Production deploys should normally use `Full Application Deploy`.
+
+### Full App Deployment Secrets
+
+Required repository or `production` environment secrets:
+
+```txt
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+DOCKERHUB_ORG               # optional; falls back to DOCKERHUB_USERNAME
+PROD_SSH_HOST
+PROD_SSH_USER
+PROD_SSH_KEY
+PROD_SSH_PORT              # optional; defaults to 22
+PROD_DEPLOY_PATH           # optional; defaults to /opt/misneach/app
+PROD_ENV_FILE              # optional; defaults to /opt/misneach/.env
+AMPLIFY_WEB_APP_ID
+AWS_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+```
+
+Optional repository variables used only in summaries:
+
+```txt
+CLEACHTADH_WEB_URL
+ADMIN_WEB_URL
+```
+
+Production host prerequisites:
+
+- The repo is cloned at `PROD_DEPLOY_PATH`.
+- Docker and Docker Compose v2 are installed.
+- `/opt/misneach/.env` sets `DOCKERHUB_NAMESPACE` when not supplied by the workflow and any compose-level variables.
+- Runtime env files exist under `/opt/misneach/env/*.env`.
+- The SSH user can run `git`, `docker login`, and `docker compose`.
 
 ## Environment Variable Strategy
 
@@ -212,19 +249,36 @@ In full app mode, the compose stack and MariaDB-backed services run normally and
 ## Deployment Runbook
 
 1. Open or update Issue(s) and assign release metadata.
-2. Open PR with:
-   - linked issue in body (`Closes #123`),
-   - exactly one deploy label,
-   - optional target env label (`env:staging` or `env:prod`).
-3. Merge to `main`.
-4. Confirm workflow outcomes:
-   - deploy routing decision
-   - image publish (backend/nlp as applicable)
-   - frontend build/deploy signal as applicable
-5. Verify target environment health:
+2. Open PR with linked issue in body (`Closes #123`).
+3. Confirm PR validation workflows pass.
+4. Merge to `main`.
+5. Confirm `Full Application Deploy` succeeds:
+   - frontend build validation
+   - Docker image publish
+   - production compose restart
+   - Amplify Misneach web deploy
+6. Verify production health:
    - service boot logs
    - external endpoints
    - Kafka/DB dependent services
+
+Manual full-app deploy:
+
+```bash
+gh workflow run full-app-deploy.yml --ref main
+```
+
+Manual image-only publish:
+
+```bash
+gh workflow run backend-images-dockerhub.yml --ref main -f service=all
+```
+
+Manual Misneach web deploy:
+
+```bash
+gh workflow run web-amplify-deploy.yml --ref main -f branch=main
+```
 
 ### Single API Entrypoint (Production Compose)
 
@@ -260,10 +314,31 @@ Defaults use the first lesson in `cafe` when available.
 ## Rollback Runbook
 
 1. Identify last known good image tags per impacted service.
-2. Set `IMAGE_TAG` in deployment environment to that known-good SHA.
-3. Redeploy compose stack.
+2. SSH to the production host and redeploy compose with that tag:
+
+```bash
+cd /opt/misneach/app
+git fetch origin main
+git checkout main
+DOCKERHUB_NAMESPACE=<dockerhub-namespace> IMAGE_TAG=<known-good-sha> \
+  docker compose --env-file /opt/misneach/.env -f docker-compose.prod.yml pull
+DOCKERHUB_NAMESPACE=<dockerhub-namespace> IMAGE_TAG=<known-good-sha> \
+  docker compose --env-file /opt/misneach/.env -f docker-compose.prod.yml up -d --remove-orphans
+```
+
+3. Validate compose health:
+
+```bash
+DOCKERHUB_NAMESPACE=<dockerhub-namespace> IMAGE_TAG=<known-good-sha> \
+  docker compose --env-file /opt/misneach/.env -f docker-compose.prod.yml ps
+```
+
 4. Validate dependent services and user-facing paths.
 5. If issue persists, disable affected feature path and open `type:infra` incident issue with recovery notes.
+
+Misneach web rollback is done from the Amplify console by redeploying the previous successful job/artifact for the `main` branch, or by reverting the bad PR and letting `Full Application Deploy` run again.
+
+Cleachtadh web and admin web roll back with the compose image tag because they are containerized services in `docker-compose.prod.yml`.
 
 Proxy topology rollback (if needed):
 

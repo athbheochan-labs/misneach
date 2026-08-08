@@ -26,7 +26,7 @@ This runbook deploys `apps/misneach-web` to AWS Amplify Hosting.
 
 ## Deploy Flows
 
-- Automatic: pushes to `main` that touch `apps/misneach-web/**` trigger [`web-amplify-deploy.yml`](../.github/workflows/web-amplify-deploy.yml).
+- Automatic: pushes to `main` that touch application deployment paths trigger [`full-app-deploy.yml`](../.github/workflows/full-app-deploy.yml), which calls [`web-amplify-deploy.yml`](../.github/workflows/web-amplify-deploy.yml).
 - Manual: run `Web Deploy (Amplify)` workflow and set branch input.
 - Deploy workflow smoke checks validate:
   - `GET /taster`

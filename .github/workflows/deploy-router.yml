@@ -1,8 +1,26 @@
 name: Deploy Router
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: Dispatch backend image publishing
+        required: true
+        type: boolean
+        default: true
+      deploy_frontend:
+        description: Emit frontend deployment request
+        required: true
+        type: boolean
+        default: false
+      target_env:
+        description: Target environment for the legacy frontend dispatch payload
+        required: true
+        type: choice
+        options:
+          - prod
+          - staging
+        default: prod
 
 permissions:
   contents: write
@@ -27,6 +45,16 @@ jobs:
             const { owner, repo } = context.repo;
             const commitSha = context.sha;
             const headCommitMessage = String(context.payload.head_commit?.message || "");
+
+            if (context.eventName === "workflow_dispatch") {
+              core.info("Using manual deploy-router inputs.");
+              core.setOutput("deploy_backend", String(${{ inputs.deploy_backend }}));
+              core.setOutput("deploy_frontend", String(${{ inputs.deploy_frontend }}));
+              core.setOutput("target_env", "${{ inputs.target_env }}");
+              core.setOutput("merge_sha", commitSha);
+              core.setOutput("pr_number", "");
+              return;
+            }
 
             const parsePrNumber = (value) => {
               const match =

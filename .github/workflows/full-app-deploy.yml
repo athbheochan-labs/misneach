@@ -1,0 +1,237 @@
+name: Full Application Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/full-app-deploy.yml'
+      - '.github/workflows/backend-images-dockerhub.yml'
+      - '.github/workflows/web-amplify-deploy.yml'
+      - 'amplify.yml'
+      - 'apps/admin-web/**'
+      - 'apps/cleachtadh-web/**'
+      - 'apps/misneach-web/**'
+      - 'deploy/**'
+      - 'docker/**'
+      - 'docker-compose.prod.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.base.json'
+      - 'libs/**'
+      - 'services/client/**'
+      - 'services/translation/translation-connector/**'
+      - 'services/lexicon/**'
+      - 'services/phrasebook/**'
+      - 'services/flashcards/**'
+      - 'services/focus/**'
+      - 'services/practice/**'
+      - 'services/courses/**'
+      - 'services/challenges/**'
+      - 'services/payment/**'
+      - 'services/discounts/**'
+      - 'services/business/**'
+      - 'services/waitlist/**'
+      - 'services/nlp/**'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 22
+  TARGET_ENV: production
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-app-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate production deploy inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Validate required secrets
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DOCKERHUB_USERNAME"
+          test -n "$DOCKERHUB_TOKEN"
+          test -n "$PROD_SSH_HOST"
+          test -n "$PROD_SSH_USER"
+          test -n "$PROD_SSH_KEY"
+          test -n "$AMPLIFY_WEB_APP_ID"
+          test -n "$AWS_REGION"
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend workspaces
+        run: |
+          set -euo pipefail
+          npm run build --workspace misneach-web
+          npm run build --workspace cleachtadh-web
+          npm run build --workspace admin-web
+
+  publish-images:
+    name: Build and publish Docker images
+    needs: validate
+    uses: ./.github/workflows/backend-images-dockerhub.yml
+    with:
+      service: all
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_ORG: ${{ secrets.DOCKERHUB_ORG }}
+
+  deploy-compose:
+    name: Deploy production compose services
+    needs: publish-images
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+      PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+      PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT || '22' }}
+      PROD_DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH || '/opt/misneach/app' }}
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE || '/opt/misneach/.env' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/production_deploy_key
+          chmod 600 ~/.ssh/production_deploy_key
+          ssh-keyscan -p "$PROD_SSH_PORT" "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Docker login on production host
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$DOCKERHUB_TOKEN" | ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "docker login --username '$DOCKERHUB_USERNAME' --password-stdin"
+
+      - name: Pull and restart production compose services
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "set -euo pipefail
+             cd '$PROD_DEPLOY_PATH'
+             git fetch origin main
+             git checkout main
+             git reset --hard '$GITHUB_SHA'
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml pull
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml up -d --remove-orphans
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps"
+
+      - name: Production health checks
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "set -euo pipefail
+             cd '$PROD_DEPLOY_PATH'
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml exec -T api-proxy wget -q -O /dev/null http://127.0.0.1/healthz
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml exec -T client node -e \"fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+
+      - name: Compose diagnostics on failure
+        if: failure()
+        run: |
+          set +e
+          ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "cd '$PROD_DEPLOY_PATH'
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml logs --tail=120 api-proxy client cleachtadh-web admin-web"
+
+      - name: Compose deployment summary
+        run: |
+          {
+            echo "## Production compose deployment"
+            echo ""
+            echo "- Target: \`$TARGET_ENV\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Image namespace: \`$IMAGE_NAMESPACE\`"
+            echo "- Image tag: \`$IMAGE_TAG\`"
+            echo "- Compose path: \`$PROD_DEPLOY_PATH\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-misneach-web:
+    name: Deploy Misneach web to Amplify
+    needs: validate
+    uses: ./.github/workflows/web-amplify-deploy.yml
+    with:
+      branch: main
+    secrets:
+      AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  deployment-summary:
+    name: Deployment summary
+    needs:
+      - publish-images
+      - deploy-compose
+      - deploy-misneach-web
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAMESPACE: ${{ secrets.DOCKERHUB_ORG != '' && secrets.DOCKERHUB_ORG || secrets.DOCKERHUB_USERNAME }}
+      MISNEACH_WEB_URL: ${{ needs.deploy-misneach-web.outputs.deploy_url }}
+      CLEACHTADH_WEB_URL: ${{ vars.CLEACHTADH_WEB_URL }}
+      ADMIN_WEB_URL: ${{ vars.ADMIN_WEB_URL }}
+    steps:
+      - name: Print deployment summary
+        run: |
+          {
+            echo "## Full application deployment"
+            echo ""
+            echo "- Target: \`production\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Docker image tag: \`$GITHUB_SHA\`"
+            echo "- Docker namespace: \`$IMAGE_NAMESPACE\`"
+            echo "- Backend images: \`misneach-{translator,lexicon,phrasebook,flashcards,focus,practice,courses,challenges,payment,discounts,business,waitlist,client,nlp}:$GITHUB_SHA\`"
+            echo "- Cleachtadh image: \`misneach-cleachtadh-web:$GITHUB_SHA\`"
+            echo "- Admin image: \`misneach-admin-web:$GITHUB_SHA\`"
+            echo "- Misneach web: ${MISNEACH_WEB_URL:-not reported}"
+            echo "- Cleachtadh web: ${CLEACHTADH_WEB_URL:-set CLEACHTADH_WEB_URL repo variable}"
+            echo "- Admin web: ${ADMIN_WEB_URL:-set ADMIN_WEB_URL repo variable}"
+            echo ""
+            echo "Results:"
+            echo "- Image publish: \`${{ needs.publish-images.result }}\`"
+            echo "- Compose deploy: \`${{ needs.deploy-compose.result }}\`"
+            echo "- Misneach web deploy: \`${{ needs.deploy-misneach-web.result }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ needs.publish-images.result }}" != "success" ] ||
+             [ "${{ needs.deploy-compose.result }}" != "success" ] ||
+             [ "${{ needs.deploy-misneach-web.result }}" != "success" ]; then
+            exit 1
+          fi

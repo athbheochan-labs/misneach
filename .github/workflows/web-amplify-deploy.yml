@@ -1,14 +1,26 @@
 name: Web Deploy (Amplify)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/misneach-web/**'
-      - 'amplify.yml'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/web-amplify-deploy.yml'
+  workflow_call:
+    inputs:
+      branch:
+        description: Amplify branch name
+        required: false
+        type: string
+        default: main
+    outputs:
+      deploy_url:
+        description: Deployed Amplify branch URL
+        value: ${{ jobs.deploy.outputs.deploy_url }}
+    secrets:
+      AMPLIFY_WEB_APP_ID:
+        required: true
+      AWS_REGION:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
   workflow_dispatch:
     inputs:
       branch:
@@ -19,6 +31,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    outputs:
+      deploy_url: ${{ steps.wait.outputs.deploy_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
