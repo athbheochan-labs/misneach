@@ -2,15 +2,6 @@ name: Public API PR
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/public-api-pr.yml'
-      - '.github/workflows/public-api-deploy.yml'
-      - 'infra/aws/**'
-      - 'packages/public-flows/**'
-      - 'services/public-api/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig.base.json'
   workflow_dispatch:
 
 env:

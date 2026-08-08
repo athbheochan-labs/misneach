@@ -2,14 +2,6 @@ name: Frontend Builds
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/frontend-builds.yml'
-      - 'apps/misneach-web/**'
-      - 'apps/cleachtadh-web/**'
-      - 'apps/admin-web/**'
-      - 'libs/**'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
 
 env:
