@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Validate required secrets
@@ -62,6 +62,64 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Configure Amplify app build settings
+        env:
+          APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          set -euo pipefail
+
+          BUILD_SPEC="$(cat amplify.yml)"
+          aws amplify get-app \
+            --app-id "$APP_ID" \
+            --region "$AWS_REGION" \
+            --query 'app.environmentVariables' \
+            --output json > /tmp/amplify-env.json
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const envPath = '/tmp/amplify-env.json';
+          const parsed = JSON.parse(fs.readFileSync(envPath, 'utf8') || '{}');
+          const env = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+          env.AMPLIFY_MONOREPO_APP_ROOT = 'apps/misneach-web';
+          fs.writeFileSync('/tmp/amplify-env.updated.json', JSON.stringify(env));
+          NODE
+
+          aws amplify update-app \
+            --app-id "$APP_ID" \
+            --region "$AWS_REGION" \
+            --build-spec "$BUILD_SPEC" \
+            --environment-variables file:///tmp/amplify-env.updated.json \
+            >/dev/null
+
+          rm -f /tmp/amplify-env.json /tmp/amplify-env.updated.json
+
+          APP_ROOT="$(aws amplify get-app \
+            --app-id "$APP_ID" \
+            --region "$AWS_REGION" \
+            --query 'app.environmentVariables.AMPLIFY_MONOREPO_APP_ROOT' \
+            --output text)"
+
+          if [ "$APP_ROOT" != "apps/misneach-web" ]; then
+            echo "Amplify app root is '$APP_ROOT', expected 'apps/misneach-web'"
+            exit 1
+          fi
+
+          echo "Amplify app root configured: $APP_ROOT"
+
+      - name: Report Amplify IAM role
+        env:
+          APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          set -euo pipefail
+          ROLE_ARN="$(aws amplify get-app \
+            --app-id "$APP_ID" \
+            --region "$AWS_REGION" \
+            --query 'app.iamServiceRoleArn' \
+            --output text)"
+          echo "Amplify service role: ${ROLE_ARN:-not configured}"
 
       - name: Start Amplify branch deployment
         id: deploy
@@ -121,6 +179,13 @@ jobs:
 
             if [ "$status" = "FAILED" ] || [ "$status" = "CANCELLED" ]; then
               echo "Amplify deployment failed with status: $status"
+              aws amplify get-job \
+                --app-id "$APP_ID" \
+                --branch-name "$BRANCH_NAME" \
+                --job-id "$JOB_ID" \
+                --region "$AWS_REGION" \
+                --query 'job.steps[*].[stepName,status,logUrl]' \
+                --output table || true
               exit 1
             fi
 

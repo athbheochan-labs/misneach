@@ -19,9 +19,10 @@ Production application deployment has one automatic `main` path:
    - Shared runtime image: `misneach-backend-runtime:<sha>`
    - `misneach-nlp:<sha>` and `latest`
 4. It SSHes to the production host, uploads the production compose/proxy files, pulls images, and runs `docker compose up -d`.
-5. It writes a summary with image tags, frontend URLs, and deployment results.
+5. It deploys `misneach-web` through AWS Amplify Hosting.
+6. It writes a summary with image tags, frontend URLs, and deployment results.
 
-`misneach-web` Amplify deployment is temporarily kept out of the automatic full-app path while the Amplify app IAM role/build configuration is repaired. Deploy it manually from Amplify or with `web-amplify-deploy.yml` after that is fixed.
+`misneach-web` deploys from the monorepo app root `apps/misneach-web`. The workflow applies the repository [`amplify.yml`](../amplify.yml) build spec and `AMPLIFY_MONOREPO_APP_ROOT=apps/misneach-web` to the Amplify app before starting the branch release.
 
 `cleachtadh-web` and `admin-web` are frontend applications and are intentionally not deployed on the EC2 compose host. Deploy them to their frontend hosting targets instead of adding them to `docker-compose.prod.yml`.
 
@@ -51,6 +52,10 @@ PROD_SSH_KEY
 PROD_SSH_PORT              # optional; defaults to 22
 PROD_DEPLOY_PATH           # optional; defaults to /opt/misneach
 PROD_ENV_FILE              # optional; defaults to /opt/misneach/.env
+AMPLIFY_WEB_APP_ID
+AWS_REGION
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
 ```
 
 Optional repository variables used only in summaries:
@@ -59,6 +64,28 @@ Optional repository variables used only in summaries:
 CLEACHTADH_WEB_URL
 ADMIN_WEB_URL
 ```
+
+Required Amplify app environment variables for `misneach-web` production:
+
+```txt
+AMPLIFY_MONOREPO_APP_ROOT=apps/misneach-web
+PUBLIC_API_BASE_URL=https://api.<your-domain>
+PUBLIC_SURVEY_QR_BASE_URL=https://misneach.site
+API_INTERNAL_URL=https://api.<your-domain>
+API_INTERNAL_URLS=                 # optional comma-separated fallbacks
+PUBLIC_API_URL=https://<public-api-id>.execute-api.<region>.amazonaws.com
+WAITLIST_API_URL=                  # optional; falls back to PUBLIC_API_URL
+WAITLIST_API_URLS=                 # optional comma-separated fallbacks
+SURVEYS_API_URL=                   # optional; falls back to PUBLIC_API_URL
+SURVEYS_API_URLS=                  # optional comma-separated fallbacks
+BUSINESS_INTERNAL_URL=https://api.<your-domain>
+BUSINESS_INTERNAL_URLS=            # optional comma-separated fallbacks
+INTERNAL_AUTH_SECRET=<shared internal auth secret>
+APP_BASE_URL=https://misneach.site
+WEB_APP_URL=https://misneach.site
+```
+
+The AWS deploy user used by GitHub Actions must allow `amplify:GetApp`, `amplify:UpdateApp`, `amplify:StartJob`, `amplify:GetJob`, and `amplify:GetBranch` on the `misneach-web` Amplify app.
 
 Production host prerequisites:
 

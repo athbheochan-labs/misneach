@@ -6,6 +6,9 @@ on:
     paths:
       - '.github/workflows/full-app-deploy.yml'
       - '.github/workflows/backend-images-dockerhub.yml'
+      - '.github/workflows/web-amplify-deploy.yml'
+      - 'amplify.yml'
+      - 'apps/misneach-web/**'
       - 'deploy/**'
       - 'docker/**'
       - 'docker-compose.prod.yml'
@@ -61,6 +64,10 @@ jobs:
           PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
           PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           test -n "$DOCKERHUB_USERNAME"
@@ -68,6 +75,10 @@ jobs:
           test -n "$PROD_SSH_HOST"
           test -n "$PROD_SSH_USER"
           test -n "$PROD_SSH_KEY"
+          test -n "$AMPLIFY_WEB_APP_ID"
+          test -n "$AWS_REGION"
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
 
       - name: Install dependencies
         run: npm ci
@@ -251,11 +262,24 @@ jobs:
             echo "- Compose path: \`$PROD_DEPLOY_PATH\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  deploy-misneach-web:
+    name: Deploy misneach-web to Amplify
+    needs: deploy-compose
+    uses: ./.github/workflows/web-amplify-deploy.yml
+    with:
+      branch: main
+    secrets:
+      AMPLIFY_WEB_APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
   deployment-summary:
     name: Deployment summary
     needs:
       - publish-images
       - deploy-compose
+      - deploy-misneach-web
     if: always()
     runs-on: ubuntu-latest
     env:
@@ -274,17 +298,18 @@ jobs:
             echo "- Docker namespace: \`$IMAGE_NAMESPACE\`"
             echo "- Backend runtime image: \`misneach-backend-runtime:$GITHUB_SHA\`"
             echo "- NLP image: \`misneach-nlp:$GITHUB_SHA\`"
-            echo "- Misneach web: Amplify deploy temporarily disabled; deploy manually from Amplify"
+            echo "- Misneach web: ${{ needs.deploy-misneach-web.outputs.deploy_url || 'not reported' }}"
             echo "- Cleachtadh web: ${CLEACHTADH_WEB_URL:-set CLEACHTADH_WEB_URL repo variable}"
             echo "- Admin web: ${ADMIN_WEB_URL:-set ADMIN_WEB_URL repo variable}"
             echo ""
             echo "Results:"
             echo "- Image publish: \`${{ needs.publish-images.result }}\`"
             echo "- Compose deploy: \`${{ needs.deploy-compose.result }}\`"
-            echo "- Misneach web deploy: \`skipped\`"
+            echo "- Misneach web deploy: \`${{ needs.deploy-misneach-web.result }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [ "${{ needs.publish-images.result }}" != "success" ] ||
-             [ "${{ needs.deploy-compose.result }}" != "success" ]; then
+             [ "${{ needs.deploy-compose.result }}" != "success" ] ||
+             [ "${{ needs.deploy-misneach-web.result }}" != "success" ]; then
             exit 1
           fi
