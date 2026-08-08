@@ -41,8 +41,8 @@ services:
   nlp:
     image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-nlp:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    ports:
-      - "8300:8300"
+    expose:
+      - "8300"
 
   lexicon:
     <<: *backend-common
