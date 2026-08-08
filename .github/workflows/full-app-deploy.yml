@@ -166,10 +166,10 @@ jobs:
              sudo install -m 0644 /tmp/misneach-deploy/docker-compose.prod.yml '$PROD_DEPLOY_PATH/docker-compose.prod.yml'
              sudo install -m 0644 /tmp/misneach-deploy/nginx.client-api.conf '$PROD_DEPLOY_PATH/deploy/proxy/nginx.client-api.conf'
              if [ ! -f \"\$ENV_DIR_VALUE/cleachtadh-web.env\" ]; then
-               sudo install -m 0640 /tmp/misneach-deploy/cleachtadh-web.env.example \"\$ENV_DIR_VALUE/cleachtadh-web.env\"
+               sudo install -m 0644 /tmp/misneach-deploy/cleachtadh-web.env.example \"\$ENV_DIR_VALUE/cleachtadh-web.env\"
              fi
              if [ ! -f \"\$ENV_DIR_VALUE/admin-web.env\" ]; then
-               sudo install -m 0640 /tmp/misneach-deploy/admin-web.env.example \"\$ENV_DIR_VALUE/admin-web.env\"
+               sudo install -m 0644 /tmp/misneach-deploy/admin-web.env.example \"\$ENV_DIR_VALUE/admin-web.env\"
              fi
              rm -rf /tmp/misneach-deploy"
 
