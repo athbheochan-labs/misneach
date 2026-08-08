@@ -11,6 +11,12 @@ applications:
         build:
           commands:
             - rm -f apps/misneach-web/.env.production
+            - printf 'PUBLIC_API_BASE_URL=%s\n' "${PUBLIC_API_BASE_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'PUBLIC_SURVEY_QR_BASE_URL=%s\n' "${PUBLIC_SURVEY_QR_BASE_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'API_INTERNAL_URL=%s\n' "${API_INTERNAL_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'API_INTERNAL_URLS=%s\n' "${API_INTERNAL_URLS:-}" >> apps/misneach-web/.env.production
+            - printf 'BUSINESS_INTERNAL_URL=%s\n' "${BUSINESS_INTERNAL_URL:-}" >> apps/misneach-web/.env.production
+            - printf 'BUSINESS_INTERNAL_URLS=%s\n' "${BUSINESS_INTERNAL_URLS:-}" >> apps/misneach-web/.env.production
             - printf 'NEST_INTERNAL_URL=%s\n' "${NEST_INTERNAL_URL:-}" >> apps/misneach-web/.env.production
             - printf 'NEST_INTERNAL_URLS=%s\n' "${NEST_INTERNAL_URLS:-}" >> apps/misneach-web/.env.production
             - printf 'CLIENT_API_URL=%s\n' "${CLIENT_API_URL:-}" >> apps/misneach-web/.env.production
@@ -27,7 +33,7 @@ applications:
             - npm run build --workspace misneach-web
             # Install runtime dependencies for the SSR compute bundle.
             - cd apps/misneach-web/build/compute/default
-            - npm i --omit=dev
+            - npm install --omit=dev
       artifacts:
         baseDirectory: apps/misneach-web/build
         files:

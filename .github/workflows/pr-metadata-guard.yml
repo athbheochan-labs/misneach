@@ -64,7 +64,7 @@ jobs:
                 return false;
               }
               if (
-                path.startsWith("apps/web/") ||
+                path.startsWith("apps/misneach-web/") ||
                 path.startsWith("apps/cleachtadh-web/") ||
                 path.startsWith("apps/admin-web/") ||
                 path.startsWith("apps/irish-week/")
