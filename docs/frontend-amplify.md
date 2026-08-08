@@ -9,7 +9,7 @@ This runbook deploys `apps/misneach-web` to AWS Amplify Hosting.
 
 ## Prerequisites
 
-1. Create an Amplify app and connect this GitHub repository.
+1. Create an Amplify app and connect this GitHub repository. SSR deploys require a connected repository app; disconnected/manual-only Amplify apps cannot deploy the SvelteKit SSR artifact correctly.
 2. Configure the app to use repository root as base and [`amplify.yml`](../amplify.yml).
 3. In GitHub repository secrets, add:
    - `AMPLIFY_WEB_APP_ID`
