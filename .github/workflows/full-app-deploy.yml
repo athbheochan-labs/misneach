@@ -10,6 +10,7 @@ on:
       - 'amplify.yml'
       - 'apps/misneach-web/**'
       - 'deploy/**'
+      - 'scripts/deploy/**'
       - 'docker/**'
       - 'docker-compose.prod.yml'
       - 'package.json'
@@ -83,6 +84,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate env manifest
+        run: npm run render:env -- --validate-only --summary
+
+      - name: Check runtime env contract
+        run: npm run check:env-contract
+
       - name: Build web workspace
         run: |
           set -euo pipefail
@@ -116,6 +123,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
       - name: Verify published image tags
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -144,6 +158,17 @@ jobs:
           chmod 600 ~/.ssh/production_deploy_key
           ssh-keyscan -p "$PROD_SSH_PORT" "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
 
+      - name: Render production env files from SSM
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/misneach-rendered-env
+          npm run render:env -- \
+            --manifest deploy/env/manifest.json \
+            --provider aws \
+            --output-dir /tmp/misneach-rendered-env \
+            --summary
+          tar -C /tmp/misneach-rendered-env -czf /tmp/misneach-rendered-env.tar.gz .
+
       - name: Docker login on production host
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -166,10 +191,20 @@ jobs:
           scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
             deploy/proxy/nginx.client-api.conf \
             "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/nginx.client-api.conf"
+          scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
+            /tmp/misneach-rendered-env.tar.gz \
+            "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/env.tar.gz"
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "set -euo pipefail
+             mkdir -p /tmp/misneach-deploy/env
+             tar -xzf /tmp/misneach-deploy/env.tar.gz -C /tmp/misneach-deploy/env
              sudo install -m 0644 /tmp/misneach-deploy/docker-compose.prod.yml '$PROD_DEPLOY_PATH/docker-compose.prod.yml'
              sudo install -m 0644 /tmp/misneach-deploy/nginx.client-api.conf '$PROD_DEPLOY_PATH/deploy/proxy/nginx.client-api.conf'
+             sudo mkdir -p '$PROD_DEPLOY_PATH/env'
+             for env_file in /tmp/misneach-deploy/env/*.env; do
+               [ -f \"\$env_file\" ] || continue
+               sudo install -m 0600 -o '$PROD_SSH_USER' -g '$PROD_SSH_USER' \"\$env_file\" '$PROD_DEPLOY_PATH/env/'\"\$(basename \"\$env_file\")\"
+             done
              rm -rf /tmp/misneach-deploy"
 
       - name: Free Docker disk before pulling images
@@ -260,6 +295,7 @@ jobs:
             echo "- Image namespace: \`$IMAGE_NAMESPACE\`"
             echo "- Image tag: \`$IMAGE_TAG\`"
             echo "- Compose path: \`$PROD_DEPLOY_PATH\`"
+            echo "- Runtime env source: \`SSM /misneach/prod/*\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-misneach-web:

@@ -18,9 +18,10 @@ Production application deployment has one automatic `main` path:
 3. It calls `Backend Images (Docker Hub)` to build and push:
    - Shared runtime image: `misneach-backend-runtime:<sha>`
    - `misneach-nlp:<sha>` and `latest`
-4. It SSHes to the production host, uploads the production compose/proxy files, pulls images, and runs `docker compose up -d`.
-5. It deploys `misneach-web` through AWS Amplify Hosting.
-6. It writes a summary with image tags, frontend URLs, and deployment results.
+4. It renders production compose env files from SSM Parameter Store.
+5. It SSHes to the production host, uploads the production compose/proxy/env files, pulls images, and runs `docker compose up -d`.
+6. It deploys `misneach-web` through AWS Amplify Hosting.
+7. It writes a summary with image tags, frontend URLs, and deployment results.
 
 `misneach-web` deploys from the monorepo app root `apps/misneach-web`. The workflow applies the repository [`amplify.yml`](../amplify.yml) build spec and `AMPLIFY_MONOREPO_APP_ROOT=apps/misneach-web` to the Amplify app before starting the branch release.
 
@@ -87,20 +88,138 @@ WEB_APP_URL=https://misneach.site
 
 The AWS deploy user used by GitHub Actions must allow `amplify:GetApp`, `amplify:UpdateApp`, `amplify:StartJob`, `amplify:GetJob`, and `amplify:GetBranch` on the `misneach-web` Amplify app.
 
+It must also be able to read production runtime config from SSM Parameter Store:
+
+```txt
+ssm:GetParameter
+ssm:GetParameters
+ssm:GetParametersByPath
+```
+
+Scope those SSM permissions to:
+
+```txt
+arn:aws:ssm:<region>:<account-id>:parameter/misneach/prod/*
+```
+
+If SecureString parameters use a customer-managed KMS key, allow `kms:Decrypt` for that key through SSM.
+
 Production host prerequisites:
 
 - `PROD_DEPLOY_PATH` exists as the production compose bundle directory.
 - Docker and Docker Compose v2 are installed.
 - `/opt/misneach/.env` sets `DOCKERHUB_NAMESPACE` when not supplied by the workflow and any compose-level variables.
-- Runtime env files exist under `/opt/misneach/env/*.env`.
+- Runtime env files are rendered under `/opt/misneach/env/*.env`.
 - The SSH user can run `docker login`, `docker compose`, and passwordless `sudo install` for refreshing compose/proxy files.
 
 ## Environment Variable Strategy
 
-- Use `deploy/env/examples/*.env.example` as templates.
-- Copy each file to `/opt/misneach/env/<service>.env` in staging/prod.
-- Never commit real secrets.
-- Keep compose service definitions and env examples synchronized.
+- Use `deploy/env/manifest.json` as the production compose env source of truth.
+- Use `deploy/env/examples/*.env.example` as the developer-facing contract for each service.
+- Store production values in SSM Parameter Store under `/misneach/prod/<service>/<ENV_VAR_NAME>`.
+- Use SSM `String` for non-secret config and `SecureString` for secrets.
+- Never commit real secrets or generated production env files.
+- Keep compose service definitions, env examples, and the manifest synchronized.
+
+List required SSM names without printing values:
+
+```bash
+npm run render:env -- --list-parameters
+```
+
+Set a non-secret value:
+
+```bash
+aws ssm put-parameter \
+  --name /misneach/prod/client/NODE_ENV \
+  --type String \
+  --value production \
+  --overwrite \
+  --region eu-west-1
+```
+
+Set a secret value:
+
+```bash
+aws ssm put-parameter \
+  --name /misneach/prod/client/INTERNAL_AUTH_SECRET \
+  --type SecureString \
+  --value '<secret-value>' \
+  --overwrite \
+  --region eu-west-1
+```
+
+Seed SSM from the current EC2 env files during the one-time migration:
+
+```bash
+mkdir -p /tmp/misneach-prod-env-seed
+scp -i "$PROD_SSH_KEY" -P "$PROD_SSH_PORT" \
+  "$PROD_SSH_USER@$PROD_SSH_HOST:/opt/misneach/env/*.env" \
+  /tmp/misneach-prod-env-seed/
+
+npm run seed:ssm-env -- \
+  --manifest deploy/env/manifest.json \
+  --env-dir /tmp/misneach-prod-env-seed \
+  --dry-run
+
+npm run seed:ssm-env -- \
+  --manifest deploy/env/manifest.json \
+  --env-dir /tmp/misneach-prod-env-seed
+```
+
+Validate the manifest only:
+
+```bash
+npm run render:env -- --validate-only --summary
+```
+
+Check code-level env usage against the production compose env contract:
+
+```bash
+npm run check:env-contract
+```
+
+This PR/deploy check scans EC2-backed service source code for runtime env access and fails if a key is missing from `deploy/env/manifest.json` or the matching `deploy/env/examples/*.env.example`.
+
+Render locally without AWS by using a local parameter map:
+
+```bash
+npm run render:env -- \
+  --provider file \
+  --parameters /path/to/local-parameters.json \
+  --output-dir /tmp/misneach-env \
+  --summary
+```
+
+The local file maps full SSM names to values:
+
+```json
+{
+  "/misneach/prod/client/NODE_ENV": "production",
+  "/misneach/prod/client/INTERNAL_AUTH_SECRET": "local-only-secret"
+}
+```
+
+Render against Floci SSM:
+
+```bash
+npm run floci:start
+AWS_ENDPOINT_URL=http://localhost:4566 npm run floci:render-env -- --output-dir /tmp/misneach-env --summary
+```
+
+Production deploy renders env files before restarting containers. If any required parameter is missing or empty, the workflow stops before `docker compose pull` or `docker compose up`.
+
+Rollback for a bad config value:
+
+1. Put the previous value back into SSM with `aws ssm put-parameter --overwrite`.
+2. Re-run `Full Application Deploy` from the last known-good commit or rerun the failed workflow after fixing the parameter.
+3. If containers were already restarted manually, render env files and restart compose manually:
+
+```bash
+npm run render:env -- --provider aws --output-dir /tmp/misneach-env --summary
+scp -r /tmp/misneach-env/* ec2-user@<host>:/tmp/misneach-env/
+ssh ec2-user@<host> 'sudo install -m 0600 -o ec2-user -g ec2-user /tmp/misneach-env/*.env /opt/misneach/env/ && cd /opt/misneach && docker compose --env-file /opt/misneach/.env -f docker-compose.prod.yml up -d'
+```
 
 ### Web Runtime API Variables
 
@@ -163,6 +282,16 @@ Deploy the stack:
 ```bash
 npm run deploy --workspace @decyphr/aws-infra
 ```
+
+To let CDK attach SSM read permissions to an existing deploy/runtime role, pass its role ARN:
+
+```bash
+npm run deploy --workspace @decyphr/aws-infra -- \
+  --require-approval never \
+  -c runtimeConfigReaderRoleArn=arn:aws:iam::<account-id>:role/<role-name>
+```
+
+The stack outputs `RuntimeConfigParameterRoot` and `RuntimeConfigParameterArnPattern` for the env renderer path.
 
 ### Public API CI/CD
 
