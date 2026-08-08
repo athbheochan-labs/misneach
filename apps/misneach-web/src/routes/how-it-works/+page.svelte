@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import { launchConfig } from '$lib/launch-config';
 
   onMount(() => {
     const reveals = document.querySelectorAll('.reveal');
@@ -49,7 +50,9 @@
     </details>
     <a href="/for-businesses" class="nav-link">For businesses</a>
     <a href="/pricing" class="nav-link">Pricing</a>
-    <a href="/auth/login" class="nav-cta">Sign in</a>
+    <a href={launchConfig.accountLinksEnabled ? '/auth/login' : launchConfig.waitlistHref} class="nav-cta">
+      {launchConfig.accountLinksEnabled ? 'Sign in' : launchConfig.waitlistLabel}
+    </a>
   </div>
 </nav>
 
@@ -233,7 +236,9 @@
     <a href="/how-it-works" class="footer-link">How it works</a>
     <a href="/for-businesses" class="footer-link">For businesses</a>
     <a href="/pricing" class="footer-link">Pricing</a>
-    <a href="/auth/login" class="footer-link">Sign in</a>
+    <a href={launchConfig.accountLinksEnabled ? '/auth/login' : launchConfig.waitlistHref} class="footer-link">
+      {launchConfig.accountLinksEnabled ? 'Sign in' : launchConfig.waitlistLabel}
+    </a>
   </div>
 </footer>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { MisLessonPlayer, type LessonScreen } from '@decyphr/misneach-ui';
+  import { launchConfig } from '$lib/launch-config';
 
   export let data: {
     courseTitle: string;
@@ -22,13 +23,13 @@
       courseTitle={data.courseTitle}
       initialIndex={0}
       homeHref="/"
-      showAuthLinks={true}
+      showAuthLinks={launchConfig.accountLinksEnabled}
       signInHref="/auth/login"
-      registerHref="/waitlist?interest=individual_course_access"
+      registerHref={launchConfig.waitlistHref}
       showExit={false}
-      primaryCtaHref="/waitlist?interest=individual_course_access"
+      primaryCtaHref={launchConfig.waitlistHref}
       secondaryCtaHref="/pricing"
-      primaryCtaLabel="Join waitlist to continue"
+      primaryCtaLabel={`${launchConfig.waitlistLabel} to continue`}
       secondaryCtaLabel="See pricing"
       reassureText="The full first unit is free. Join the waitlist for full access updates."
       continueLabel="Ar aghaidh — Continue"
