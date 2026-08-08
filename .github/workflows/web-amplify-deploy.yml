@@ -63,15 +63,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Build web artifact
-        run: |
-          set -euo pipefail
-          npm ci
-          npm run build --workspace misneach-web
-          cd apps/misneach-web/build/compute/default
-          npm i --omit=dev
-
-      - name: Upload artifact and start Amplify deployment
+      - name: Start Amplify branch deployment
         id: deploy
         env:
           APP_ID: ${{ secrets.AMPLIFY_WEB_APP_ID }}
@@ -86,23 +78,14 @@ jobs:
             BRANCH_NAME="$INPUT_BRANCH"
           fi
 
-          cd apps/misneach-web/build
-          zip -r /tmp/web-build.zip .
-
-          read -r JOB_ID ZIP_UPLOAD_URL <<< "$(aws amplify create-deployment \
+          JOB_ID="$(aws amplify start-job \
             --app-id "$APP_ID" \
             --branch-name "$BRANCH_NAME" \
+            --job-type RELEASE \
+            --job-reason "GitHub Actions deployment for ${GITHUB_SHA}" \
             --region "$AWS_REGION" \
-            --query '[jobId,zipUploadUrl]' \
+            --query 'jobSummary.jobId' \
             --output text)"
-
-          curl -sS -X PUT -T /tmp/web-build.zip "$ZIP_UPLOAD_URL"
-
-          aws amplify start-deployment \
-            --app-id "$APP_ID" \
-            --branch-name "$BRANCH_NAME" \
-            --job-id "$JOB_ID" \
-            --region "$AWS_REGION"
 
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
           echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"

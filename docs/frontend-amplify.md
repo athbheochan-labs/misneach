@@ -28,6 +28,7 @@ This runbook deploys `apps/misneach-web` to AWS Amplify Hosting.
 
 - Automatic: pushes to `main` that touch application deployment paths trigger [`full-app-deploy.yml`](../.github/workflows/full-app-deploy.yml), which calls [`web-amplify-deploy.yml`](../.github/workflows/web-amplify-deploy.yml).
 - Manual: run `Web Deploy (Amplify)` workflow and set branch input.
+- The deploy workflow starts a connected Amplify branch build with `amplify start-job --job-type RELEASE`; it does not upload a manual zip because Amplify manual deploys do not support SSR apps.
 - Deploy workflow smoke checks validate:
   - `GET /taster`
   - `GET /api/courses/taster`

@@ -21,7 +21,7 @@ Production application deployment has one automatic `main` path:
    - `misneach-nlp:<sha>` and `latest`
    - `misneach-cleachtadh-web:<sha>` and `latest`
    - `misneach-admin-web:<sha>` and `latest`
-4. It SSHes to the production host, checks out the merge commit, pulls images, and runs `docker compose up -d`.
+4. It SSHes to the production host, uploads the production compose/proxy files, pulls images, and runs `docker compose up -d`.
 5. It deploys `misneach-web` to Amplify through `web-amplify-deploy.yml`.
 6. It writes a summary with image tags, frontend URLs, and deployment results.
 
@@ -49,7 +49,7 @@ PROD_SSH_HOST
 PROD_SSH_USER
 PROD_SSH_KEY
 PROD_SSH_PORT              # optional; defaults to 22
-PROD_DEPLOY_PATH           # optional; defaults to /opt/misneach/app
+PROD_DEPLOY_PATH           # optional; defaults to /opt/misneach
 PROD_ENV_FILE              # optional; defaults to /opt/misneach/.env
 AMPLIFY_WEB_APP_ID
 AWS_REGION
@@ -66,11 +66,11 @@ ADMIN_WEB_URL
 
 Production host prerequisites:
 
-- The repo is cloned at `PROD_DEPLOY_PATH`.
+- `PROD_DEPLOY_PATH` exists as the production compose bundle directory.
 - Docker and Docker Compose v2 are installed.
 - `/opt/misneach/.env` sets `DOCKERHUB_NAMESPACE` when not supplied by the workflow and any compose-level variables.
 - Runtime env files exist under `/opt/misneach/env/*.env`.
-- The SSH user can run `git`, `docker login`, and `docker compose`.
+- The SSH user can write to `PROD_DEPLOY_PATH` and run `docker login` and `docker compose`.
 
 ## Environment Variable Strategy
 
@@ -317,9 +317,7 @@ Defaults use the first lesson in `cafe` when available.
 2. SSH to the production host and redeploy compose with that tag:
 
 ```bash
-cd /opt/misneach/app
-git fetch origin main
-git checkout main
+cd /opt/misneach
 DOCKERHUB_NAMESPACE=<dockerhub-namespace> IMAGE_TAG=<known-good-sha> \
   docker compose --env-file /opt/misneach/.env -f docker-compose.prod.yml pull
 DOCKERHUB_NAMESPACE=<dockerhub-namespace> IMAGE_TAG=<known-good-sha> \
