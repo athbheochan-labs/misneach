@@ -3,6 +3,7 @@ version: "3.9"
 name: misneach
 
 x-backend-common: &backend-common
+  image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-backend-runtime:${IMAGE_TAG:-latest}
   restart: unless-stopped
 
 services:
@@ -28,7 +29,6 @@ services:
 
   translator:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-translator:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/translation/translation-connector
     command: ["node", "dist/main"]
     depends_on:
@@ -46,7 +46,6 @@ services:
 
   lexicon:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-lexicon:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/lexicon
     command: ["./entrypoint.sh"]
     depends_on:
@@ -58,7 +57,6 @@ services:
 
   phrasebook:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-phrasebook:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/phrasebook
     command: ["./entrypoint.sh"]
     depends_on:
@@ -70,7 +68,6 @@ services:
 
   flashcards:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-flashcards:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/flashcards
     command: ["./entrypoint.sh"]
     depends_on:
@@ -82,7 +79,6 @@ services:
 
   focus:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-focus:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/focus
     command: ["node", "dist/main"]
     depends_on:
@@ -94,7 +90,6 @@ services:
 
   practice:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-practice:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/practice
     command: ["./entrypoint.sh"]
     depends_on:
@@ -107,7 +102,6 @@ services:
 
   courses:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-courses:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/courses
     command: ["./entrypoint.sh"]
     depends_on:
@@ -119,7 +113,6 @@ services:
 
   challenges:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-challenges:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/challenges
     command: ["node", "dist/main"]
     depends_on:
@@ -132,7 +125,6 @@ services:
 
   payment:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-payment:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/payment
     command: ["node", "dist/main"]
     env_file:
@@ -142,7 +134,6 @@ services:
 
   discounts:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-discounts:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/discounts
     command: ["node", "dist/main"]
     depends_on:
@@ -154,7 +145,6 @@ services:
 
   business:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-business:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/business
     command: ["node", "dist/main"]
     depends_on:
@@ -167,7 +157,6 @@ services:
 
   waitlist:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-waitlist:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/waitlist
     command: ["node", "dist/main"]
     depends_on:
@@ -179,7 +168,6 @@ services:
 
   client:
     <<: *backend-common
-    image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-client:${IMAGE_TAG:-latest}
     working_dir: /usr/src/app/services/client
     command: ["node", "dist/main"]
     depends_on:

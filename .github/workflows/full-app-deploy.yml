@@ -121,19 +121,7 @@ jobs:
           echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
           images=(
-            translator
-            lexicon
-            phrasebook
-            flashcards
-            focus
-            practice
-            courses
-            challenges
-            payment
-            discounts
-            business
-            waitlist
-            client
+            backend-runtime
             nlp
             cleachtadh-web
             admin-web
@@ -258,7 +246,8 @@ jobs:
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Docker image tag: \`$GITHUB_SHA\`"
             echo "- Docker namespace: \`$IMAGE_NAMESPACE\`"
-            echo "- Backend images: \`misneach-{translator,lexicon,phrasebook,flashcards,focus,practice,courses,challenges,payment,discounts,business,waitlist,client,nlp}:$GITHUB_SHA\`"
+            echo "- Backend runtime image: \`misneach-backend-runtime:$GITHUB_SHA\`"
+            echo "- NLP image: \`misneach-nlp:$GITHUB_SHA\`"
             echo "- Cleachtadh image: \`misneach-cleachtadh-web:$GITHUB_SHA\`"
             echo "- Admin image: \`misneach-admin-web:$GITHUB_SHA\`"
             echo "- Misneach web: Amplify deploy temporarily disabled; deploy manually from Amplify"
