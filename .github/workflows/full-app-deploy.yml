@@ -144,6 +144,7 @@ jobs:
           done
 
       - name: Configure SSH
+        id: configure-ssh
         env:
           PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
         run: |
@@ -216,7 +217,7 @@ jobs:
              DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml exec -T client node -e \"fetch('http://127.0.0.1:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
 
       - name: Compose diagnostics on failure
-        if: failure()
+        if: failure() && steps.configure-ssh.outcome == 'success'
         run: |
           set +e
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
