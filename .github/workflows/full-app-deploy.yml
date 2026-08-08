@@ -152,10 +152,25 @@ jobs:
           scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
             deploy/proxy/nginx.client-api.conf \
             "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/nginx.client-api.conf"
+          scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
+            deploy/env/examples/cleachtadh-web.env.example \
+            "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/cleachtadh-web.env.example"
+          scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
+            deploy/env/examples/admin-web.env.example \
+            "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/admin-web.env.example"
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "set -euo pipefail
+             ENV_DIR_VALUE=\$(grep -E '^ENV_DIR=' '$PROD_ENV_FILE' | tail -n1 | cut -d= -f2-)
+             ENV_DIR_VALUE=\${ENV_DIR_VALUE:-'$PROD_DEPLOY_PATH/env'}
+             sudo mkdir -p \"\$ENV_DIR_VALUE\"
              sudo install -m 0644 /tmp/misneach-deploy/docker-compose.prod.yml '$PROD_DEPLOY_PATH/docker-compose.prod.yml'
              sudo install -m 0644 /tmp/misneach-deploy/nginx.client-api.conf '$PROD_DEPLOY_PATH/deploy/proxy/nginx.client-api.conf'
+             if [ ! -f \"\$ENV_DIR_VALUE/cleachtadh-web.env\" ]; then
+               sudo install -m 0640 /tmp/misneach-deploy/cleachtadh-web.env.example \"\$ENV_DIR_VALUE/cleachtadh-web.env\"
+             fi
+             if [ ! -f \"\$ENV_DIR_VALUE/admin-web.env\" ]; then
+               sudo install -m 0640 /tmp/misneach-deploy/admin-web.env.example \"\$ENV_DIR_VALUE/admin-web.env\"
+             fi
              rm -rf /tmp/misneach-deploy"
 
       - name: Pull and restart production compose services
