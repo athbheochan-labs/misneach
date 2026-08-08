@@ -12,8 +12,8 @@ services:
     restart: unless-stopped
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/mariadb.env
-    ports:
-      - "3306:3306"
+    expose:
+      - "3306"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
@@ -35,8 +35,8 @@ services:
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/translator.env
-    ports:
-      - "3009:3009"
+    expose:
+      - "3009"
 
   nlp:
     image: ${DOCKERHUB_NAMESPACE:?Set DOCKERHUB_NAMESPACE}/misneach-nlp:${IMAGE_TAG:-latest}
@@ -52,8 +52,8 @@ services:
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/lexicon.env
-    ports:
-      - "3010:3010"
+    expose:
+      - "3010"
 
   phrasebook:
     <<: *backend-common
@@ -63,8 +63,8 @@ services:
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/phrasebook.env
-    ports:
-      - "3011:3011"
+    expose:
+      - "3011"
 
   flashcards:
     <<: *backend-common
@@ -74,8 +74,8 @@ services:
       - mariadb
     env_file:
       - ${ENV_DIR:-/opt/misneach/env}/flashcards.env
-    ports:
-      - "3012:3012"
+    expose:
+      - "3012"
 
   focus:
     <<: *backend-common
