@@ -174,33 +174,47 @@ jobs:
             local path="$2"
             local method="${3:-GET}"
             local data="${4:-}"
+            local attempts="${5:-1}"
+            local sleep_seconds="${6:-10}"
             local tmp
-            tmp="$(mktemp)"
-
             local code
-            if [ "$method" = "POST" ]; then
-              code="$(curl -sS -o "$tmp" -w "%{http_code}" \
-                -X POST \
-                -H "content-type: application/json" \
-                -d "$data" \
-                "$DEPLOY_URL$path")"
-            else
-              code="$(curl -sS -o "$tmp" -w "%{http_code}" "$DEPLOY_URL$path")"
-            fi
+            local attempt
 
-            if [ "$code" != "$expected" ]; then
+            for attempt in $(seq 1 "$attempts"); do
+              tmp="$(mktemp)"
+
+              if [ "$method" = "POST" ]; then
+                code="$(curl -sS -o "$tmp" -w "%{http_code}" \
+                  -X POST \
+                  -H "content-type: application/json" \
+                  -d "$data" \
+                  "$DEPLOY_URL$path")"
+              else
+                code="$(curl -sS -o "$tmp" -w "%{http_code}" "$DEPLOY_URL$path")"
+              fi
+
+              if [ "$code" = "$expected" ]; then
+                echo "Smoke check passed: $method $path -> $code"
+                rm -f "$tmp"
+                return 0
+              fi
+
+              if [ "$attempt" -lt "$attempts" ]; then
+                echo "Smoke check pending for $method $path: expected $expected, got $code; retrying in ${sleep_seconds}s"
+                rm -f "$tmp"
+                sleep "$sleep_seconds"
+                continue
+              fi
+
               echo "Smoke check failed for $method $path: expected $expected, got $code"
               echo "Response body:"
               cat "$tmp"
               rm -f "$tmp"
               exit 1
-            fi
-
-            echo "Smoke check passed: $method $path -> $code"
-            rm -f "$tmp"
+            done
           }
 
-          require_status 200 "/"
+          require_status 200 "/" "GET" "" 30 10
           require_status 200 "/taster"
           require_status 200 "/survey/setup"
           require_status 200 "/api/courses/taster"
