@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
@@ -27,6 +28,39 @@ export class PublicApiStack extends cdk.Stack {
     cdk.Tags.of(this).add('Application', 'decyphr');
     cdk.Tags.of(this).add('Service', 'public-api');
     cdk.Tags.of(this).add('Environment', props.environmentName);
+
+    const runtimeConfigParameterRoot = `/misneach/${props.environmentName}`;
+    const runtimeConfigParameterArnPrefix = `arn:${cdk.Aws.PARTITION}:ssm:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:parameter${runtimeConfigParameterRoot}`;
+    const runtimeConfigReaderRoleArn = this.node.tryGetContext('runtimeConfigReaderRoleArn') || process.env.RUNTIME_CONFIG_READER_ROLE_ARN;
+
+    if (runtimeConfigReaderRoleArn) {
+      const runtimeConfigReaderRole = iam.Role.fromRoleArn(
+        this,
+        'RuntimeConfigReaderRole',
+        runtimeConfigReaderRoleArn,
+        { mutable: true },
+      );
+
+      runtimeConfigReaderRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'ReadMisneachRuntimeConfigParameters',
+          actions: ['ssm:GetParameter', 'ssm:GetParameters', 'ssm:GetParametersByPath'],
+          resources: [`${runtimeConfigParameterArnPrefix}/*`],
+        }),
+      );
+      runtimeConfigReaderRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'DecryptMisneachRuntimeConfigParameters',
+          actions: ['kms:Decrypt'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'kms:ViaService': `ssm.${cdk.Aws.REGION}.amazonaws.com`,
+            },
+          },
+        }),
+      );
+    }
 
     const waitlistTable = new dynamodb.Table(this, 'WaitlistTable', {
       tableName: `decyphr-${props.environmentName}-waitlist`,
@@ -204,6 +238,16 @@ export class PublicApiStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'PublicApiUrl', {
       value: httpApi.apiEndpoint,
       description: 'Base URL for public waitlist and survey API calls.',
+    });
+
+    new cdk.CfnOutput(this, 'RuntimeConfigParameterRoot', {
+      value: runtimeConfigParameterRoot,
+      description: 'SSM Parameter Store root for production/runtime service env rendering.',
+    });
+
+    new cdk.CfnOutput(this, 'RuntimeConfigParameterArnPattern', {
+      value: `${runtimeConfigParameterArnPrefix}/*`,
+      description: 'IAM resource pattern needed to read runtime config parameters.',
     });
 
     new cdk.CfnOutput(this, 'WaitlistTableName', {

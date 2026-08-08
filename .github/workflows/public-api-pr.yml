@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check runtime env contract
+        run: npm run check:env-contract
+
       - name: Test shared public-flow logic
         run: npm run test --workspace @misneach/public-flows
 

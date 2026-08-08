@@ -52,6 +52,22 @@ Deploy to AWS:
 npm run deploy --workspace @decyphr/aws-infra
 ```
 
+Attach runtime config SSM read permissions to an existing deploy/runtime IAM role:
+
+```bash
+npm run deploy --workspace @decyphr/aws-infra -- \
+  --require-approval never \
+  -c runtimeConfigReaderRoleArn=arn:aws:iam::<account-id>:role/<role-name>
+```
+
+Runtime compose env values are read from SSM under:
+
+```txt
+/misneach/prod/<service>/<ENV_VAR_NAME>
+```
+
+The stack outputs `RuntimeConfigParameterRoot` and `RuntimeConfigParameterArnPattern`.
+
 Deploy and write CDK outputs to a file:
 
 ```bash

@@ -1,0 +1,947 @@
+{
+  "version": 1,
+  "environment": "prod",
+  "parameterRoot": "/misneach/prod",
+  "outputDir": "/opt/misneach/env",
+  "files": [
+    {
+      "file": "mariadb.env",
+      "service": "mariadb",
+      "parameters": [
+        {
+          "name": "MYSQL_ROOT_PASSWORD",
+          "type": "SecureString",
+          "required": false
+        },
+        {
+          "name": "MYSQL_DATABASE",
+          "type": "String",
+          "required": false
+        }
+      ]
+    },
+    {
+      "file": "translator.env",
+      "service": "translator",
+      "parameters": [
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "NLP_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DEEPL_API_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DEEPL_API_KEY",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "lexicon.env",
+      "service": "lexicon",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        }
+      ]
+    },
+    {
+      "file": "phrasebook.env",
+      "service": "phrasebook",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "TRANSLATOR_URL",
+          "type": "String",
+          "required": false
+        }
+      ]
+    },
+    {
+      "file": "flashcards.env",
+      "service": "flashcards",
+      "parameters": [
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        }
+      ]
+    },
+    {
+      "file": "focus.env",
+      "service": "focus",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "practice.env",
+      "service": "practice",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PHRASEBOOK_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "courses.env",
+      "service": "courses",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_TARGET_LANGUAGE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_CONTENT_PROVIDER",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_PREVIEW_ENABLED",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_PREVIEW_SECRET",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "COURSES_TASTER_COURSE_SLUG",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "COURSES_TASTER_LESSON_SLUG",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "INTERNAL_AUTH_SECRET",
+          "type": "SecureString",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "challenges.env",
+      "service": "challenges",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_USERNAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "MARIA_DB_DATABASE",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "INTERNAL_AUTH_SECRET",
+          "type": "SecureString",
+          "required": false
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "payment.env",
+      "service": "payment",
+      "parameters": [
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "STRIPE_SECRET_KEY",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "INTERNAL_AUTH_SECRET",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "USE_MOCK_PAYMENTS",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "discounts.env",
+      "service": "discounts",
+      "parameters": [
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_NAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_USER",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "INTERNAL_AUTH_SECRET",
+          "type": "SecureString",
+          "required": false
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        }
+      ]
+    },
+    {
+      "file": "business.env",
+      "service": "business",
+      "parameters": [
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "PAYMENT_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "BUSINESS_PROMO_CODES",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "waitlist.env",
+      "service": "waitlist",
+      "parameters": [
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_USER",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "DB_NAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_METHODS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_HEADERS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CORS_CREDENTIALS",
+          "type": "String",
+          "required": true
+        }
+      ]
+    },
+    {
+      "file": "client.env",
+      "service": "client",
+      "parameters": [
+        {
+          "name": "NODE_ENV",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "APP_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "AUTH_ALLOWED_APP_URLS",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "TRANSLATOR_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PAYMENT_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "BUSINESS_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "WAITLIST_SERVICE_URL",
+          "type": "String",
+          "required": false
+        },
+        {
+          "name": "DB_HOST",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PORT",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_USER",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "DB_PASSWORD",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "DB_NAME",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "RESEND_API_KEY",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "EMAIL_FROM",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "EMAIL_DELIVERY",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "AUTH_TRUSTED_HEADERS_ENABLED",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "AUTH_TRUSTED_PROXY_IPS",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "INTERNAL_AUTH_SECRET",
+          "type": "SecureString",
+          "required": true
+        },
+        {
+          "name": "FOCUS_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "PRACTICE_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "COURSES_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "CHALLENGES_SERVICE_URL",
+          "type": "String",
+          "required": true
+        },
+        {
+          "name": "ADMIN_UI_ENABLED",
+          "type": "String",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
