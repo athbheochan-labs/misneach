@@ -6,11 +6,6 @@ on:
     paths:
       - '.github/workflows/full-app-deploy.yml'
       - '.github/workflows/backend-images-dockerhub.yml'
-      - '.github/workflows/web-amplify-deploy.yml'
-      - 'amplify.yml'
-      - 'apps/admin-web/**'
-      - 'apps/cleachtadh-web/**'
-      - 'apps/misneach-web/**'
       - 'deploy/**'
       - 'docker/**'
       - 'docker-compose.prod.yml'
@@ -77,19 +72,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build frontend workspaces
+      - name: Build web workspace
         run: |
           set -euo pipefail
           npm run build --workspace misneach-web
-          npm run build --workspace cleachtadh-web
-          npm run build --workspace admin-web
 
   publish-images:
     name: Build and publish Docker images
     needs: validate
     uses: ./.github/workflows/backend-images-dockerhub.yml
     with:
-      service: all
+      service: backend
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -123,8 +116,6 @@ jobs:
           images=(
             backend-runtime
             nlp
-            cleachtadh-web
-            admin-web
           )
 
           for image in "${images[@]}"; do
@@ -164,25 +155,10 @@ jobs:
           scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
             deploy/proxy/nginx.client-api.conf \
             "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/nginx.client-api.conf"
-          scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
-            deploy/env/examples/cleachtadh-web.env.example \
-            "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/cleachtadh-web.env.example"
-          scp -i ~/.ssh/production_deploy_key -P "$PROD_SSH_PORT" \
-            deploy/env/examples/admin-web.env.example \
-            "$PROD_SSH_USER@$PROD_SSH_HOST:/tmp/misneach-deploy/admin-web.env.example"
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "set -euo pipefail
-             ENV_DIR_VALUE=\$(grep -E '^ENV_DIR=' '$PROD_ENV_FILE' | tail -n1 | cut -d= -f2-)
-             ENV_DIR_VALUE=\${ENV_DIR_VALUE:-'$PROD_DEPLOY_PATH/env'}
-             sudo mkdir -p \"\$ENV_DIR_VALUE\"
              sudo install -m 0644 /tmp/misneach-deploy/docker-compose.prod.yml '$PROD_DEPLOY_PATH/docker-compose.prod.yml'
              sudo install -m 0644 /tmp/misneach-deploy/nginx.client-api.conf '$PROD_DEPLOY_PATH/deploy/proxy/nginx.client-api.conf'
-             if [ ! -f \"\$ENV_DIR_VALUE/cleachtadh-web.env\" ]; then
-               sudo install -m 0644 /tmp/misneach-deploy/cleachtadh-web.env.example \"\$ENV_DIR_VALUE/cleachtadh-web.env\"
-             fi
-             if [ ! -f \"\$ENV_DIR_VALUE/admin-web.env\" ]; then
-               sudo install -m 0644 /tmp/misneach-deploy/admin-web.env.example \"\$ENV_DIR_VALUE/admin-web.env\"
-             fi
              rm -rf /tmp/misneach-deploy"
 
       - name: Pull and restart production compose services
@@ -211,7 +187,7 @@ jobs:
           ssh -i ~/.ssh/production_deploy_key -p "$PROD_SSH_PORT" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "cd '$PROD_DEPLOY_PATH'
              DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml ps
-             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml logs --tail=120 api-proxy client cleachtadh-web admin-web || true"
+             DOCKERHUB_NAMESPACE='$IMAGE_NAMESPACE' IMAGE_TAG='$IMAGE_TAG' docker compose --env-file '$PROD_ENV_FILE' -f docker-compose.prod.yml logs --tail=120 api-proxy client || true"
 
       - name: Compose deployment summary
         run: |
@@ -248,8 +224,6 @@ jobs:
             echo "- Docker namespace: \`$IMAGE_NAMESPACE\`"
             echo "- Backend runtime image: \`misneach-backend-runtime:$GITHUB_SHA\`"
             echo "- NLP image: \`misneach-nlp:$GITHUB_SHA\`"
-            echo "- Cleachtadh image: \`misneach-cleachtadh-web:$GITHUB_SHA\`"
-            echo "- Admin image: \`misneach-admin-web:$GITHUB_SHA\`"
             echo "- Misneach web: Amplify deploy temporarily disabled; deploy manually from Amplify"
             echo "- Cleachtadh web: ${CLEACHTADH_WEB_URL:-set CLEACHTADH_WEB_URL repo variable}"
             echo "- Admin web: ${ADMIN_WEB_URL:-set ADMIN_WEB_URL repo variable}"

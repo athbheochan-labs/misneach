@@ -23,6 +23,7 @@ on:
         type: choice
         options:
           - all
+          - backend
           - translator
           - lexicon
           - phrasebook
@@ -95,6 +96,7 @@ jobs:
     needs: detect
     if: |
       inputs.service == 'all' ||
+      inputs.service == 'backend' ||
       inputs.service == 'translator' ||
       inputs.service == 'lexicon' ||
       inputs.service == 'phrasebook' ||
@@ -139,14 +141,20 @@ jobs:
       - detect
       - publish-shared-backend
     if: |
-      (github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.service != 'nlp' &&
-        github.event.inputs.service != 'cleachtadh-web' &&
-        github.event.inputs.service != 'admin-web') ||
-      (github.event_name == 'workflow_call' &&
-        inputs.service != 'nlp' &&
-        inputs.service != 'cleachtadh-web' &&
-        inputs.service != 'admin-web')
+      inputs.service == 'all' ||
+      inputs.service == 'translator' ||
+      inputs.service == 'lexicon' ||
+      inputs.service == 'phrasebook' ||
+      inputs.service == 'flashcards' ||
+      inputs.service == 'focus' ||
+      inputs.service == 'practice' ||
+      inputs.service == 'courses' ||
+      inputs.service == 'challenges' ||
+      inputs.service == 'payment' ||
+      inputs.service == 'discounts' ||
+      inputs.service == 'business' ||
+      inputs.service == 'waitlist' ||
+      inputs.service == 'client'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -192,6 +200,7 @@ jobs:
     needs: detect
     if: |
       inputs.service == 'all' ||
+      inputs.service == 'backend' ||
       inputs.service == 'nlp' ||
       (github.event_name != 'workflow_dispatch' && needs.detect.outputs.nlp == 'true')
     runs-on: ubuntu-latest

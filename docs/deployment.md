@@ -14,17 +14,16 @@ This project deploys as a multi-service system with containerized backend worklo
 Production application deployment has one automatic `main` path:
 
 1. Merge to `main` triggers `Full Application Deploy`.
-2. The workflow validates required secrets and builds `misneach-web`, `cleachtadh-web`, and `admin-web`.
+2. The workflow validates required secrets and builds `misneach-web`.
 3. It calls `Backend Images (Docker Hub)` to build and push:
    - Shared runtime image: `misneach-backend-runtime:<sha>`
-   - Service tags: `misneach-<service>:<sha>` and `latest`
    - `misneach-nlp:<sha>` and `latest`
-   - `misneach-cleachtadh-web:<sha>` and `latest`
-   - `misneach-admin-web:<sha>` and `latest`
 4. It SSHes to the production host, uploads the production compose/proxy files, pulls images, and runs `docker compose up -d`.
 5. It writes a summary with image tags, frontend URLs, and deployment results.
 
 `misneach-web` Amplify deployment is temporarily kept out of the automatic full-app path while the Amplify app IAM role/build configuration is repaired. Deploy it manually from Amplify or with `web-amplify-deploy.yml` after that is fixed.
+
+`cleachtadh-web` and `admin-web` are frontend applications and are intentionally not deployed on the EC2 compose host. Deploy them to their frontend hosting targets instead of adding them to `docker-compose.prod.yml`.
 
 Relevant workflows:
 
@@ -67,7 +66,6 @@ Production host prerequisites:
 - Docker and Docker Compose v2 are installed.
 - `/opt/misneach/.env` sets `DOCKERHUB_NAMESPACE` when not supplied by the workflow and any compose-level variables.
 - Runtime env files exist under `/opt/misneach/env/*.env`.
-- The deploy workflow creates readable `cleachtadh-web.env` and `admin-web.env` files from checked-in examples if they are missing; replace placeholder values before exposing those apps publicly.
 - The SSH user can run `docker login`, `docker compose`, and passwordless `sudo install` for refreshing compose/proxy files.
 
 ## Environment Variable Strategy
