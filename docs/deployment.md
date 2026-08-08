@@ -70,6 +70,7 @@ Production host prerequisites:
 - Docker and Docker Compose v2 are installed.
 - `/opt/misneach/.env` sets `DOCKERHUB_NAMESPACE` when not supplied by the workflow and any compose-level variables.
 - Runtime env files exist under `/opt/misneach/env/*.env`.
+- The deploy workflow creates `cleachtadh-web.env` and `admin-web.env` from checked-in examples if they are missing; replace placeholder values before exposing those apps publicly.
 - The SSH user can run `docker login`, `docker compose`, and passwordless `sudo install` for refreshing compose/proxy files.
 
 ## Environment Variable Strategy
